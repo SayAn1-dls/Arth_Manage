@@ -10,12 +10,6 @@ CREATE TYPE "SyncStatus" AS ENUM ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED');
 -- CreateEnum
 CREATE TYPE "MirrorStatus" AS ENUM ('PENDING', 'MIRRORED', 'FAILED');
 
--- DropForeignKey
-ALTER TABLE "Certificate" DROP CONSTRAINT "certificate_member_same_event";
-
--- DropForeignKey
-ALTER TABLE "CertificateException" DROP CONSTRAINT "cert_exception_member_same_event";
-
 -- CreateTable
 CREATE TABLE "IntegrationConnection" (
     "id" TEXT NOT NULL,

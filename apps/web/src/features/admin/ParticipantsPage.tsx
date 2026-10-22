@@ -117,7 +117,7 @@ export function ParticipantsPage() {
       {res.isPending && <Spinner label="Loading participants" />}
       {res.isError && <Alert tone="error" title="We couldn't load participants" />}
       {res.data && res.data.rows.length === 0 && (
-        <EmptyState title="No matches">
+        <EmptyState title={list.queryString() ? 'No matches' : 'No participants yet'}>
           {list.queryString()
             ? 'Try clearing the filters.'
             : 'People appear here as they register.'}

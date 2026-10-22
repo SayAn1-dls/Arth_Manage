@@ -1,7 +1,8 @@
 import type { Playwright } from '@playwright/test';
 import { Api, future, newUser, pdf } from './api.js';
+import { latestEmailLink } from './helpers.js';
 
-export const BASE = 'http://localhost:5173';
+export const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:5173';
 
 export interface Scenario {
   admin: Api;
@@ -101,10 +102,8 @@ export async function buildJudgingScenario(
     const u = await newUser(playwright, BASE, `Judge ${i + 1}`);
     await admin.post(`${ev}/invitations`, { email: u.email, role: 'JUDGE' });
     const api = await Api.signedIn(playwright, BASE, u.email, u.password);
-    const mail = (
-      await (await api.ctx.get(`/api/v1/dev/outbox?to=${encodeURIComponent(u.email)}`)).json()
-    ).messages.find((m: { subject: string }) => m.subject.includes('invited'));
-    await api.post('/invitations/accept', { token: new URL(mail.link).searchParams.get('token') });
+    const link = await latestEmailLink(api.ctx, u.email, 'invited');
+    await api.post('/invitations/accept', { token: new URL(link).searchParams.get('token') });
     judges.push({ ...u, membershipId: '', api });
   }
   const members = (await admin.get(`${ev}/members`)).members as {

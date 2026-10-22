@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import type { APIRequestContext, Page } from '@playwright/test';
 
 export const DEV_PASSWORD = 'Password!2345';
@@ -18,12 +19,32 @@ export async function signInUi(page: Page, email: string, password = DEV_PASSWOR
   await page.waitForURL(/\/events/);
 }
 
-/** Reads the most recent link emailed to an address from the development outbox. */
-export async function latestEmailLink(request: APIRequestContext, to: string): Promise<string> {
-  for (let i = 0; i < 20; i++) {
-    const res = await request.get(`/api/v1/dev/outbox?to=${encodeURIComponent(to)}`);
-    const link = (await res.json()).messages?.[0]?.link as string | undefined;
-    if (link) return link;
+/**
+ * Reads the most recent link emailed to an address. Development reads the dev outbox; a staging run with real
+ * SMTP sets E2E_MAIL_FILE to the capture file written by scripts/staging/smtp-sink.mjs.
+ */
+export async function latestEmailLink(
+  request: APIRequestContext,
+  to: string,
+  subjectIncludes = '',
+): Promise<string> {
+  for (let i = 0; i < 40; i++) {
+    const file = process.env.E2E_MAIL_FILE;
+    if (file) {
+      const lines = existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
+      const mine = lines
+        .map((l) => JSON.parse(l) as { to: string; subject: string; text: string })
+        .filter(
+          (m) => m.to.toLowerCase() === to.toLowerCase() && m.subject.includes(subjectIncludes),
+        );
+      const link = /https?:\/\/\S+/.exec(mine.at(-1)?.text ?? '')?.[0];
+      if (link) return link;
+    } else {
+      const res = await request.get(`/api/v1/dev/outbox?to=${encodeURIComponent(to)}`);
+      const messages = ((await res.json()).messages ?? []) as { link?: string; subject: string }[];
+      const link = messages.find((m) => m.subject.includes(subjectIncludes))?.link;
+      if (link) return link;
+    }
     await new Promise((r) => setTimeout(r, 250));
   }
   throw new Error(`No email for ${to}`);

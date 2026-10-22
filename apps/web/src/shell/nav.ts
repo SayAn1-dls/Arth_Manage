@@ -63,7 +63,6 @@ export function navFor(role: Role): NavEntry[] {
         entry('', 'Overview', undefined, true),
         entry('judge', 'My teams'),
         entry('feedback', 'Feedback'),
-        entry('certificates', 'Certificates'),
         entry('guidebook', 'Guidebook'),
         entry('announcements', 'Announcements'),
       ];
@@ -73,7 +72,6 @@ export function navFor(role: Role): NavEntry[] {
         entry('tasks', 'My tasks'),
         entry('checkin', 'Check-in'),
         entry('issues', 'Report an issue'),
-        entry('certificates', 'Certificates'),
         entry('guidebook', 'Guidebook'),
         entry('announcements', 'Announcements'),
       ];

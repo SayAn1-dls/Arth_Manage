@@ -9,7 +9,7 @@ export class Api {
   constructor(readonly ctx: APIRequestContext) {}
 
   static async signedIn(playwright: Playwright, baseURL: string, email: string, password: string) {
-    const ctx = await playwright.request.newContext({ baseURL });
+    const ctx = await playwright.request.newContext({ baseURL, ignoreHTTPSErrors: true });
     const res = await ctx.post('/api/v1/auth/login', { headers: CSRF, data: { email, password } });
     if (!res.ok()) throw new Error(`login failed for ${email}: ${res.status()}`);
     return new Api(ctx);
@@ -47,7 +47,7 @@ export class Api {
 
 /** Registers and verifies a user through the public API; returns their credentials. */
 export async function newUser(playwright: Playwright, baseURL: string, name: string) {
-  const anon = await playwright.request.newContext({ baseURL });
+  const anon = await playwright.request.newContext({ baseURL, ignoreHTTPSErrors: true });
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@example.test`;
   const password = 'A-long-passphrase-1';
   await anon.post('/api/v1/auth/register', { headers: CSRF, data: { name, email, password } });

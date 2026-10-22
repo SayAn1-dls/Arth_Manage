@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Api, newUser } from './api.js';
 import { BASE, buildJudgingScenario } from './scenario.js';
-import { signInUi } from './helpers.js';
+import { latestEmailLink, signInUi } from './helpers.js';
 
 test('event day: tasks, check-in on a phone, issue reporting and the organiser dashboard (AT-20, AT-21)', async ({
   playwright,
@@ -14,13 +14,9 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   const staff = await newUser(playwright, BASE, 'Sahil Staff');
   await s.admin.post(`${s.ev}/invitations`, { email: staff.email, role: 'STAFF' });
   const staffApi = await Api.signedIn(playwright, BASE, staff.email, staff.password);
-  const mail = (
-    await (
-      await staffApi.ctx.get(`/api/v1/dev/outbox?to=${encodeURIComponent(staff.email)}`)
-    ).json()
-  ).messages.find((m: { subject: string }) => m.subject.includes('invited'));
+  const link = await latestEmailLink(staffApi.ctx, staff.email, 'invited');
   await staffApi.post('/invitations/accept', {
-    token: new URL(mail.link).searchParams.get('token'),
+    token: new URL(link).searchParams.get('token'),
   });
   const staffMembership = (
     (await s.admin.get(`${s.ev}/members`)).members as { membershipId: string; email: string }[]

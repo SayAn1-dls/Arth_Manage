@@ -78,3 +78,23 @@
     }
   }
 }
+
+/* Progress bars use the brand: an Ember fill on a Blush track, with a thin Graphite outline so the track is visible on White. */
+progress {
+  appearance: none;
+  height: 0.75rem;
+  border: 1px solid var(--ak-graphite);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--ak-blush);
+  accent-color: var(--ak-ember);
+}
+progress::-webkit-progress-bar {
+  background: var(--ak-blush);
+}
+progress::-webkit-progress-value {
+  background: var(--ak-ember);
+}
+progress::-moz-progress-bar {
+  background: var(--ak-ember);
+}

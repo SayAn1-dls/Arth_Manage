@@ -154,7 +154,7 @@ export function TeamsPage() {
       {res.isPending && <Spinner label="Loading teams" />}
       {res.isError && <Alert tone="error" title="We couldn't load teams" />}
       {res.data && res.data.rows.length === 0 && (
-        <EmptyState title="No matches">
+        <EmptyState title={list.queryString() ? 'No matches' : 'No teams yet'}>
           {list.queryString()
             ? 'Try clearing the filters.'
             : 'Teams appear here as participants create them.'}

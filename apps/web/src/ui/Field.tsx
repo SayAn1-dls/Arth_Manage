@@ -56,7 +56,7 @@ export function FieldShell({
 const control = (invalid: boolean) =>
   cn(
     'min-h-11 w-full rounded-pill border bg-white px-3 py-2 font-sans text-base text-ink',
-    'placeholder:text-graphite/60 disabled:bg-blush disabled:text-graphite/70',
+    'placeholder:text-graphite/60 disabled:bg-blush disabled:text-graphite disabled:opacity-100',
     invalid ? 'border-error-fg border-2' : 'border-line-strong',
   );
 
