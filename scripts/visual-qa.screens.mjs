@@ -42,4 +42,12 @@ export const screens = [
   { name: 'staff-tasks', path: '/events/{cup}/tasks', as: 'staff' },
   { name: 'staff-checkin', path: '/events/{cup}/checkin', as: 'staff' },
   { name: 'staff-issues', path: '/events/{cup}/issues', as: 'staff' },
+  // Phase 6: feedback and certificates
+  { name: 'setup-certificates-admin', path: '/events/{event}/setup', as: 'admin' },
+  { name: 'feedback-admin', path: '/events/{event}/feedback', as: 'admin' },
+  { name: 'feedback-participant', path: '/events/{event}/feedback', as: 'asha' },
+  { name: 'feedback-judge', path: '/events/{cup}/feedback', as: 'judge1' },
+  { name: 'certificates-admin', path: '/events/{cup}/certificates', as: 'admin' },
+  { name: 'certificates-participant', path: '/events/{cup}/certificates', as: 'cup1' },
+  { name: 'certificates-participant-empty', path: '/events/{event}/certificates', as: 'asha' },
 ];

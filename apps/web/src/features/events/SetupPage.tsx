@@ -42,6 +42,8 @@ type Draft = Pick<
   | 'showWinners'
   | 'showOwnRank'
   | 'showOwnScores'
+  | 'certParticipationRule'
+  | 'certWinnersAlsoParticipate'
 >;
 
 const fromEvent = (e: EventDto): Draft => ({
@@ -63,6 +65,8 @@ const fromEvent = (e: EventDto): Draft => ({
   showWinners: e.showWinners,
   showOwnRank: e.showOwnRank,
   showOwnScores: e.showOwnScores,
+  certParticipationRule: e.certParticipationRule,
+  certWinnersAlsoParticipate: e.certWinnersAlsoParticipate,
 });
 
 const FIELD_IDS: Record<string, string> = {
@@ -323,6 +327,23 @@ function DetailsForm({ event }: { event: EventDto }) {
           label="Show each team its own score"
           checked={draft.showOwnScores}
           onChange={(e) => set('showOwnScores', e.target.checked)}
+        />
+
+        <h3 className="mt-4">Certificates</h3>
+        <Select
+          label="Who receives a participation certificate"
+          value={draft.certParticipationRule}
+          onChange={(e) =>
+            set('certParticipationRule', e.target.value as Draft['certParticipationRule'])
+          }
+        >
+          <option value="SUBMITTED">Teams that submitted in the first round</option>
+          <option value="CHECKED_IN">People who were checked in at the event</option>
+        </Select>
+        <Checkbox
+          label="Winners also receive a participation certificate"
+          checked={draft.certWinnersAlsoParticipate}
+          onChange={(e) => set('certWinnersAlsoParticipate', e.target.checked)}
         />
 
         <div className="flex items-center gap-3">

@@ -225,8 +225,9 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Audit viewer
 
 **Phase 6 — Feedback and certificates**
-- [ ] Feedback forms + review
-- [ ] Certificate templates, generation, release, download
+- [x] Feedback forms + review (one response per person, confidential option, judge comment release/hide)
+- [x] Certificate templates, generation, release, download, revoke, name corrections
+- Deferred (P1/P2): judge/staff appreciation certificates, public verification page, email reminders
 
 **Phase 7 — Integrations and hardening**
 - [ ] Sync queue; Sheets push; Drive mirror (credential-dependent)

@@ -44,6 +44,18 @@ import { ProfilePage } from './features/participant/ProfilePage.js';
 import { SubmissionPage } from './features/participant/SubmissionPage.js';
 import { SubmissionIndexPage } from './features/participant/SubmissionIndexPage.js';
 
+import { FeedbackAdminPage } from './features/engage/FeedbackAdminPage.js';
+import { FeedbackPage } from './features/engage/FeedbackPage.js';
+import { CertificatesAdminPage } from './features/engage/CertificatesAdminPage.js';
+import { MyCertificatesPage } from './features/engage/MyCertificatesPage.js';
+import { useOutletContext } from 'react-router';
+import type { MyEvent } from '@arthakram/shared';
+
+const CertificatesRoute = () =>
+  useOutletContext<MyEvent>().role === 'ADMIN' ? <CertificatesAdminPage /> : <MyCertificatesPage />;
+const FeedbackRoute = () =>
+  useOutletContext<MyEvent>().role === 'ADMIN' ? <FeedbackAdminPage /> : <FeedbackPage />;
+
 const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
   { path: '/e/:slug', element: <PublicEventPage /> },
@@ -82,6 +94,8 @@ const routes: RouteObject[] = [
               { path: 'checkin', element: <CheckInPage /> },
               { path: 'issues', element: <IssuesPage /> },
               { path: 'audit', element: <AuditPage /> },
+              { path: 'feedback', element: <FeedbackRoute /> },
+              { path: 'certificates', element: <CertificatesRoute /> },
               { path: 'rubric', element: <RubricPage /> },
               { path: 'judging', element: <JudgingPage /> },
               { path: 'judge', element: <JudgeIndexPage /> },

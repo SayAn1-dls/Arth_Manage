@@ -126,7 +126,11 @@ export async function buildJudgingScenario(
 }
 
 /** Assigns every judge to every team, opens judging and has each judge submit the given scores per team. */
-export async function scoreEverything(s: Scenario, scores: Record<string, number[][]>) {
+export async function scoreEverything(
+  s: Scenario,
+  scores: Record<string, number[][]>,
+  comments: Record<string, string[]> = {},
+) {
   const { admin, ev, roundId } = s;
   await admin.post(`${ev}/rounds/${roundId}/assignments`, {
     judgeMembershipIds: s.judges.map((j) => j.membershipId),
@@ -149,6 +153,7 @@ export async function scoreEverything(s: Scenario, scores: Record<string, number
       const saved = await judge.api.put(`${ev}/assignments/${a}/evaluation`, {
         scores: Object.fromEntries(rubric.criteria.map((c, k) => [c.id, triple[k]])),
         version: 0,
+        teamComment: comments[team.name]?.[i] ?? null,
       });
       await judge.api.post(`${ev}/assignments/${a}/evaluation/submit`, { version: saved.version });
     }

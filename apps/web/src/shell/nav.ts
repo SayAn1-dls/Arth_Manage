@@ -39,6 +39,8 @@ export function navFor(role: Role): NavEntry[] {
         entry('structure', 'Tracks and problems', 'Set up'),
         entry('guidebook', 'Guidebook', 'Set up'),
         entry('announcements', 'Announcements', 'Set up'),
+        entry('feedback', 'Feedback', 'After the event'),
+        entry('certificates', 'Certificates', 'After the event'),
         entry('audit', 'Audit history', 'Records'),
       ];
     case 'PARTICIPANT':
@@ -47,6 +49,8 @@ export function navFor(role: Role): NavEntry[] {
         entry('team', 'My team', 'My event'),
         entry('submission', 'Submission', 'My event'),
         entry('results', 'Results', 'My event'),
+        entry('feedback', 'Feedback', 'My event'),
+        entry('certificates', 'Certificates', 'My event'),
         entry('profile', 'My details', 'My event'),
         entry('rounds', 'Rounds and deadlines', 'Information'),
         entry('structure', 'Tracks and problems', 'Information'),
@@ -57,6 +61,8 @@ export function navFor(role: Role): NavEntry[] {
       return [
         entry('', 'Overview', undefined, true),
         entry('judge', 'My teams'),
+        entry('feedback', 'Feedback'),
+        entry('certificates', 'Certificates'),
         entry('guidebook', 'Guidebook'),
         entry('announcements', 'Announcements'),
       ];
@@ -66,6 +72,7 @@ export function navFor(role: Role): NavEntry[] {
         entry('tasks', 'My tasks'),
         entry('checkin', 'Check-in'),
         entry('issues', 'Report an issue'),
+        entry('certificates', 'Certificates'),
         entry('guidebook', 'Guidebook'),
         entry('announcements', 'Announcements'),
       ];

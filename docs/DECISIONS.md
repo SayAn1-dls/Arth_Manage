@@ -56,6 +56,8 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-42 | Approvable team | A team is ready for approval when it has all required counted evaluations, or no pending assignment and at least one counted evaluation (after exclusions with reasons), or is explicitly marked Not ranked. Teams that did not submit or are disqualified never block approval. *Adopted (FR-149 reading)* |
 | D-43 | Judge file report | Resolved: an assigned judge's "Report a missing file" creates a Technical issue linked to the team in the admin issue queue (supersedes D-37). *Adopted* |
 | D-44 | Staff phone numbers | Staff cards show name, institution, year, track and attendance only. The optional "staff can see phone numbers" and "visible to staff" custom-field settings (P1) are not built. *Adopted* |
+| D-45 | Certificate scope | Participation and winner certificates only; judge/staff appreciation certificates, public verification page and certificate email reminders are deferred (P1/P2). Participants' own detail edits lock once a certificate exists, so changes go through a recorded name correction that keeps the certificate ID and bumps the version. Release needs an explicit "reviewed" confirmation and is blocked while any certificate is flagged or needs regeneration. *Adopted* |
+| D-46 | Feedback | Each event has one participant and one judge form (defaults from the PRD). Responses are final. Confidential forms never expose respondent names, even in CSV. Judge comments reach a team only after the round's results are published and the organiser releases them, labelled Judge 1, Judge 2. *Adopted* |
 
 ## PRD open questions — defaults in force
 

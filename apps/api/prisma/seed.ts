@@ -4,7 +4,12 @@ import { hashPassword } from '../src/auth/crypto.js';
 import { createDb } from '../src/db/client.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { defaultSubmissionFields, RUBRIC_TEMPLATES, judgeScore } from '@arthakram/shared';
+import {
+  DEFAULT_FEEDBACK,
+  defaultSubmissionFields,
+  RUBRIC_TEMPLATES,
+  judgeScore,
+} from '@arthakram/shared';
 import { LocalDiskStorage } from '../src/storage/provider.js';
 
 if (process.env.NODE_ENV === 'production') {
@@ -454,6 +459,38 @@ async function seedCaseCup(users: Record<string, string>) {
   });
 }
 
+/** Both feedback forms open, and one participant response so the organiser's results screen has content. */
+async function seedFeedback(eventId: string, ravi: string) {
+  for (const audience of ['PARTICIPANT', 'JUDGE'] as const) {
+    await db.feedbackForm.upsert({
+      where: { eventId_audience: { eventId, audience } },
+      update: {},
+      create: {
+        eventId,
+        audience,
+        state: 'OPEN',
+        confidential: DEFAULT_FEEDBACK[audience].confidential,
+        questions: DEFAULT_FEEDBACK[audience].questions,
+      },
+    });
+  }
+  const form = await db.feedbackForm.findUniqueOrThrow({
+    where: { eventId_audience: { eventId, audience: 'PARTICIPANT' } },
+  });
+  const m = await db.eventMembership.findUniqueOrThrow({
+    where: { eventId_userId: { eventId, userId: ravi } },
+  });
+  await db.feedbackResponse.upsert({
+    where: { formId_respondentMembershipId: { formId: form.id, respondentMembershipId: m.id } },
+    update: {},
+    create: {
+      formId: form.id,
+      respondentMembershipId: m.id,
+      answers: { q1: 5, q2: 4, q3: 4, q5: 'Clear guidebook and quick answers', q7: 'Yes' },
+    },
+  });
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEV_PASSWORD);
   const users: Record<string, string> = {};
@@ -499,6 +536,7 @@ async function main() {
   }
   await seedStructure(event.id, users.admin!);
   await seedParticipants(event.id, users);
+  await seedFeedback(event.id, users.ravi!);
   await seedCaseCup(users);
   console.log(
     `Seeded ${SEED_ACCOUNTS.length} dev accounts (password "${DEV_PASSWORD}") and event ${event.slug}`,

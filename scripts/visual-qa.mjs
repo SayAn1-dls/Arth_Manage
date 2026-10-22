@@ -16,6 +16,7 @@ const accounts = {
   judge1: 'judge1@arthakram.test',
   staff: 'staff@arthakram.test',
   asha: 'asha@arthakram.test',
+  cup1: 'cup1@arthakram.test',
   ravi: 'ravi@arthakram.test',
 };
 
