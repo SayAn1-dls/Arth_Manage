@@ -124,6 +124,9 @@ model Event {
   showWinners          Boolean            @default(true)
   showOwnRank          Boolean            @default(false)
   showOwnScores        Boolean            @default(false)
+  // Up to five participant declarations to tick at registration (PRD FR-013)
+  declarations         String[]           @default([])
+  trackRequired        Boolean            @default(false)
   teamCodeSeq          Int                @default(0)
   ownerId              String
   version              Int                @default(1)
@@ -131,9 +134,15 @@ model Event {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  owner       User              @relation("EventOwner", fields: [ownerId], references: [id])
-  memberships EventMembership[]
-  audit       AuditLog[]
+  owner             User               @relation("EventOwner", fields: [ownerId], references: [id])
+  memberships       EventMembership[]
+  audit             AuditLog[]
+  tracks            Track[]
+  problems          ProblemStatement[]
+  rounds            Round[]
+  guidebook         Guidebook?
+  guidebookVersions GuidebookVersion[]
+  announcements     Announcement[]
 }
 
 enum EventRole {
@@ -182,4 +191,105 @@ model AuditLog {
   event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([eventId, at])
+}
+
+// ───────────── Competition structure (PRD A.2) ─────────────
+
+model Track {
+  id          String             @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  order       Int                @default(0)
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  problems    ProblemStatement[]
+
+  @@unique([eventId, name])
+}
+
+model ProblemStatement {
+  id          String  @id @default(cuid())
+  eventId     String
+  trackId     String?
+  title       String
+  description String
+  order       Int     @default(0)
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  track       Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, title])
+}
+
+enum LatePolicy {
+  REJECT
+  ACCEPT_AND_FLAG
+}
+
+enum RankingScope {
+  OVERALL
+  PER_TRACK
+}
+
+model Round {
+  id                  String       @id @default(cuid())
+  eventId             String
+  order               Int
+  name                String
+  opensAt             DateTime?
+  submissionDeadline  DateTime?
+  graceMinutes        Int          @default(0)
+  latePolicy          LatePolicy   @default(REJECT)
+  judgingDeadline     DateTime?
+  rankingScope        RankingScope @default(OVERALL)
+  requiredEvaluations Int          @default(2)
+  awardPositions      Int          @default(3)
+  version             Int          @default(1)
+  event               Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, order])
+}
+
+// ───────────── Guidebook and announcements (PRD A.4, FR-007) ─────────────
+
+model Guidebook {
+  eventId     String   @id
+  sections    Json // draft: [{ id, title, body, hidden }] in display order
+  version     Int      @default(1) // optimistic-lock counter for the draft
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model GuidebookVersion {
+  id            String   @id @default(cuid())
+  eventId       String
+  versionNo     Int
+  sections      Json // immutable snapshot of the visible sections at publish time
+  changeNote    String?
+  publishedById String
+  publishedAt   DateTime @default(now())
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, versionNo])
+}
+
+enum AnnouncementAudience {
+  EVERYONE
+  PARTICIPANTS
+  JUDGES
+  STAFF
+}
+
+model Announcement {
+  id        String               @id @default(cuid())
+  eventId   String
+  audience  AnnouncementAudience @default(EVERYONE)
+  title     String
+  body      String
+  authorId  String
+  createdAt DateTime             @default(now())
+  editedAt  DateTime?
+  event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
 }
