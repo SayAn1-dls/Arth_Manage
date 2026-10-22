@@ -26,4 +26,10 @@ export const screens = [
   { name: 'team-detail-admin', path: '/events/{event}/teams/{team}', as: 'admin' },
   { name: 'submissions-admin', path: '/events/{event}/submissions', as: 'admin' },
   { name: 'people-admin', path: '/events/{event}/people', as: 'admin' },
+  // Phase 4: rubric, judging, judge workspace (Case Cup demo event: submissions closed, judging open)
+  { name: 'rubric-admin', path: '/events/{cup}/rubric', as: 'admin' },
+  { name: 'judging-admin', path: '/events/{cup}/judging', as: 'admin' },
+  { name: 'judge-dashboard', path: '/events/{cup}', as: 'judge1' },
+  { name: 'judge-teams', path: '/events/{cup}/judge/{cupRound}', as: 'judge1' },
+  { name: 'judge-workspace', path: '/events/{cup}/judge/{cupRound}/{cupTeam}', as: 'judge1' },
 ];

@@ -2,7 +2,10 @@
 import { loadEnvFile } from 'node:process';
 import { hashPassword } from '../src/auth/crypto.js';
 import { createDb } from '../src/db/client.js';
-import { defaultSubmissionFields } from '@arthakram/shared';
+import { createHash, randomUUID } from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { defaultSubmissionFields, RUBRIC_TEMPLATES, judgeScore } from '@arthakram/shared';
+import { LocalDiskStorage } from '../src/storage/provider.js';
 
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Refusing to seed a production database');
@@ -183,6 +186,240 @@ async function seedParticipants(eventId: string, users: Record<string, string>) 
   }
 }
 
+/** A one-page real PDF so the judge workspace has something to open. */
+async function demoPdf(title: string): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  page.drawText(title, { x: 56, y: 760, size: 28, font });
+  page.drawText('Demo deck created by the development seed.', {
+    x: 56,
+    y: 720,
+    size: 12,
+    font: await doc.embedFont(StandardFonts.Helvetica),
+  });
+  return Buffer.from(await doc.save());
+}
+
+/**
+ * "Case Cup 2026": an event whose submission window has closed and whose judging is open, so the judge
+ * workspace, assignments and results can be seen without waiting for deadlines. Development data only.
+ */
+async function seedCaseCup(users: Record<string, string>) {
+  const slug = 'case-cup-2026';
+  if (await db.event.findUnique({ where: { slug } })) return;
+  const storage = new LocalDiskStorage(process.env.STORAGE_DIR ?? './.data/uploads');
+  const passwordHash = await hashPassword(DEV_PASSWORD);
+  const event = await db.event.create({
+    data: {
+      slug,
+      name: 'Case Cup 2026',
+      type: 'CASE_COMPETITION',
+      mode: 'IN_PERSON',
+      startsAt: new Date('2026-10-05T04:00:00Z'),
+      endsAt: new Date('2026-10-06T12:00:00Z'),
+      timeZone: 'Asia/Kolkata',
+      institution: 'Rishihood University',
+      contactEmail: 'arthakram@rishihood.edu.in',
+      venue: 'Rishihood University, Sonipat',
+      description:
+        'Demo case competition: submissions closed, judging open. Created by the development seed.',
+      status: 'PUBLISHED',
+      publishedAt: new Date('2026-09-01T00:00:00Z'),
+      registrationStatus: 'CLOSED',
+      teamMin: 2,
+      teamMax: 3,
+      ownerId: users.admin!,
+    },
+  });
+  const round = await db.round.create({
+    data: {
+      eventId: event.id,
+      order: 1,
+      name: 'Round 1',
+      opensAt: new Date('2026-09-20T00:00:00Z'),
+      submissionDeadline: new Date('2026-10-05T12:30:00Z'),
+      judgingDeadline: new Date('2026-12-30T12:30:00Z'),
+      requiredEvaluations: 2,
+      awardPositions: 3,
+      judgingStatus: 'OPEN',
+    },
+  });
+  await db.submissionFormField.createMany({
+    data: defaultSubmissionFields('CASE_COMPETITION').map((f, i) => ({
+      roundId: round.id,
+      order: i,
+      ...f,
+    })),
+  });
+  const field = await db.submissionFormField.findFirstOrThrow({ where: { roundId: round.id } });
+  const template = RUBRIC_TEMPLATES.find((t) => t.key === 'CASE_COMPETITION')!;
+  const rubric = await db.rubric.create({
+    data: {
+      roundId: round.id,
+      name: template.name,
+      sourceTemplate: template.key,
+      state: 'LOCKED',
+      criteria: { create: template.criteria.map((c, i) => ({ ...c, order: i })) },
+    },
+    include: { criteria: { orderBy: { order: 'asc' } } },
+  });
+  await db.guidebook.create({
+    data: {
+      eventId: event.id,
+      updatedById: users.admin!,
+      sections: [{ id: 's1', title: 'Overview', body: 'Welcome to Case Cup 2026.', hidden: false }],
+    },
+  });
+
+  const mem = async (userId: string, role: 'ADMIN' | 'JUDGE' | 'STAFF' | 'PARTICIPANT') =>
+    (await db.eventMembership.create({ data: { eventId: event.id, userId, role } })).id;
+  await mem(users.admin!, 'ADMIN');
+  const judges = [await mem(users.judge1!, 'JUDGE'), await mem(users.judge2!, 'JUDGE')];
+  await mem(users.staff!, 'STAFF');
+
+  const names = [
+    'Priya Nair',
+    'Kabir Shah',
+    'Meera Iyer',
+    'Dev Malhotra',
+    'Isha Verma',
+    'Arjun Das',
+  ];
+  const teams = [
+    { name: 'Alpha Consulting', members: [0, 1] },
+    { name: 'Beta Strategy', members: [2, 3] },
+    { name: 'Gamma Advisory', members: [4, 5] },
+  ];
+  const memberships: string[] = [];
+  for (const [i, n] of names.entries()) {
+    const email = `cup${i + 1}@arthakram.test`;
+    const u = await db.user.upsert({
+      where: { email },
+      update: {},
+      create: { email, name: n, passwordHash, emailVerifiedAt: new Date() },
+    });
+    const m = await mem(u.id, 'PARTICIPANT');
+    memberships.push(m);
+    await db.registration.create({
+      data: {
+        eventId: event.id,
+        membershipId: m,
+        fullName: n,
+        institution: 'Rishihood University',
+        certificateName: n,
+        declarationsAcceptedAt: new Date(),
+      },
+    });
+  }
+  const created: { id: string; name: string }[] = [];
+  for (const [i, t] of teams.entries()) {
+    await db.event.update({ where: { id: event.id }, data: { teamCodeSeq: { increment: 1 } } });
+    const team = await db.team.create({
+      data: {
+        eventId: event.id,
+        name: t.name,
+        teamCode: `T-${String(i + 1).padStart(4, '0')}`,
+        joinCode: `CUPTEAM${i + 2}`,
+      },
+    });
+    for (const [k, idx] of t.members.entries())
+      await db.teamMember.create({
+        data: {
+          teamId: team.id,
+          eventId: event.id,
+          membershipId: memberships[idx]!,
+          role: k === 0 ? 'LEADER' : 'MEMBER',
+        },
+      });
+    created.push(team);
+    if (i === 2) continue; // Gamma never submits: shows "Did not submit" for judges
+    const sub = await db.submission.create({
+      data: {
+        eventId: event.id,
+        roundId: round.id,
+        teamId: team.id,
+        lastVersionNo: 1,
+        draftTitle: `${t.name} recommendation`,
+        draftSummary: 'Our recommendation for the case.',
+      },
+    });
+    const bytes = await demoPdf(`${t.name} deck`);
+    const key = `events/${event.id}/submissions/${randomUUID()}.pdf`;
+    await storage.put(key, bytes);
+    const file = await db.submissionFile.create({
+      data: {
+        eventId: event.id,
+        submissionId: sub.id,
+        fieldId: field.id,
+        storageKey: key,
+        originalName: `${t.name.replace(/ /g, '-')}-deck.pdf`,
+        sizeBytes: bytes.length,
+        contentType: 'application/pdf',
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        uploadedByMembershipId: memberships[t.members[0]!]!,
+      },
+    });
+    await db.submissionVersion.create({
+      data: {
+        submissionId: sub.id,
+        eventId: event.id,
+        versionNo: 1,
+        title: `${t.name} recommendation`,
+        summary: 'A market-entry recommendation with a phased rollout.',
+        values: { [field.id]: file.id },
+        submittedByMembershipId: memberships[t.members[0]!]!,
+        submittedAt: new Date('2026-10-05T10:00:00Z'),
+      },
+    });
+  }
+  // Every team gets both judges; judge1 has already scored Alpha so progress is visible.
+  for (const team of created)
+    for (const judge of judges) {
+      await db.judgeAssignment.create({
+        data: { eventId: event.id, roundId: round.id, teamId: team.id, judgeMembershipId: judge },
+      });
+    }
+  const crit = rubric.criteria.map((c) => ({ id: c.id, weight: c.weight, min: c.min, max: c.max }));
+  const scores = Object.fromEntries(rubric.criteria.map((c, i) => [c.id, [8, 7, 9, 6, 8][i]!]));
+  const j = judgeScore(crit, scores);
+  const a = await db.judgeAssignment.findFirstOrThrow({
+    where: { roundId: round.id, teamId: created[0]!.id, judgeMembershipId: judges[0]! },
+  });
+  const ev = await db.evaluation.create({
+    data: {
+      assignmentId: a.id,
+      eventId: event.id,
+      status: 'SUBMITTED',
+      weightedScore: j.toFixed(4),
+      submittedAt: new Date(),
+      submissionCount: 1,
+      teamComment: 'Strong structure and a clear recommendation.',
+      privateNote: 'Check the financial assumptions.',
+      scores: {
+        create: Object.entries(scores).map(([criterionId, score]) => ({ criterionId, score })),
+      },
+    },
+  });
+  await db.evaluationVersion.create({
+    data: {
+      evaluationId: ev.id,
+      versionNo: 1,
+      scores,
+      weightedScore: j.toFixed(4),
+      criteria: rubric.criteria.map((c) => ({
+        id: c.id,
+        name: c.name,
+        weight: c.weight,
+        min: c.min,
+        max: c.max,
+      })),
+      teamComment: ev.teamComment,
+      privateNote: ev.privateNote,
+    },
+  });
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEV_PASSWORD);
   const users: Record<string, string> = {};
@@ -228,6 +465,7 @@ async function main() {
   }
   await seedStructure(event.id, users.admin!);
   await seedParticipants(event.id, users);
+  await seedCaseCup(users);
   console.log(
     `Seeded ${SEED_ACCOUNTS.length} dev accounts (password "${DEV_PASSWORD}") and event ${event.slug}`,
   );

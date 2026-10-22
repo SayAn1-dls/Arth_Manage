@@ -210,12 +210,12 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Admin submission monitoring
 
 **Phase 4 — Judging**
-- [ ] Rubrics (generic + custom) with weight validation
-- [ ] Scoring engine + fixtures
-- [ ] Judge assignments + progress
-- [ ] Evaluations (draft/submit/reopen)
-- [ ] Judge dashboard + workspace
-- [ ] Access-isolation tests
+- [x] Rubrics (generic + custom) with weight validation
+- [x] Scoring engine + fixtures
+- [x] Judge assignments + progress
+- [x] Evaluations (draft/submit/reopen)
+- [x] Judge dashboard + workspace
+- [x] Access-isolation tests
 
 **Phase 5 — Results and operations**
 - [ ] Rankings, completeness, ties, exclusions

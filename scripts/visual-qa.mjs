@@ -53,6 +53,8 @@ async function signedInContext(vp, who, cache) {
     if (!cache.event) {
       const events = (await (await context.request.get(`${base}/api/v1/me/events`)).json()).events;
       cache.event = events.find((e) => e.slug === 'hacksonipat-2026')?.eventId;
+      cache.cup = events.find((e) => e.slug === 'case-cup-2026')?.eventId;
+      cache.cup = events.find((e) => e.slug === 'case-cup-2026')?.eventId;
     }
     if (who === 'admin' && !cache.team) {
       const api = (p) =>
@@ -60,6 +62,14 @@ async function signedInContext(vp, who, cache) {
       cache.team = (await api('/teams')).rows?.[0]?.id;
       cache.round = (await api('/rounds')).rounds?.[0]?.id;
       cache.participant = (await api('/participants?q=asha')).rows?.[0]?.membershipId;
+    }
+    if (who === 'judge1' && !cache.cupRound) {
+      const get = (p) =>
+        context.request.get(`${base}/api/v1/events/${cache.cup}${p}`).then((r) => r.json());
+      cache.cupRound = (await get('/judge/rounds')).rounds?.[0]?.roundId;
+      cache.cupTeam = (await get(`/rounds/${cache.cupRound}/judge/teams`)).rows?.find(
+        (r) => r.name === 'Beta Strategy',
+      )?.teamId;
     }
   }
   return context;
@@ -74,6 +84,9 @@ for (const vp of viewports) {
     if (!contexts.has(key)) contexts.set(key, await signedInContext(vp, s.as, cache));
     const page = await contexts.get(key).newPage();
     const path = s.path
+      .replace('{cupRound}', cache.cupRound ?? '')
+      .replace('{cupTeam}', cache.cupTeam ?? '')
+      .replace('{cup}', cache.cup ?? '')
       .replace('{event}', cache.event ?? '')
       .replace('{team}', cache.team ?? '')
       .replace('{round}', cache.round ?? '')

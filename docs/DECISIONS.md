@@ -47,6 +47,11 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-33 | Withdraw (P1) | Participant self-withdrawal (FR-058) is not built; admins remove participants, and a removed participant cannot return. The schema keeps `Registration.status = WITHDRAWN` for it. *Adopted* |
 | D-34 | Judge file access | Judges can download only files of teams assigned to them; assignments arrive in Phase 4, so until then no judge can read any submission file. *Adopted* |
 | D-35 | Delete-in-use | Tracks and problem statements in use by a team block deletion with the team list; rounds with submissions cannot be deleted; maximum team size cannot drop below an existing team (all tested). *Adopted* |
+| D-36 | Extension vs judging | A team extension changes only whether the team can still submit. If judging has already opened, a late resubmission is simply the new judged version; evaluations already submitted are not auto-reopened (PRD 18.9 describes pausing and reopening). Admins can reopen individual evaluations or unlock the rubric when that is needed. *Adopted, simplification* |
+| D-37 | Missing-file report | The judge's "Report missing file" action (FR-094) needs the issue queue, so it is delivered with staff issue reports in Phase 5. The workspace links to download the file as a fallback. *Deferred to Phase 5* |
+| D-38 | Draft rubrics | Drafts may total any weight (they must total 100 to activate), but each criterion must individually be valid (weight 1-100, min 0 or 1, max above min) so the database constraints can mirror the PRD limits. *Adopted* |
+| D-39 | Judge visibility | Before judging opens a judge sees only their assigned team names; project content, files and the rubric appear when judging is Open or Closed. Files are served for the judged (last submitted) version only. *Adopted* |
+| D-40 | Not required | "Did not submit" assignments are derived (no submitted version once the submission window closed) rather than stored, so granting an extension restores them automatically. *Adopted* |
 
 ## PRD open questions — defaults in force
 
