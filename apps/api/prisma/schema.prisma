@@ -131,6 +131,8 @@ model Event {
   ownerId              String
   version              Int                @default(1)
   publishedAt          DateTime?
+  concludedAt          DateTime?
+  archivedAt           DateTime?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
