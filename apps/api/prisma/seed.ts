@@ -27,6 +27,102 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
 const db = createDb(databaseUrl);
 
+async function seedStructure(eventId: string, adminId: string) {
+  // Round 1 with a deadline (the demo event is already published, so it needs one).
+  await db.round.upsert({
+    where: { eventId_order: { eventId, order: 1 } },
+    update: {},
+    create: {
+      eventId,
+      order: 1,
+      name: 'Round 1',
+      opensAt: new Date('2027-02-14T05:00:00Z'),
+      submissionDeadline: new Date('2027-02-15T12:30:00Z'), // 18:00 IST
+      judgingDeadline: new Date('2027-02-15T16:30:00Z'),
+      requiredEvaluations: 2,
+    },
+  });
+  for (const [i, name] of ['Fintech', 'Climate'].entries()) {
+    await db.track.upsert({
+      where: { eventId_name: { eventId, name } },
+      update: {},
+      create: {
+        eventId,
+        name,
+        order: i,
+        description:
+          name === 'Fintech' ? 'Payments, credit and inclusion' : 'Energy, mobility and resilience',
+      },
+    });
+  }
+  const fintech = await db.track.findUniqueOrThrow({
+    where: { eventId_name: { eventId, name: 'Fintech' } },
+  });
+  await db.problemStatement.upsert({
+    where: { eventId_title: { eventId, title: 'Detect UPI fraud in real time' } },
+    update: {},
+    create: {
+      eventId,
+      trackId: fintech.id,
+      title: 'Detect UPI fraud in real time',
+      description:
+        'Design a system that flags **suspicious UPI transactions** without blocking honest users.',
+    },
+  });
+  const sections = [
+    'Overview',
+    'Eligibility',
+    'Schedule',
+    'Submission requirements',
+    'Judging criteria',
+    'Code of conduct',
+  ].map((title, i) => ({
+    id: `s${i + 1}`,
+    title,
+    hidden: false,
+    body:
+      title === 'Overview'
+        ? '## Welcome to HackSonipat\n\nTwo days to build something **useful**. Teams of 2 to 4.'
+        : `Details for ${title.toLowerCase()} will be shared by the organisers.`,
+  }));
+  await db.guidebook.upsert({
+    where: { eventId },
+    update: {},
+    create: { eventId, sections, updatedById: adminId },
+  });
+  await db.guidebookVersion.upsert({
+    where: { eventId_versionNo: { eventId, versionNo: 1 } },
+    update: {},
+    create: {
+      eventId,
+      versionNo: 1,
+      sections,
+      changeNote: 'Seeded demo guidebook',
+      publishedById: adminId,
+    },
+  });
+  if ((await db.announcement.count({ where: { eventId } })) === 0) {
+    await db.announcement.createMany({
+      data: [
+        {
+          eventId,
+          authorId: adminId,
+          audience: 'EVERYONE',
+          title: 'Welcome to HackSonipat 2026',
+          body: 'Registration is open. Read the guidebook and form your team.',
+        },
+        {
+          eventId,
+          authorId: adminId,
+          audience: 'JUDGES',
+          title: 'Judge briefing',
+          body: 'Judging opens after the submission deadline. Your assigned teams will appear in your workspace.',
+        },
+      ],
+    });
+  }
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEV_PASSWORD);
   const users: Record<string, string> = {};
@@ -70,6 +166,7 @@ async function main() {
       create: { eventId: event.id, userId: users[a.key]!, role: a.role },
     });
   }
+  await seedStructure(event.id, users.admin!);
   console.log(
     `Seeded ${SEED_ACCOUNTS.length} dev accounts (password "${DEV_PASSWORD}") and event ${event.slug}`,
   );

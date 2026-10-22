@@ -8,6 +8,11 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   STORAGE_DIR: z.string().default('./.data/uploads'),
   EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
+  // Local development and automated browser runs sign in far more often than real users; never set in production.
+  RATE_LIMIT_DISABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
 });
 

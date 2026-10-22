@@ -13,7 +13,7 @@ const app = createApp({
   logger,
   env,
   email: new ConsoleEmailProvider(db, logger),
-  limit: createRateLimiter(env.NODE_ENV !== 'test'),
+  limit: createRateLimiter(env.NODE_ENV !== 'test' && !env.RATE_LIMIT_DISABLED),
 });
 
 const server = app.listen(env.API_PORT, () => {
