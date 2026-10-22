@@ -17,7 +17,7 @@ describe('SmtpEmailProvider', () => {
     await ok.send({
       to: 'a@example.test',
       subject: 'Verify',
-      body: 'Open https://x/verify?token=1',
+      body: 'Confirm your email address.',
       link: 'https://x/verify?token=1',
     });
     expect(sent).toEqual([
@@ -25,7 +25,7 @@ describe('SmtpEmailProvider', () => {
         from: 'Arthakram <hello@example.org>',
         to: 'a@example.test',
         subject: 'Verify',
-        text: 'Open https://x/verify?token=1',
+        text: 'Confirm your email address.\n\nhttps://x/verify?token=1\n', // the link is part of the delivered message
       },
     ]);
     const down = new SmtpEmailProvider(

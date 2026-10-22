@@ -61,7 +61,8 @@ export class SmtpEmailProvider implements EmailProvider {
       from: this.from,
       to: message.to,
       subject: message.subject,
-      text: message.body,
+      // The call-to-action link travels separately from the body, so it must be added to the delivered text.
+      text: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
     });
     this.logger.info({ subject: message.subject }, 'email sent');
   }
