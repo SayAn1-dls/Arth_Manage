@@ -1,0 +1,10 @@
+// Domain models are added phase by phase (see docs/IMPLEMENTATION_PLAN.md).
+// Phase 0 only establishes the datasource, generator and baseline migration.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
