@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -31,6 +33,13 @@ export function createApp(deps: Deps) {
   api.use(eventsRouter(deps));
   if (deps.env.NODE_ENV !== 'production') api.use(devRouter(deps));
   app.use('/api/v1', api);
+
+  // One process can serve the built web app too (apps/web/dist), with client-side routes falling back to index.html.
+  const webDist = fileURLToPath(new URL('../../../web/dist', import.meta.url));
+  if (deps.env.NODE_ENV === 'production' && existsSync(webDist)) {
+    app.use(express.static(webDist, { index: false, maxAge: '1h' }));
+    app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile('index.html', { root: webDist }));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: { conditions: ['source'] },
   server: {
     port: 5173,
     // The browser talks to one origin; /api is forwarded to the Express API.

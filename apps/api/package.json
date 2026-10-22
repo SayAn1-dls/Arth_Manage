@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "dev": "tsx watch --conditions=source --env-file=../../.env src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "start": "node --env-file=../../.env dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -12,7 +12,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx --env-file=../../.env prisma/seed.ts",
+    "db:seed": "tsx --conditions=source --env-file=../../.env prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "postinstall": "prisma generate"
   },
