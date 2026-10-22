@@ -11,7 +11,7 @@ The platform database is the source of truth; Google Sheets/Drive are optional, 
 * Decisions and deviations: `docs/DECISIONS.md`
 * Visual identity rules: `docs/BRAND_IMPLEMENTATION.md`
 
-**Status:** Phases 0–1 complete (foundation, authentication, permissions). See the checklist for what exists.
+**Status:** Phases 0–2 complete (foundation, authentication, permissions, events, rounds, guidebook). See the checklist for what exists.
 
 ## Prerequisites
 

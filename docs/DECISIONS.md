@@ -36,6 +36,12 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-22 | Session lifetime | Decided at sign-in: 12 h when the user is an active Core Admin of any event, otherwise 7 days (OQ-14 defaults); not sliding. *Adopted* |
 | D-23 | Unverified accounts | Sign-in is refused (403 `email_not_verified`) until the email is verified, with a resend option. Registration answers identically for new and existing emails to avoid account enumeration. *Adopted* |
 | D-24 | Prisma generated client | Generated to `apps/api/src/generated` (git-ignored) with ESM `.js` import extensions; regenerated on install and build. *Adopted* |
+| D-25 | PDF fonts | Guidebook and certificate PDFs embed Bricolage Grotesque and Instrument Sans TTFs from the open-licence `@expo-google-fonts/*` npm packages (the `@fontsource` packages ship only WOFF). Print documents sit on White with Ember rules, per the kit. *Adopted* |
+| D-26 | Markdown italics | The guidebook Markdown subset accepts `*italic*`, but the web renders it semibold because the kit allows bold as the only inline emphasis. The PDF mirrors this. *Adopted* |
+| D-27 | Delete-in-use checks | Blocking deletion of tracks, problem statements and rounds that teams or submissions use lives in `modules/events/usage.ts`; the bodies are completed in Phase 3 when those tables exist. Until then nothing can be in use. *Adopted* |
+| D-28 | Problem statement attachments | The optional PDF attachment (PRD FR-011) depends on the storage provider and is built after Phase 3's storage work; timed release ("visible from") and per-problem caps are P1 and skipped. *Adopted* |
+| D-29 | Dev rate limits | Rate limiting is on by default; `RATE_LIMIT_DISABLED=true` (in the untracked `.env` for local runs) lets browser tests sign in repeatedly. Tests enable the limiter explicitly to assert it works. *Adopted* |
+| D-30 | Publish rules | Publishing requires at least one round with a submission deadline (FR-005). An unpublished guidebook only warns. Concluding without published results needs explicit confirmation until Phase 5 supplies published snapshots. *Adopted* |
 
 ## PRD open questions — defaults in force
 

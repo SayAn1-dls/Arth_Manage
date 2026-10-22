@@ -28,3 +28,14 @@ export async function latestEmailLink(request: APIRequestContext, to: string): P
   }
   throw new Error(`No email for ${to}`);
 }
+
+/** Creates a verified account through the public API (register, read the emailed link, verify). */
+export async function createVerifiedUser(request: APIRequestContext, name = 'E2E Organiser') {
+  const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@example.test`;
+  const password = 'A-long-passphrase-1';
+  const headers = { 'X-Requested-With': 'arthakram' };
+  await request.post('/api/v1/auth/register', { headers, data: { name, email, password } });
+  const token = new URL(await latestEmailLink(request, email)).searchParams.get('token');
+  await request.post('/api/v1/auth/verify-email', { headers, data: { token } });
+  return { email, password };
+}

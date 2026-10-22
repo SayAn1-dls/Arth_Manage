@@ -193,12 +193,12 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Seed accounts
 
 **Phase 2 — Events and guidebook**
-- [ ] Event create/edit/publish/registration status
-- [ ] Rounds, deadlines, submission form fields
-- [ ] Tracks and problem statements
-- [ ] Guidebook editor, versions, PDF
-- [ ] Announcements
-- [ ] Admin setup UI, public landing page
+- [x] Event create/edit/publish/registration status
+- [x] Rounds and deadlines (submission form fields land with submissions in Phase 3)
+- [x] Tracks and problem statements
+- [x] Guidebook editor, versions, PDF
+- [x] Announcements
+- [x] Admin setup UI, public landing page
 
 **Phase 3 — Teams and submissions**
 - [ ] Registration + participant records
