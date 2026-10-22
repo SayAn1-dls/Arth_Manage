@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { api } from '../../lib/api.js';
 import { formatDate, ROLE_LABEL } from '../../lib/format.js';
 import { Alert, Badge, Card, EmptyState, Skeleton } from '../../ui/index.js';
+import { Plus } from 'lucide-react';
 
 const statusTone = {
   DRAFT: 'info',
@@ -24,7 +25,15 @@ export function MyEventsPage() {
   return (
     <main className="mx-auto max-w-content px-4 py-8 sm:px-8">
       <p className="text-xs font-bold uppercase tracking-eyebrow text-ink">Your workspace</p>
-      <h1 className="mt-2 text-[2rem] sm:text-[2.5rem]">My events</h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[2rem] sm:text-[2.5rem]">My events</h1>
+        <Link
+          to="/events/new"
+          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-ember bg-ember px-5 py-2 font-bold text-ink no-underline hover:brightness-95"
+        >
+          <Plus aria-hidden className="size-4" /> Create event
+        </Link>
+      </div>
 
       <div className="mt-6">
         {events.isPending && (
