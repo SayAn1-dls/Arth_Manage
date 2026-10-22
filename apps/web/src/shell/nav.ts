@@ -22,13 +22,26 @@ export function navFor(role: Role): NavEntry[] {
       return [
         overview,
         { to: 'setup', label: 'Setup' },
+        { to: 'participants', label: 'Participants' },
+        { to: 'teams', label: 'Teams' },
+        { to: 'submissions', label: 'Submissions' },
+        { to: 'people', label: 'People' },
         schedule,
         tracks,
         guidebook,
         announcements,
       ];
     case 'PARTICIPANT':
-      return [overview, schedule, tracks, guidebook, announcements];
+      return [
+        overview,
+        { to: 'team', label: 'My team' },
+        { to: 'submission', label: 'Submission' },
+        { to: 'profile', label: 'My details' },
+        schedule,
+        tracks,
+        guidebook,
+        announcements,
+      ];
     case 'JUDGE':
     case 'STAFF':
       return [overview, guidebook, announcements];

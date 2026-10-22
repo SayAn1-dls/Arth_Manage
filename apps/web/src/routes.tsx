@@ -21,11 +21,28 @@ import { StructurePage } from './features/events/StructurePage.js';
 import { GuidebookPage } from './features/events/GuidebookPages.js';
 import { AnnouncementsPage } from './features/events/AnnouncementsPage.js';
 import { PublicEventPage } from './features/events/PublicEventPage.js';
+import { RegisterForEventPage } from './features/participant/RegisterPage.js';
+import { TeamPage } from './features/participant/TeamPage.js';
+import { ParticipantsPage } from './features/admin/ParticipantsPage.js';
+import { ParticipantDetailPage } from './features/admin/ParticipantDetailPage.js';
+import { TeamsPage } from './features/admin/TeamsPage.js';
+import { TeamDetailPage } from './features/admin/TeamDetailPage.js';
+import {
+  SubmissionsMonitorPage,
+  SubmissionDetailPage,
+} from './features/admin/SubmissionsMonitorPage.js';
+import { PeoplePage } from './features/admin/PeoplePage.js';
+import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage.js';
+import { ProfilePage } from './features/participant/ProfilePage.js';
+import { SubmissionPage } from './features/participant/SubmissionPage.js';
+import { SubmissionIndexPage } from './features/participant/SubmissionIndexPage.js';
 
 const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
   { path: '/e/:slug', element: <PublicEventPage /> },
+  { path: '/e/:slug/register', element: <RegisterForEventPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
+  { path: '/invitations/accept', element: <AcceptInvitationPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
@@ -53,6 +70,17 @@ const routes: RouteObject[] = [
               { path: 'structure', element: <StructurePage /> },
               { path: 'guidebook', element: <GuidebookPage /> },
               { path: 'announcements', element: <AnnouncementsPage /> },
+              { path: 'participants', element: <ParticipantsPage /> },
+              { path: 'participants/:membershipId', element: <ParticipantDetailPage /> },
+              { path: 'teams', element: <TeamsPage /> },
+              { path: 'teams/:teamId', element: <TeamDetailPage /> },
+              { path: 'submissions', element: <SubmissionsMonitorPage /> },
+              { path: 'submissions/:roundId/:teamId', element: <SubmissionDetailPage /> },
+              { path: 'people', element: <PeoplePage /> },
+              { path: 'team', element: <TeamPage /> },
+              { path: 'profile', element: <ProfilePage /> },
+              { path: 'submission', element: <SubmissionIndexPage /> },
+              { path: 'submission/:roundId', element: <SubmissionPage /> },
             ],
           },
         ],

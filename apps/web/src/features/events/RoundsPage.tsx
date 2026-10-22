@@ -18,6 +18,7 @@ import {
   Spinner,
 } from '../../ui/index.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
+import { SubmissionFormEditor } from '../admin/FormEditors.js';
 
 const blank = (): Omit<Round, 'id' | 'order' | 'version'> => ({
   name: '',
@@ -51,6 +52,7 @@ export function RoundsPage() {
     queryFn: () => eventApi.rounds(mine.eventId),
   });
   const [editing, setEditing] = useState<Round | 'new' | null>(null);
+  const [formFor, setFormFor] = useState<string | null>(null);
   if (rounds.isPending || event.isPending) return <Spinner label="Loading rounds" />;
   const tz = event.data?.timeZone ?? mine.timeZone;
 
@@ -81,9 +83,17 @@ export function RoundsPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3>{r.name}</h3>
                 {isAdmin && editing === null && (
-                  <Button variant="secondary" onClick={() => setEditing(r)}>
-                    Edit
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setFormFor(formFor === r.id ? null : r.id)}
+                    >
+                      {formFor === r.id ? 'Hide submission form' : 'Submission form'}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditing(r)}>
+                      Edit
+                    </Button>
+                  </div>
                 )}
               </div>
               <dl className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -117,6 +127,11 @@ export function RoundsPage() {
                 )}
               </dl>
             </Card>
+            {isAdmin && formFor === r.id && (
+              <div className="mt-3">
+                <SubmissionFormEditor eventId={mine.eventId} roundId={r.id} roundName={r.name} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

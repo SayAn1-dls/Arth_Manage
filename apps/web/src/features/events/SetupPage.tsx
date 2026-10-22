@@ -20,6 +20,7 @@ import {
   Textarea,
 } from '../../ui/index.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
+import { RegistrationFieldsCard } from '../admin/FormEditors.js';
 
 type Draft = Pick<
   EventDto,
@@ -88,6 +89,7 @@ export function SetupPage() {
       <h2>Setup</h2>
       <PublicationCard event={event.data} />
       <DetailsForm key={event.data.version} event={event.data} />
+      <RegistrationFieldsCard eventId={event.data.id} />
       <LifecycleCard event={event.data} />
     </div>
   );
