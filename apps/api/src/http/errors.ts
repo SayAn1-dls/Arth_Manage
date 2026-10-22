@@ -11,8 +11,21 @@ export class AppError extends Error {
     super(message);
   }
 
+  /** Out-of-scope records answer "not found", never "forbidden" (PRD 8.3). */
   static notFound(message = 'Not found') {
     return new AppError(404, 'not_found', message);
+  }
+  static unauthorized(message = 'Sign in to continue') {
+    return new AppError(401, 'unauthenticated', message);
+  }
+  static forbidden(message = "You don't have access to this") {
+    return new AppError(403, 'forbidden', message);
+  }
+  static conflict(code: string, message: string, details?: unknown) {
+    return new AppError(409, code, message, details);
+  }
+  static invalid(message: string, fields?: Record<string, string>) {
+    return new AppError(422, 'validation_error', message, fields ? { fields } : undefined);
   }
 }
 
@@ -23,6 +36,12 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     res
       .status(err.status)
       .json({ error: { code: err.code, message: err.message, details: err.details } });
+    return;
+  }
+  if (err && typeof err === 'object' && 'type' in err && err.type === 'entity.parse.failed') {
+    res
+      .status(400)
+      .json({ error: { code: 'bad_json', message: 'Request body is not valid JSON' } });
     return;
   }
   // Unknown errors: log in full, return a generic message (no stack traces to clients).

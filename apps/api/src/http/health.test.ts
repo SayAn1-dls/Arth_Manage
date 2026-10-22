@@ -1,15 +1,9 @@
 import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 import { healthResponseSchema } from '@arthakram/shared';
-import { loadEnv } from '../config/env.js';
-import { createLogger } from '../config/logger.js';
-import { createDb } from '../db/client.js';
-import { createApp } from './app.js';
+import { createTestKit } from '../test/helpers.js';
 
-const env = loadEnv();
-const db = createDb(env.DATABASE_URL);
-const app = createApp({ db, logger: createLogger(env) });
-
+const { app, db } = createTestKit();
 afterAll(() => db.$disconnect());
 
 describe('GET /api/v1/health', () => {

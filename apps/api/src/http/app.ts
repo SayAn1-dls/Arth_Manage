@@ -2,25 +2,31 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
-import type { Logger } from 'pino';
-import type { Db } from '../db/client.js';
+import type { Deps } from './deps.js';
 import { errorHandler, notFoundHandler } from './errors.js';
 import { healthRouter } from './health.js';
+import { authRouter } from '../auth/routes.js';
+import { csrfGuard, sessionLoader } from '../auth/middleware.js';
+import { meRouter } from '../modules/me.js';
+import { devRouter } from '../modules/dev.js';
 
-export interface AppDeps {
-  db: Db;
-  logger: Logger;
-}
-
-export function createApp({ db, logger }: AppDeps) {
+export function createApp(deps: Deps) {
   const app = express();
   app.disable('x-powered-by');
-  app.use(pinoHttp({ logger }));
+  app.set('trust proxy', 1);
+  app.use(pinoHttp({ logger: deps.logger }));
   app.use(helmet());
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
-  app.use('/api/v1', healthRouter(db));
+  const api = express.Router();
+  api.use(csrfGuard);
+  api.use(sessionLoader(deps));
+  api.use(healthRouter(deps.db));
+  api.use(authRouter(deps));
+  api.use(meRouter(deps));
+  if (deps.env.NODE_ENV !== 'production') api.use(devRouter(deps));
+  app.use('/api/v1', api);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
