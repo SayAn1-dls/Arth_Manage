@@ -10,7 +10,7 @@ export function Table({
 }: HTMLAttributes<HTMLTableElement> & { caption?: string }) {
   return (
     <div
-      className="overflow-x-auto rounded-card bg-white shadow-card"
+      className="relative overflow-x-auto rounded-card bg-white shadow-card"
       tabIndex={0}
       role="region"
       aria-label={caption}
