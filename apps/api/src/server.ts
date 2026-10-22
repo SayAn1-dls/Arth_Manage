@@ -1,7 +1,7 @@
 import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createDb } from './db/client.js';
-import { ConsoleEmailProvider } from './email/provider.js';
+import { ConsoleEmailProvider, SmtpEmailProvider } from './email/provider.js';
 import { LocalDiskStorage } from './storage/provider.js';
 import { createApp } from './http/app.js';
 import { createRateLimiter } from './http/rateLimit.js';
@@ -17,7 +17,10 @@ const deps: Deps = {
   db,
   logger,
   env,
-  email: new ConsoleEmailProvider(db, logger),
+  email:
+    env.EMAIL_PROVIDER === 'smtp'
+      ? SmtpEmailProvider.fromUrl(env.SMTP_URL!, env.EMAIL_FROM, logger)
+      : new ConsoleEmailProvider(db, logger),
   storage: new LocalDiskStorage(env.STORAGE_DIR),
   limit: createRateLimiter(env.NODE_ENV !== 'test' && !env.RATE_LIMIT_DISABLED),
   google: createGoogleProvider({

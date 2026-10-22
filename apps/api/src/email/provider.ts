@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import type { Logger } from 'pino';
 import type { Db } from '../db/client.js';
 
@@ -33,5 +34,35 @@ export class ConsoleEmailProvider implements EmailProvider {
       },
     });
     this.logger.info({ to: message.to, subject: message.subject }, 'email recorded in dev outbox');
+  }
+}
+
+export interface MailTransport {
+  sendMail(m: { from: string; to: string; subject: string; text: string }): Promise<unknown>;
+}
+
+/**
+ * Production provider: sends through any SMTP service (SMTP_URL, for example smtps://user:pass@host:465).
+ * Failures are thrown so callers see them; the message body is plain text and carries the link.
+ */
+export class SmtpEmailProvider implements EmailProvider {
+  constructor(
+    private readonly from: string,
+    private readonly transport: MailTransport,
+    private readonly logger: Logger,
+  ) {}
+
+  static fromUrl(url: string, from: string, logger: Logger) {
+    return new SmtpEmailProvider(from, nodemailer.createTransport(url), logger);
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    await this.transport.sendMail({
+      from: this.from,
+      to: message.to,
+      subject: message.subject,
+      text: message.body,
+    });
+    this.logger.info({ subject: message.subject }, 'email sent');
   }
 }
