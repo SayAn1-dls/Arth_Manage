@@ -136,15 +136,18 @@ model Event {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  owner             User               @relation("EventOwner", fields: [ownerId], references: [id])
-  memberships       EventMembership[]
-  audit             AuditLog[]
-  tracks            Track[]
-  problems          ProblemStatement[]
-  rounds            Round[]
-  guidebook         Guidebook?
-  guidebookVersions GuidebookVersion[]
-  announcements     Announcement[]
+  owner                 User                   @relation("EventOwner", fields: [ownerId], references: [id])
+  memberships           EventMembership[]
+  audit                 AuditLog[]
+  tracks                Track[]
+  problems              ProblemStatement[]
+  rounds                Round[]
+  guidebook             Guidebook?
+  guidebookVersions     GuidebookVersion[]
+  announcements         Announcement[]
+  registrationFieldDefs RegistrationFieldDef[]
+  teams                 Team[]
+  invitations           Invitation[]
 }
 
 enum EventRole {
@@ -161,19 +164,22 @@ enum MembershipStatus {
 }
 
 model EventMembership {
-  id          String           @id @default(cuid())
-  eventId     String
-  userId      String
-  role        EventRole
-  status      MembershipStatus @default(ACTIVE)
-  invitedById String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  eventId      String
+  userId       String
+  role         EventRole
+  status       MembershipStatus @default(ACTIVE)
+  invitedById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration Registration?
+  teamMembers  TeamMember[]
 
   // One role per user per event (PRD 8.2)
   @@unique([eventId, userId])
+  @@unique([id, eventId]) // lets child tables carry eventId in a composite foreign key
   @@index([userId])
 }
 
@@ -205,6 +211,7 @@ model Track {
   order       Int                @default(0)
   event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   problems    ProblemStatement[]
+  teams       Team[]
 
   @@unique([eventId, name])
 }
@@ -218,6 +225,7 @@ model ProblemStatement {
   order       Int     @default(0)
   event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
   track       Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  teams       Team[]
 
   @@unique([eventId, title])
 }
@@ -233,20 +241,22 @@ enum RankingScope {
 }
 
 model Round {
-  id                  String       @id @default(cuid())
+  id                  String                @id @default(cuid())
   eventId             String
   order               Int
   name                String
   opensAt             DateTime?
   submissionDeadline  DateTime?
-  graceMinutes        Int          @default(0)
-  latePolicy          LatePolicy   @default(REJECT)
+  graceMinutes        Int                   @default(0)
+  latePolicy          LatePolicy            @default(REJECT)
   judgingDeadline     DateTime?
-  rankingScope        RankingScope @default(OVERALL)
-  requiredEvaluations Int          @default(2)
-  awardPositions      Int          @default(3)
-  version             Int          @default(1)
-  event               Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  rankingScope        RankingScope          @default(OVERALL)
+  requiredEvaluations Int                   @default(2)
+  awardPositions      Int                   @default(3)
+  version             Int                   @default(1)
+  event               Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  formFields          SubmissionFormField[]
+  submissions         Submission[]
 
   @@unique([eventId, order])
 }
@@ -294,4 +304,225 @@ model Announcement {
   event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+// ───────────── Registration and teams (PRD B.1, FR-015/050-058) ─────────────
+
+enum RegistrationFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  NUMBER
+  SELECT
+  URL
+  CHECKBOX
+}
+
+model RegistrationFieldDef {
+  id       String                @id @default(cuid())
+  eventId  String
+  label    String
+  type     RegistrationFieldType
+  helpText String?
+  options  String[]              @default([])
+  required Boolean               @default(false)
+  hidden   Boolean               @default(false)
+  order    Int                   @default(0)
+  event    Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, label])
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+model Registration {
+  id                     String            @id @default(cuid())
+  eventId                String
+  membershipId           String            @unique // one registration per participant per event
+  fullName               String
+  phone                  String?
+  institution            String
+  course                 String?
+  yearOfStudy            String?
+  certificateName        String
+  answers                Json              @default("{}")
+  declarationsAcceptedAt DateTime
+  status                 ParticipantStatus @default(ACTIVE)
+  version                Int               @default(1)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  membership             EventMembership   @relation(fields: [membershipId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@unique([membershipId, eventId])
+  @@index([eventId])
+}
+
+enum TeamStatus {
+  ACTIVE
+  DISSOLVED
+  DISQUALIFIED
+}
+
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+model Team {
+  id                 String            @id @default(cuid())
+  eventId            String
+  teamCode           String // "T-0042", never reused
+  name               String
+  trackId            String?
+  problemId          String?
+  joinCode           String? // null once the team is dissolved
+  status             TeamStatus        @default(ACTIVE)
+  disqualifiedReason String?
+  version            Int               @default(1)
+  createdAt          DateTime          @default(now())
+  event              Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  track              Track?            @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  problem            ProblemStatement? @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  members            TeamMember[]
+  submissions        Submission[]
+
+  @@unique([eventId, teamCode])
+  @@unique([eventId, joinCode])
+  @@unique([id, eventId])
+}
+
+model TeamMember {
+  id           String          @id @default(cuid())
+  teamId       String
+  eventId      String
+  membershipId String
+  role         TeamRole        @default(MEMBER)
+  joinedAt     DateTime        @default(now())
+  leftAt       DateTime?
+  team         Team            @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
+  membership   EventMembership @relation(fields: [membershipId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([eventId, membershipId])
+}
+
+model JoinAttempt {
+  id      String   @id @default(cuid())
+  userId  String
+  eventId String
+  success Boolean
+  at      DateTime @default(now())
+
+  @@index([userId, eventId, at])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  eventId     String
+  email       String
+  role        EventRole
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status])
+  @@index([email])
+}
+
+// ───────────── Submissions (PRD B.3, FR-059-073) ─────────────
+
+enum SubmissionFieldType {
+  FILE
+  REPO_URL
+  VIDEO_URL
+  LIVE_URL
+  OTHER_URL
+  SHORT_TEXT
+  LONG_TEXT
+}
+
+model SubmissionFormField {
+  id                String              @id @default(cuid())
+  roundId           String
+  type              SubmissionFieldType
+  label             String
+  helpText          String?
+  required          Boolean             @default(false)
+  order             Int                 @default(0)
+  allowedExtensions String[]            @default([]) // FILE only, lower-case without dot
+  maxMb             Int                 @default(25)
+  round             Round               @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, label])
+}
+
+model Submission {
+  id                String              @id @default(cuid())
+  eventId           String
+  roundId           String
+  teamId            String
+  draftTitle        String              @default("")
+  draftSummary      String              @default("")
+  draftValues       Json                @default("{}") // fieldId -> text / url / file id
+  draftVersion      Int                 @default(1) // optimistic lock for concurrent edits by team members
+  draftUpdatedAt    DateTime            @default(now())
+  lastVersionNo     Int                 @default(0)
+  extensionDeadline DateTime?
+  extensionReason   String?
+  minSizeOverride   Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  round             Round               @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  team              Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  versions          SubmissionVersion[]
+  files             SubmissionFile[]
+
+  @@unique([roundId, teamId])
+  @@index([eventId])
+}
+
+// Immutable once written (trigger in the migration): judges and results always use the last submitted version.
+model SubmissionVersion {
+  id                      String     @id @default(cuid())
+  submissionId            String
+  eventId                 String
+  versionNo               Int
+  title                   String
+  summary                 String
+  values                  Json
+  submittedAt             DateTime   @default(now())
+  submittedByMembershipId String
+  lateMinutes             Int        @default(0)
+  submission              Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, versionNo])
+}
+
+// Files are never overwritten: replacing a file creates a new row, so earlier versions keep theirs.
+model SubmissionFile {
+  id                     String     @id @default(cuid())
+  eventId                String
+  submissionId           String
+  fieldId                String
+  storageKey             String     @unique
+  originalName           String
+  sizeBytes              Int
+  contentType            String
+  sha256                 String
+  uploadedByMembershipId String
+  createdAt              DateTime   @default(now())
+  submission             Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
 }
