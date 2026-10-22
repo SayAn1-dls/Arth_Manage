@@ -201,13 +201,13 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Admin setup UI, public landing page
 
 **Phase 3 — Teams and submissions**
-- [ ] Registration + participant records
-- [ ] Teams: create/join/leave/dissolve/transfer
-- [ ] Admin lists, search, correction, CSV export
-- [ ] Participant dashboard
-- [ ] Storage provider + upload validation
-- [ ] Submission versions, deadlines, extensions, receipts
-- [ ] Admin submission monitoring
+- [x] Registration + participant records
+- [x] Teams: create/join/leave/dissolve/transfer
+- [x] Admin lists, search, correction, CSV export
+- [x] Participant dashboard
+- [x] Storage provider + upload validation
+- [x] Submission versions, deadlines, extensions, receipts
+- [x] Admin submission monitoring
 
 **Phase 4 — Judging**
 - [ ] Rubrics (generic + custom) with weight validation

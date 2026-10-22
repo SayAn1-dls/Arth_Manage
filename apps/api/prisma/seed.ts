@@ -2,6 +2,7 @@
 import { loadEnvFile } from 'node:process';
 import { hashPassword } from '../src/auth/crypto.js';
 import { createDb } from '../src/db/client.js';
+import { defaultSubmissionFields } from '@arthakram/shared';
 
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Refusing to seed a production database');
@@ -31,12 +32,13 @@ async function seedStructure(eventId: string, adminId: string) {
   // Round 1 with a deadline (the demo event is already published, so it needs one).
   await db.round.upsert({
     where: { eventId_order: { eventId, order: 1 } },
-    update: {},
+    // Submissions open now so the demo is usable today; the dates are development data only.
+    update: { opensAt: new Date('2026-10-01T00:00:00Z') },
     create: {
       eventId,
       order: 1,
       name: 'Round 1',
-      opensAt: new Date('2027-02-14T05:00:00Z'),
+      opensAt: new Date('2026-10-01T00:00:00Z'),
       submissionDeadline: new Date('2027-02-15T12:30:00Z'), // 18:00 IST
       judgingDeadline: new Date('2027-02-15T16:30:00Z'),
       requiredEvaluations: 2,
@@ -123,6 +125,64 @@ async function seedStructure(eventId: string, adminId: string) {
   }
 }
 
+async function seedParticipants(eventId: string, users: Record<string, string>) {
+  const round = await db.round.findUniqueOrThrow({
+    where: { eventId_order: { eventId, order: 1 } },
+  });
+  if ((await db.submissionFormField.count({ where: { roundId: round.id } })) === 0) {
+    await db.submissionFormField.createMany({
+      data: defaultSubmissionFields('HACKATHON').map((f, i) => ({
+        roundId: round.id,
+        order: i,
+        ...f,
+      })),
+    });
+  }
+  const people = [
+    { key: 'asha', fullName: 'Asha Kumari', institution: 'Rishihood University' },
+    { key: 'ravi', fullName: 'Ravi Rao', institution: 'Rishihood University' },
+  ];
+  const memberships: Record<string, string> = {};
+  for (const p of people) {
+    const m = await db.eventMembership.findUniqueOrThrow({
+      where: { eventId_userId: { eventId, userId: users[p.key]! } },
+    });
+    memberships[p.key] = m.id;
+    await db.registration.upsert({
+      where: { membershipId: m.id },
+      update: {},
+      create: {
+        eventId,
+        membershipId: m.id,
+        fullName: p.fullName,
+        institution: p.institution,
+        phone: '9876543210',
+        certificateName: p.fullName,
+        declarationsAcceptedAt: new Date(),
+      },
+    });
+  }
+  // Asha leads "Byte Me" (join code HACK2026 so the demo can show joining); Ravi is registered but not yet in a team.
+  if (!(await db.team.findFirst({ where: { eventId, name: 'Byte Me' } }))) {
+    await db.$transaction(async (tx) => {
+      const seq = (
+        await tx.event.update({ where: { id: eventId }, data: { teamCodeSeq: { increment: 1 } } })
+      ).teamCodeSeq;
+      const team = await tx.team.create({
+        data: {
+          eventId,
+          name: 'Byte Me',
+          teamCode: `T-${String(seq).padStart(4, '0')}`,
+          joinCode: 'HACK2026',
+        },
+      });
+      await tx.teamMember.create({
+        data: { teamId: team.id, eventId, membershipId: memberships.asha!, role: 'LEADER' },
+      });
+    });
+  }
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEV_PASSWORD);
   const users: Record<string, string> = {};
@@ -167,6 +227,7 @@ async function main() {
     });
   }
   await seedStructure(event.id, users.admin!);
+  await seedParticipants(event.id, users);
   console.log(
     `Seeded ${SEED_ACCOUNTS.length} dev accounts (password "${DEV_PASSWORD}") and event ${event.slug}`,
   );

@@ -39,3 +39,56 @@ export async function createVerifiedUser(request: APIRequestContext, name = 'E2E
   await request.post('/api/v1/auth/verify-email', { headers, data: { token } });
   return { email, password };
 }
+
+export const CSRF = { 'X-Requested-With': 'arthakram' };
+const future = (days: number) => new Date(Date.now() + days * 864e5).toISOString();
+
+/** Creates a published event with registration open through the API, as the signed-in admin page. */
+export async function createOpenEvent(
+  page: Page,
+  opts: { teamMin?: number; teamMax?: number } = {},
+) {
+  const api = page.request;
+  const name = `E2E Cup ${Date.now()}`;
+  const created = await (
+    await api.post('/api/v1/events', {
+      headers: CSRF,
+      data: {
+        name,
+        type: 'HACKATHON',
+        mode: 'IN_PERSON',
+        startsAt: future(30),
+        endsAt: future(31),
+        timeZone: 'Asia/Kolkata',
+        institution: 'Rishihood University',
+        contactEmail: 'org@example.test',
+      },
+    })
+  ).json();
+  const base = `/api/v1/events/${created.id}`;
+  await api.patch(base, {
+    headers: CSRF,
+    data: { version: 1, teamMin: opts.teamMin ?? 2, teamMax: opts.teamMax ?? 3 },
+  });
+  const rounds = (await (await api.get(`${base}/rounds`)).json()).rounds;
+  await api.patch(`${base}/rounds/${rounds[0].id}`, {
+    headers: CSRF,
+    data: {
+      name: 'Round 1',
+      submissionDeadline: future(29),
+      graceMinutes: 0,
+      latePolicy: 'REJECT',
+      rankingScope: 'OVERALL',
+      requiredEvaluations: 2,
+      awardPositions: 3,
+    },
+  });
+  await api.post(`${base}/publish`, { headers: CSRF });
+  await api.put(`${base}/registration`, { headers: CSRF, data: { status: 'OPEN' } });
+  return {
+    id: created.id as string,
+    slug: created.slug as string,
+    name,
+    roundId: rounds[0].id as string,
+  };
+}

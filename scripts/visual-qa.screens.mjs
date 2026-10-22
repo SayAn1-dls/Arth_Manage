@@ -10,4 +10,20 @@ export const screens = [
   { name: 'guidebook-participant', path: '/events/{event}/guidebook', as: 'asha' },
   { name: 'announcements-admin', path: '/events/{event}/announcements', as: 'admin' },
   { name: 'announcements-judge', path: '/events/{event}/announcements', as: 'judge1' },
+  // Phase 3: participants, teams, submissions
+  { name: 'team-asha', path: '/events/{event}/team', as: 'asha' },
+  { name: 'team-ravi-no-team', path: '/events/{event}/team', as: 'ravi' },
+  { name: 'dashboard-asha', path: '/events/{event}', as: 'asha' },
+  { name: 'submission-asha', path: '/events/{event}/submission/{round}', as: 'asha' },
+  { name: 'profile-asha', path: '/events/{event}/profile', as: 'asha' },
+  { name: 'participants-admin', path: '/events/{event}/participants', as: 'admin' },
+  {
+    name: 'participant-detail-admin',
+    path: '/events/{event}/participants/{participant}',
+    as: 'admin',
+  },
+  { name: 'teams-admin', path: '/events/{event}/teams', as: 'admin' },
+  { name: 'team-detail-admin', path: '/events/{event}/teams/{team}', as: 'admin' },
+  { name: 'submissions-admin', path: '/events/{event}/submissions', as: 'admin' },
+  { name: 'people-admin', path: '/events/{event}/people', as: 'admin' },
 ];

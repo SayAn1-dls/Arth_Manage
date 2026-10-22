@@ -42,6 +42,11 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-28 | Problem statement attachments | The optional PDF attachment (PRD FR-011) depends on the storage provider and is built after Phase 3's storage work; timed release ("visible from") and per-problem caps are P1 and skipped. *Adopted* |
 | D-29 | Dev rate limits | Rate limiting is on by default; `RATE_LIMIT_DISABLED=true` (in the untracked `.env` for local runs) lets browser tests sign in repeatedly. Tests enable the limiter explicitly to assert it works. *Adopted* |
 | D-30 | Publish rules | Publishing requires at least one round with a submission deadline (FR-005). An unpublished guidebook only warns. Concluding without published results needs explicit confirmation until Phase 5 supplies published snapshots. *Adopted* |
+| D-31 | File downloads | Instead of 10-minute signed URLs (PRD §8.3), `GET /events/:id/files/:fileId` checks the caller's permission on every request (own team or Core Admin; unassigned judges and staff get 404) and sends `Content-Disposition: attachment`, `nosniff`, a sandbox CSP and `no-store`. Same-origin cookies make a signed URL unnecessary, and a revoked member loses access immediately. *Adopted* |
+| D-32 | Upload transport | Files are uploaded as the raw request body (`PUT .../files/:fieldId`, name in `X-Filename`) with XHR progress, avoiding a multipart dependency. Validated by magic number and size before anything is stored. *Adopted* |
+| D-33 | Withdraw (P1) | Participant self-withdrawal (FR-058) is not built; admins remove participants, and a removed participant cannot return. The schema keeps `Registration.status = WITHDRAWN` for it. *Adopted* |
+| D-34 | Judge file access | Judges can download only files of teams assigned to them; assignments arrive in Phase 4, so until then no judge can read any submission file. *Adopted* |
+| D-35 | Delete-in-use | Tracks and problem statements in use by a team block deletion with the team list; rounds with submissions cannot be deleted; maximum team size cannot drop below an existing team (all tested). *Adopted* |
 
 ## PRD open questions — defaults in force
 

@@ -16,6 +16,7 @@ const accounts = {
   judge1: 'judge1@arthakram.test',
   staff: 'staff@arthakram.test',
   asha: 'asha@arthakram.test',
+  ravi: 'ravi@arthakram.test',
 };
 
 // `as`: seeded account to sign in with. `{event}` in a path is replaced by the demo event id.
@@ -53,6 +54,13 @@ async function signedInContext(vp, who, cache) {
       const events = (await (await context.request.get(`${base}/api/v1/me/events`)).json()).events;
       cache.event = events.find((e) => e.slug === 'hacksonipat-2026')?.eventId;
     }
+    if (who === 'admin' && !cache.team) {
+      const api = (p) =>
+        context.request.get(`${base}/api/v1/events/${cache.event}${p}`).then((r) => r.json());
+      cache.team = (await api('/teams')).rows?.[0]?.id;
+      cache.round = (await api('/rounds')).rounds?.[0]?.id;
+      cache.participant = (await api('/participants?q=asha')).rows?.[0]?.membershipId;
+    }
   }
   return context;
 }
@@ -65,7 +73,11 @@ for (const vp of viewports) {
     const key = s.as ?? '';
     if (!contexts.has(key)) contexts.set(key, await signedInContext(vp, s.as, cache));
     const page = await contexts.get(key).newPage();
-    const path = s.path.replace('{event}', cache.event ?? '');
+    const path = s.path
+      .replace('{event}', cache.event ?? '')
+      .replace('{team}', cache.team ?? '')
+      .replace('{round}', cache.round ?? '')
+      .replace('{participant}', cache.participant ?? '');
     await page.goto(base + path, { waitUntil: 'networkidle' });
     await page.evaluate(() => document.fonts.ready);
     if (s.prepare) await s.prepare(page, cache, base);
