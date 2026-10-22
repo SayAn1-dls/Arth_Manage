@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createTestKit, resetDb, signedInAgent } from '../test/helpers.js';
+import { createTestKit, resetDb } from '../test/helpers.js';
 import { upload, pdfBytes, future } from '../test/world.js';
 
 const kit = createTestKit();

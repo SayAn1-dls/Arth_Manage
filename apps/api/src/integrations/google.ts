@@ -62,7 +62,26 @@ const SCOPES = {
   email: 'openid email',
 };
 
+/** Base URLs, overridable so the real client can be exercised against a local stand-in server in tests. */
+export interface GoogleEndpoints {
+  oauth: string;
+  token: string;
+  userinfo: string;
+  sheets: string;
+  drive: string;
+  upload: string;
+}
+export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
+  oauth: 'https://accounts.google.com/o/oauth2/v2/auth',
+  token: 'https://oauth2.googleapis.com/token',
+  userinfo: 'https://openidconnect.googleapis.com/v1/userinfo',
+  sheets: 'https://sheets.googleapis.com/v4/spreadsheets',
+  drive: 'https://www.googleapis.com/drive/v3/files',
+  upload: 'https://www.googleapis.com/upload/drive/v3/files',
+};
+
 interface Creds {
+  endpoints?: GoogleEndpoints;
   clientId?: string;
   clientSecret?: string;
   redirectUri: string;
@@ -71,6 +90,7 @@ interface Creds {
 
 /** REST client for Google OAuth, Sheets v4 and Drive v3. Not exercised without real credentials. */
 export function createGoogleProvider(c: Creds): GoogleProvider {
+  const ep = c.endpoints ?? GOOGLE_ENDPOINTS;
   const configured = Boolean(c.clientId && c.clientSecret && c.encryptionKeyOk);
 
   async function call(url: string, init: RequestInit & { token?: string }): Promise<Response> {
@@ -91,7 +111,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
   }
 
   async function accessToken(refreshToken: string): Promise<string> {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
+    const res = await fetch(ep.token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -113,7 +133,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
   return {
     configured,
     authUrl(state) {
-      return `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+      return `${ep.oauth}?${new URLSearchParams({
         client_id: c.clientId ?? '',
         redirect_uri: c.redirectUri,
         response_type: 'code',
@@ -124,7 +144,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
       })}`;
     },
     async exchangeCode(code) {
-      const res = await fetch('https://oauth2.googleapis.com/token', {
+      const res = await fetch(ep.token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -142,14 +162,14 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
       };
       if (!res.ok || !body.refresh_token || !body.access_token)
         throw new GoogleError('OTHER', `Code exchange failed: ${res.status} ${body.error ?? ''}`);
-      const info = (await (
-        await call('https://openidconnect.googleapis.com/v1/userinfo', { token: body.access_token })
-      ).json()) as { email?: string };
+      const info = (await (await call(ep.userinfo, { token: body.access_token })).json()) as {
+        email?: string;
+      };
       return { refreshToken: body.refresh_token, email: info.email ?? 'unknown' };
     },
     async createSpreadsheet(refreshToken, title, tabs) {
       const token = await accessToken(refreshToken);
-      const res = await call('https://sheets.googleapis.com/v4/spreadsheets', {
+      const res = await call(ep.sheets, {
         method: 'POST',
         token,
         headers: { 'Content-Type': 'application/json' },
@@ -176,7 +196,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
     },
     async writeTab(refreshToken, spreadsheetId, tab, rows, bannerRows) {
       const token = await accessToken(refreshToken);
-      const base = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+      const base = `${ep.sheets}/${spreadsheetId}`;
       const meta = (await (await call(`${base}?fields=sheets.properties`, { token })).json()) as {
         sheets: { properties: { sheetId: number; title: string } }[];
       };
@@ -204,7 +224,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
       });
-      await call(`${base}/values/${encodeURIComponent(range)}!A1?valueInputOption=RAW`, {
+      await call(`${base}/values/${encodeURIComponent(`${range}!A1`)}?valueInputOption=RAW`, {
         method: 'PUT',
         token,
         headers: { 'Content-Type': 'application/json' },
@@ -232,7 +252,7 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
     },
     async createFolder(refreshToken, name, parentId) {
       const token = await accessToken(refreshToken);
-      const res = await call('https://www.googleapis.com/drive/v3/files?fields=id', {
+      const res = await call(`${ep.drive}?fields=id`, {
         method: 'POST',
         token,
         headers: { 'Content-Type': 'application/json' },
@@ -255,15 +275,12 @@ export function createGoogleProvider(c: Creds): GoogleProvider {
         bytes,
         Buffer.from(`\r\n--${boundary}--`),
       ]);
-      const res = await call(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        {
-          method: 'POST',
-          token,
-          headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-          body,
-        },
-      );
+      const res = await call(`${ep.upload}?uploadType=multipart&fields=id`, {
+        method: 'POST',
+        token,
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body,
+      });
       return ((await res.json()) as { id: string }).id;
     },
   };
