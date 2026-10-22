@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/bricolage-grotesque/wght.css';
+@import '@fontsource/instrument-sans/400.css';
+@import '@fontsource/instrument-sans/500.css';
+@import '@fontsource/instrument-sans/600.css';
+@import '@fontsource/instrument-sans/700.css';
+@import '@fontsource/caveat/500.css';
+@import './tokens.css';
+@import './theme.css';
+
+@layer base {
+  html {
+    background: var(--ak-paper);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--ak-paper); /* Paper, not white, is the page */
+    color: var(--ak-graphite); /* Graphite is body text; Ink is for headlines */
+    font-family: var(--ak-text);
+    font-size: 1rem;
+    line-height: var(--ak-leading-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--ak-display);
+    color: var(--ak-ink);
+    margin: 0;
+  }
+  h1 {
+    font-weight: var(--ak-weight-display);
+    letter-spacing: var(--ak-track-display);
+    line-height: var(--ak-leading-display);
+    font-size: clamp(2rem, 1.2rem + 3vw, 3.25rem);
+  }
+  h2 {
+    font-weight: 800;
+    letter-spacing: var(--ak-track-section);
+    line-height: 1.1;
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2rem);
+  }
+  h3 {
+    font-weight: 700;
+    letter-spacing: var(--ak-track-section);
+    line-height: 1.2;
+    font-size: 1.25rem;
+  }
+  p {
+    max-width: var(--ak-measure);
+  }
+  a {
+    color: var(--ak-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  strong,
+  b {
+    font-weight: 700; /* bold is the only inline emphasis */
+  }
+  em,
+  i {
+    font-style: normal;
+  }
+  :focus-visible {
+    outline: var(--ak-focus-ring);
+    outline-offset: var(--ak-focus-offset);
+  }
+  .on-dark :focus-visible {
+    outline-color: var(--ak-paper);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
