@@ -123,6 +123,7 @@ export async function teamDto(
       name: m.membership.registration?.fullName ?? m.membership.user.name,
       institution: m.membership.registration?.institution ?? '',
       role: m.role,
+      isYou: m.membershipId === viewer.membershipId,
       ...(seeEmail ? { email: m.membership.user.email } : {}),
     })),
     size: team.members.length,

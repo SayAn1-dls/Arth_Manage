@@ -125,6 +125,8 @@ export interface TeamMemberDto {
   name: string;
   institution: string;
   role: 'LEADER' | 'MEMBER';
+  /** True for the viewer's own row. */
+  isYou: boolean;
   email?: string; // visible to teammates and admins only
 }
 
