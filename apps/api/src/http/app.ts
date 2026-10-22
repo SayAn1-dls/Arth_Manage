@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
 import type { Deps } from './deps.js';
-import { errorHandler, notFoundHandler } from './errors.js';
+import { AppError, errorHandler, notFoundHandler } from './errors.js';
 import { healthRouter } from './health.js';
 import { authRouter } from '../auth/routes.js';
 import { csrfGuard, sessionLoader } from '../auth/middleware.js';
@@ -40,6 +40,20 @@ export function createApp(deps: Deps) {
   );
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
+  // PostgreSQL cannot store NUL characters; reject them up front instead of failing deep inside a query.
+  app.use((req, _res, next) => {
+    const hasNul = (v: unknown): boolean =>
+      typeof v === 'string'
+        ? v.includes('\u0000')
+        : Array.isArray(v)
+          ? v.some(hasNul)
+          : v !== null && typeof v === 'object'
+            ? Object.entries(v).some(([k, x]) => k.includes('\u0000') || hasNul(x))
+            : false;
+    if (hasNul(req.query) || hasNul(req.body))
+      return next(AppError.invalid('The request contains a character that is not allowed', {}));
+    next();
+  });
 
   const api = express.Router();
   // Responses carry personal data and per-user state; never let a shared cache keep them.

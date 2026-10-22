@@ -56,6 +56,15 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       .json({ error: { code: 'unsupported', message: 'Unsupported request encoding' } });
     return;
   }
+  // A filter or id the database layer rejects (unknown enum value, invalid date) is the caller's mistake.
+  if (err instanceof Error && err.name === 'PrismaClientValidationError') {
+    res
+      .status(400)
+      .json({
+        error: { code: 'invalid_request', message: 'One of the filters or values is not valid' },
+      });
+    return;
+  }
   // Unknown errors: log in full, return a generic message (no stack traces to clients).
   req.log?.error({ err }, 'unhandled error');
   res.status(500).json({ error: { code: 'internal_error', message: 'Something went wrong' } });

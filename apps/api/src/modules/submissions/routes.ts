@@ -64,6 +64,15 @@ function when(date: Date, tz: string) {
   return `${d}, ${t} ${tz === 'Asia/Kolkata' ? 'IST' : tz}`;
 }
 
+/** A malformed percent sequence in X-Filename must not become a server error. */
+function decodedName(raw: string | undefined): string {
+  try {
+    return decodeURIComponent(raw ?? 'file');
+  } catch {
+    return raw ?? 'file';
+  }
+}
+
 export function submissionsRouter(deps: Deps) {
   const { db, storage, email, env } = deps;
   const router = Router({ mergeParams: true });
@@ -283,7 +292,7 @@ export function submissionsRouter(deps: Deps) {
       const field = round.formFields.find((f) => f.id === String(req.params.fieldId));
       if (!field || field.type !== 'FILE') throw AppError.notFound();
       const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-      const filename = safeFilename(decodeURIComponent(String(req.get('x-filename') ?? 'file')));
+      const filename = safeFilename(decodedName(req.get('x-filename')));
       const check = checkUpload({
         filename,
         bytes,

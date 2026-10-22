@@ -258,4 +258,67 @@ describe('regressions found in the release audit', () => {
     expect(await db.authToken.count({ where: { tokenHash: 'fresh-tok' } })).toBe(1);
     expect(await db.authToken.count({ where: { tokenHash: 'old-tok' } })).toBe(0);
   });
+
+  it('treats a malformed X-Filename as a bad file name, not a server error', async () => {
+    const w = await openEvent(kit);
+    const t = await teamOfTwo(w, 'Gamma');
+    const sub = (await t.lead.agent.get(`${w.base}/rounds/${w.roundId}/submission`)).body;
+    const file = sub.fields.find((f: { type: string }) => f.type === 'FILE');
+    const res = await t.lead.agent
+      .put(`${w.base}/rounds/${w.roundId}/submission/files/${file.id}`)
+      .set('Content-Type', 'application/octet-stream')
+      .set('X-Filename', '%E0%A4%A.pdf')
+      .send(Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.from('x'.repeat(100))]));
+    expect(res.status).toBe(201);
+  });
+
+  it('never answers 500 to an organiser sending garbage ids, queries or bodies to any route', async () => {
+    const w = await openEvent(kit);
+    const t = await teamOfTwo(w, 'Delta');
+    void t;
+    const evil = ['x', '%00', '\'; DROP TABLE "User"; --', '../../etc/passwd', '0'.repeat(300)];
+    const queries = [
+      '?page=-1',
+      '?page=abc&pageSize=999999999',
+      '?sort=;--&dir=sideways',
+      '?q=%00%ff',
+      '?from=not-a-date&to=9999-99-99',
+      '?type=NOPE&status=NOPE',
+    ];
+    const bodies: unknown[] = [
+      {},
+      [],
+      'text',
+      null,
+      { version: 'x' },
+      { a: { b: { c: [1, 2, { d: 1 }] } } },
+      { name: 'x'.repeat(5000) },
+    ];
+    const bad: string[] = [];
+    for (const r of routes) {
+      const path = (v: string) =>
+        `/api/v1/events/${w.eventId}${r.path.replace(/:[A-Za-z]+/g, () => encodeURIComponent(v))}`;
+      if (r.method === 'get') {
+        for (const v of evil) {
+          const res = await w.admin.get(path(v));
+          if (res.status >= 500) bad.push(`GET ${r.path} id=${v.slice(0, 12)} -> ${res.status}`);
+        }
+        for (const q of queries) {
+          const res = await w.admin.get(path('x') + q);
+          if (res.status >= 500) bad.push(`GET ${r.path}${q} -> ${res.status}`);
+        }
+      } else if (!/\/(conclude|archive|disconnect|remove)$/.test(r.path)) {
+        for (const body of bodies) {
+          const res = await w.admin[r.method as 'post'](path('x'))
+            .set('Content-Type', 'application/json')
+            .send(JSON.stringify(body));
+          if (res.status >= 500)
+            bad.push(
+              `${r.method.toUpperCase()} ${r.path} body=${JSON.stringify(body).slice(0, 20)} -> ${res.status}`,
+            );
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 300_000);
 });
