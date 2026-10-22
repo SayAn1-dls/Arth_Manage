@@ -4,6 +4,14 @@ import { AppError } from './errors.js';
 /** Small in-memory fixed-window limiter (single-process pilot deployment; see TECHNICAL_ARCHITECTURE §10). */
 export function createRateLimiter(enabled: boolean) {
   const hits = new Map<string, { count: number; resetAt: number }>();
+  // Expired windows are swept so the map cannot grow without bound under scanning traffic.
+  if (enabled) {
+    const sweep = setInterval(() => {
+      const now = Date.now();
+      for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
+    }, 60_000);
+    sweep.unref();
+  }
   return function limit(name: string, max: number, windowMs: number): RequestHandler {
     return (req, _res, next) => {
       if (!enabled) return next();

@@ -174,3 +174,88 @@ describe('input handling', () => {
     expect(dl.headers['x-content-type-options']).toBe('nosniff');
   });
 });
+
+describe('regressions found in the release audit', () => {
+  it('counts parallel wrong passwords exactly, so guesses cannot slip past the lockout', async () => {
+    const user = await createUser(db);
+    const attempts = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        request(app)
+          .post('/api/v1/auth/login')
+          .set('X-Requested-With', 'arthakram')
+          .send({ email: user.email, password: 'wrong-password-1' }),
+      ),
+    );
+    expect(attempts.every((r) => r.status === 401 || r.status === 429)).toBe(true);
+    const after = await db.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(after.failedLoginCount).toBe(8);
+    expect(after.lockedUntil).not.toBeNull();
+    const correct = await request(app)
+      .post('/api/v1/auth/login')
+      .set('X-Requested-With', 'arthakram')
+      .send({ email: user.email, password: 'Correct-horse-9' });
+    expect(correct.status).toBe(429); // locked even for the right password until the window passes
+  });
+
+  it('marks API responses as not cacheable', async () => {
+    const res = await request(app).get('/api/v1/health');
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('limits invitation sending per hour, and rate limits follow the real client address behind a proxy', async () => {
+    const limited = createTestKit({ rateLimit: true });
+    const w = await openEvent(limited);
+    let blocked = 0;
+    for (let i = 0; i < 101; i++) {
+      const res = await w.admin
+        .post(`${w.base}/invitations`)
+        .send({ email: `judge${i}@example.test`, role: 'JUDGE' });
+      if (res.status === 429) blocked += 1;
+    }
+    expect(blocked).toBe(1);
+
+    const login = (agentApp: typeof app, ip: string) =>
+      request(agentApp)
+        .post('/api/v1/auth/login')
+        .set('X-Requested-With', 'arthakram')
+        .set('X-Forwarded-For', ip)
+        .send({ email: 'nobody@example.test', password: 'x' });
+    // one hop of proxy: each client address has its own budget of 20
+    for (let i = 0; i < 20; i++) await login(limited.app, '203.0.113.7');
+    expect((await login(limited.app, '203.0.113.7')).status).toBe(429);
+    expect((await login(limited.app, '203.0.113.8')).status).toBe(401);
+    // with no proxy configured the header is ignored, so it cannot be used to dodge the limit
+    const direct = createTestKit({ rateLimit: true, trustProxyHops: 0 });
+    for (let i = 0; i < 20; i++) await login(direct.app, `198.51.100.${i}`);
+    expect((await login(direct.app, '198.51.100.99')).status).toBe(429);
+  });
+
+  it('purges expired sessions and spent tokens only', async () => {
+    const { purgeExpired } = await import('../auth/maintenance.js');
+    const user = await createUser(db);
+    const old = new Date(Date.now() - 10 * 864e5);
+    await db.session.createMany({
+      data: [
+        { userId: user.id, tokenHash: 'expired-1', expiresAt: old },
+        { userId: user.id, tokenHash: 'live-1', expiresAt: new Date(Date.now() + 864e5) },
+      ],
+    });
+    await db.authToken.createMany({
+      data: [
+        { userId: user.id, type: 'VERIFY_EMAIL', tokenHash: 'old-tok', expiresAt: old },
+        {
+          userId: user.id,
+          type: 'VERIFY_EMAIL',
+          tokenHash: 'fresh-tok',
+          expiresAt: new Date(Date.now() + 864e5),
+        },
+      ],
+    });
+    const gone = await purgeExpired(kit.deps);
+    expect(gone.sessions).toBeGreaterThanOrEqual(1);
+    expect(await db.session.count({ where: { tokenHash: 'live-1' } })).toBe(1);
+    expect(await db.session.count({ where: { tokenHash: 'expired-1' } })).toBe(0);
+    expect(await db.authToken.count({ where: { tokenHash: 'fresh-tok' } })).toBe(1);
+    expect(await db.authToken.count({ where: { tokenHash: 'old-tok' } })).toBe(0);
+  });
+});

@@ -123,59 +123,64 @@ export function invitationsRouter(deps: Deps) {
     });
   });
 
-  scoped.post('/invitations', requireAction('members.manage'), async (req, res) => {
-    const ctx = requireCtx(req);
-    assertWritable(ctx);
-    const { email: to, role } = parse(inviteSchema, req.body);
-    const user = await db.user.findUnique({ where: { email: to } });
-    if (user) {
-      const m = await db.eventMembership.findUnique({
-        where: { eventId_userId: { eventId: ctx.event.id, userId: user.id } },
-      });
-      if (m && m.status !== 'REMOVED') {
-        throw AppError.conflict(
-          'role_conflict',
-          `${to} is already ${ROLE_NAME[m.role]} in this event, and a person can hold only one role per event.`,
-        );
+  scoped.post(
+    '/invitations',
+    limit('invite-send', 100, 60 * 60 * 1000),
+    requireAction('members.manage'),
+    async (req, res) => {
+      const ctx = requireCtx(req);
+      assertWritable(ctx);
+      const { email: to, role } = parse(inviteSchema, req.body);
+      const user = await db.user.findUnique({ where: { email: to } });
+      if (user) {
+        const m = await db.eventMembership.findUnique({
+          where: { eventId_userId: { eventId: ctx.event.id, userId: user.id } },
+        });
+        if (m && m.status !== 'REMOVED') {
+          throw AppError.conflict(
+            'role_conflict',
+            `${to} is already ${ROLE_NAME[m.role]} in this event, and a person can hold only one role per event.`,
+          );
+        }
       }
-    }
-    // A fresh invitation replaces an earlier pending one for the same address.
-    await db.invitation.updateMany({
-      where: { eventId: ctx.event.id, email: to, status: 'PENDING' },
-      data: { status: 'REVOKED' },
-    });
-    const token = newToken();
-    const inv = await db.$transaction(async (tx) => {
-      const row = await tx.invitation.create({
-        data: {
+      // A fresh invitation replaces an earlier pending one for the same address.
+      await db.invitation.updateMany({
+        where: { eventId: ctx.event.id, email: to, status: 'PENDING' },
+        data: { status: 'REVOKED' },
+      });
+      const token = newToken();
+      const inv = await db.$transaction(async (tx) => {
+        const row = await tx.invitation.create({
+          data: {
+            eventId: ctx.event.id,
+            email: to,
+            role,
+            tokenHash: sha256(token),
+            invitedById: ctx.membership.userId,
+            expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+          },
+        });
+        await writeAudit(tx, {
           eventId: ctx.event.id,
-          email: to,
-          role,
-          tokenHash: sha256(token),
-          invitedById: ctx.membership.userId,
-          expiresAt: new Date(Date.now() + INVITE_TTL_MS),
-        },
+          actorId: ctx.membership.userId,
+          action: 'member.invited',
+          entityType: 'Invitation',
+          entityId: row.id,
+          after: { email: to, role },
+        });
+        return row;
       });
-      await writeAudit(tx, {
-        eventId: ctx.event.id,
-        actorId: ctx.membership.userId,
-        action: 'member.invited',
-        entityType: 'Invitation',
-        entityId: row.id,
-        after: { email: to, role },
+      await email.send({
+        to,
+        subject: `You're invited to ${ctx.event.name} as ${ROLE_NAME[role]}`,
+        body: `You have been invited to ${ctx.event.name} as ${ROLE_NAME[role]}. Sign in (or create an account) with this email address to accept. The invitation expires in 14 days.`,
+        link: `${env.APP_BASE_URL}/invitations/accept?token=${token}`,
       });
-      return row;
-    });
-    await email.send({
-      to,
-      subject: `You're invited to ${ctx.event.name} as ${ROLE_NAME[role]}`,
-      body: `You have been invited to ${ctx.event.name} as ${ROLE_NAME[role]}. Sign in (or create an account) with this email address to accept. The invitation expires in 14 days.`,
-      link: `${env.APP_BASE_URL}/invitations/accept?token=${token}`,
-    });
-    res
-      .status(201)
-      .json({ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt });
-  });
+      res
+        .status(201)
+        .json({ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt });
+    },
+  );
 
   scoped.delete('/invitations/:id', requireAction('members.manage'), async (req, res) => {
     const ctx = requireCtx(req);

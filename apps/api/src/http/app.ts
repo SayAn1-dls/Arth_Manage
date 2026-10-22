@@ -17,13 +17,36 @@ import { syncHooks } from '../modules/integrations/routes.js';
 export function createApp(deps: Deps) {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1);
+  app.set('trust proxy', deps.env.TRUST_PROXY_HOPS);
   app.use(pinoHttp({ logger: deps.logger }));
-  app.use(helmet());
+  // Everything is same-origin: scripts, styles, fonts and images come from this origin only.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // React sets inline style attributes (progress bars, widths)
+          imgSrc: ["'self'", 'data:'],
+          fontSrc: ["'self'"],
+          connectSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'self'"],
+        },
+      },
+    }),
+  );
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
 
   const api = express.Router();
+  // Responses carry personal data and per-user state; never let a shared cache keep them.
+  api.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   api.use(csrfGuard);
   api.use(sessionLoader(deps));
   api.use(healthRouter(deps.db));

@@ -25,8 +25,14 @@ export interface TestKit {
   app: Express;
 }
 
-export function createTestKit(opts: { rateLimit?: boolean } = {}): TestKit {
-  const env = loadEnv();
+export function createTestKit(
+  opts: { rateLimit?: boolean; trustProxyHops?: number } = {},
+): TestKit {
+  const env = loadEnv(
+    opts.trustProxyHops === undefined
+      ? process.env
+      : { ...process.env, TRUST_PROXY_HOPS: String(opts.trustProxyHops) },
+  );
   const logger = createLogger(env);
   const db = createDb(env.DATABASE_URL);
   const google = new FakeGoogle();

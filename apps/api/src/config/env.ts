@@ -6,6 +6,8 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
     APP_BASE_URL: z.string().url().default('http://localhost:5173'),
+    // Reverse proxies between the internet and the API. Rate limits use the client IP, so set 0 when there is no proxy.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
     API_PORT: z.coerce.number().int().positive().default(4000),
     STORAGE_DIR: z.string().default('./.data/uploads'),
     EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),

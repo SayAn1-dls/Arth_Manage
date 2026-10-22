@@ -98,18 +98,24 @@ export function createAuthService({ db, email, env }: Deps) {
       const ok = await verifyPassword(password, user.passwordHash);
       if (!ok) {
         const now = new Date();
-        const windowOpen =
-          user.lastFailedLoginAt &&
-          now.getTime() - user.lastFailedLoginAt.getTime() < LOCK_WINDOW_MS;
-        const count = (windowOpen ? user.failedLoginCount : 0) + 1;
-        await db.user.update({
-          where: { id: user.id },
-          data: {
-            failedLoginCount: count,
-            lastFailedLoginAt: now,
-            lockedUntil: count >= LOCK_AFTER ? new Date(now.getTime() + LOCK_WINDOW_MS) : null,
+        // A stale count from an earlier window is reset first; the increment itself is atomic in the database
+        // so parallel guesses cannot all read the same count and slip past the lock.
+        await db.user.updateMany({
+          where: {
+            id: user.id,
+            lastFailedLoginAt: { lt: new Date(now.getTime() - LOCK_WINDOW_MS) },
           },
+          data: { failedLoginCount: 0 },
         });
+        const updated = await db.user.update({
+          where: { id: user.id },
+          data: { failedLoginCount: { increment: 1 }, lastFailedLoginAt: now },
+        });
+        if (updated.failedLoginCount >= LOCK_AFTER)
+          await db.user.update({
+            where: { id: user.id },
+            data: { lockedUntil: new Date(now.getTime() + LOCK_WINDOW_MS) },
+          });
         throw new AppError(401, 'invalid_credentials', GENERIC_CREDENTIALS_ERROR);
       }
       if (!user.emailVerifiedAt) {

@@ -8,6 +8,7 @@ import { createRateLimiter } from './http/rateLimit.js';
 import { createGoogleProvider } from './integrations/google.js';
 import { parseKey } from './integrations/crypto.js';
 import { startSyncWorker } from './integrations/queue.js';
+import { startMaintenance } from './auth/maintenance.js';
 import type { Deps } from './http/deps.js';
 
 const env = loadEnv();
@@ -32,6 +33,7 @@ const deps: Deps = {
 };
 const app = createApp(deps);
 const stopWorker = startSyncWorker(deps);
+const stopMaintenance = startMaintenance(deps);
 
 const server = app.listen(env.API_PORT, () => {
   logger.info(`API listening on http://localhost:${env.API_PORT}`);
@@ -39,6 +41,7 @@ const server = app.listen(env.API_PORT, () => {
 
 async function shutdown() {
   stopWorker();
+  stopMaintenance();
   server.close();
   await db.$disconnect();
   process.exit(0);
