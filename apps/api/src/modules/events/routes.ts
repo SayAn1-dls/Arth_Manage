@@ -15,6 +15,8 @@ import { announcementsRouter } from './announcements.js';
 import { peopleRouter } from '../people/routes.js';
 import { participantTeamsRouter } from '../teams/routes.js';
 import { submissionsRouter } from '../submissions/routes.js';
+import { staffRouter } from '../staff/routes.js';
+import { opsRouter } from '../ops/routes.js';
 import { resultsRouter } from '../results/routes.js';
 import { judgingRouter } from '../judging/routes.js';
 import { invitationsRouter } from '../invitations/routes.js';
@@ -118,6 +120,8 @@ export function eventsRouter(deps: Deps) {
   scoped.use(submissionsRouter(deps));
   scoped.use(judgingRouter(deps));
   scoped.use(resultsRouter(deps));
+  scoped.use(staffRouter(deps));
+  scoped.use(opsRouter(deps));
   const invitations = invitationsRouter(deps);
   scoped.use(invitations.scoped);
   router.use(invitations.accept);
