@@ -9,6 +9,7 @@ import { AlertCircle } from 'lucide-react';
 import { cn } from './cn.js';
 
 interface FieldShellProps {
+  id?: string;
   label: string;
   hint?: string;
   error?: string;
@@ -17,8 +18,16 @@ interface FieldShellProps {
 }
 
 /** Visible label above the control, hint and error text below, wired for assistive tech. */
-export function FieldShell({ label, hint, error, required, children }: FieldShellProps) {
-  const id = useId();
+export function FieldShell({
+  id: idProp,
+  label,
+  hint,
+  error,
+  required,
+  children,
+}: FieldShellProps) {
+  const autoId = useId();
+  const id = idProp ?? autoId;
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(' ') || undefined;
@@ -61,7 +70,7 @@ export function Input({
   ...rest
 }: Common & InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <FieldShell label={label} hint={hint} error={error} required={rest.required}>
+    <FieldShell id={rest.id} label={label} hint={hint} error={error} required={rest.required}>
       {({ id, describedBy, invalid }) => (
         <input
           id={id}
@@ -83,7 +92,7 @@ export function Textarea({
   ...rest
 }: Common & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <FieldShell label={label} hint={hint} error={error} required={rest.required}>
+    <FieldShell id={rest.id} label={label} hint={hint} error={error} required={rest.required}>
       {({ id, describedBy, invalid }) => (
         <textarea
           id={id}
@@ -107,7 +116,7 @@ export function Select({
   ...rest
 }: Common & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <FieldShell label={label} hint={hint} error={error} required={rest.required}>
+    <FieldShell id={rest.id} label={label} hint={hint} error={error} required={rest.required}>
       {({ id, describedBy, invalid }) => (
         <select
           id={id}

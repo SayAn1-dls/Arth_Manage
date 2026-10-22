@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router';
 import { api } from '../lib/api.js';
 import { Arc, Badge, Eyebrow, Logo, Marker } from '../ui/index.js';
+import { useSession } from '../shell/session.js';
 
 export function HomePage() {
+  const { user } = useSession();
   const health = useQuery({ queryKey: ['health'], queryFn: api.health });
 
   return (
@@ -24,6 +27,23 @@ export function HomePage() {
           Registration, teams, submissions, judging, results and certificates for Arthakram events,
           with one source of truth.
         </p>
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            to={user ? '/events' : '/login'}
+            className="inline-flex min-h-11 items-center rounded-pill border border-ember bg-ember px-5 py-2 font-bold text-ink no-underline hover:brightness-95"
+          >
+            {user ? 'Open my events' : 'Sign in'}
+          </Link>
+          {!user && (
+            <Link
+              to="/register"
+              className="inline-flex min-h-11 items-center rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
+            >
+              Create an account
+            </Link>
+          )}
+        </div>
 
         <div className="mt-8 flex flex-wrap items-center gap-3" aria-live="polite">
           <Badge tone="brand">Foundation build</Badge>
