@@ -13,11 +13,13 @@ import { createRateLimiter } from '../http/rateLimit.js';
 import type { Deps } from '../http/deps.js';
 import { hashPassword } from '../auth/crypto.js';
 import { CSRF_HEADER, CSRF_VALUE } from '../auth/middleware.js';
+import { FakeGoogle } from '../integrations/fake.js';
 import type { EventRole } from '../generated/prisma/client.js';
 
 export const TEST_PASSWORD = 'Correct-horse-9';
 
 export interface TestKit {
+  google: FakeGoogle;
   db: Db;
   deps: Deps;
   app: Express;
@@ -27,6 +29,7 @@ export function createTestKit(opts: { rateLimit?: boolean } = {}): TestKit {
   const env = loadEnv();
   const logger = createLogger(env);
   const db = createDb(env.DATABASE_URL);
+  const google = new FakeGoogle();
   const deps: Deps = {
     db,
     logger,
@@ -34,8 +37,9 @@ export function createTestKit(opts: { rateLimit?: boolean } = {}): TestKit {
     email: new ConsoleEmailProvider(db, logger),
     limit: createRateLimiter(opts.rateLimit ?? false),
     storage: new LocalDiskStorage(mkdtempSync(join(tmpdir(), 'ak-test-storage-'))),
+    google,
   };
-  return { db, deps, app: createApp(deps) };
+  return { google, db, deps, app: createApp(deps) };
 }
 
 /** Empties every table except migrations. Audit rows are removed with TRUNCATE (the trigger guards row DML only). */

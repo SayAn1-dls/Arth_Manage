@@ -185,8 +185,25 @@ export function opsRouter(deps: Deps) {
       issues,
       tasks,
       deadlines,
-      // Integrations arrive in Phase 7; until then the card is honest that nothing is connected.
-      integrations: { sheets: 'NOT_CONNECTED', drive: 'NOT_CONNECTED' },
+      integrations: await card(async () => {
+        const c = await db.integrationConnection.findUnique({ where: { eventId: e.id } });
+        const on = c && c.status !== 'DISCONNECTED';
+        const failing = Boolean(on && c.lastResult === 'FAILED');
+        return {
+          configured: deps.google.configured,
+          status: !on
+            ? 'NOT_CONNECTED'
+            : c.status === 'NEEDS_REAUTH'
+              ? 'NEEDS_REAUTH'
+              : failing
+                ? 'FAILING'
+                : 'CONNECTED',
+          driveEnabled: Boolean(on && c.driveEnabled),
+          lastSuccessAt: on ? c.lastSuccessAt : null,
+          lastError: on ? c.lastError : null,
+          spreadsheetUrl: on ? c.spreadsheetUrl : null,
+        };
+      }),
     });
   });
 

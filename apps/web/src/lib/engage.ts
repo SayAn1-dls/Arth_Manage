@@ -193,3 +193,45 @@ export const engageApi = {
   requestCorrection: (id: string, certId: string, name: string) =>
     request<unknown>('POST', `${ev(id)}/certificates/${certId}/correction-request`, { name }),
 };
+
+export interface IntegrationsDto {
+  configured: boolean;
+  connection: {
+    status: 'CONNECTED' | 'NEEDS_REAUTH';
+    googleEmail: string;
+    spreadsheetUrl: string | null;
+    driveEnabled: boolean;
+    lastSuccessAt: string | null;
+    lastAttemptAt: string | null;
+    lastResult: string | null;
+    lastError: string | null;
+    lastErrorDetail: string | null;
+  } | null;
+  jobs: {
+    id: string;
+    kind: 'SHEETS' | 'DRIVE_MIRROR';
+    status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+    attempt: number;
+    runAfter: string;
+    finishedAt: string | null;
+    summary: string | null;
+    error: string | null;
+    errorDetail: string | null;
+    createdAt: string;
+  }[];
+  mirror: Record<string, number>;
+}
+
+export const integrationsApi = {
+  get: (id: string) => request<IntegrationsDto>('GET', `${ev(id)}/integrations`),
+  connect: (id: string, enableDrive: boolean) =>
+    request<{ url: string }>('POST', `${ev(id)}/integrations/connect`, {
+      acknowledged: true,
+      enableDrive,
+    }),
+  syncNow: (id: string) => request<unknown>('POST', `${ev(id)}/integrations/sync-now`),
+  drive: (id: string, enabled: boolean) =>
+    request<unknown>('PUT', `${ev(id)}/integrations/drive`, { enabled }),
+  newSheet: (id: string) => request<unknown>('POST', `${ev(id)}/integrations/new-spreadsheet`),
+  disconnect: (id: string) => request<unknown>('POST', `${ev(id)}/integrations/disconnect`),
+};

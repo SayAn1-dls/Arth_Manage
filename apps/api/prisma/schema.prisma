@@ -1001,3 +1001,88 @@ model CertificateJob {
 
   @@index([eventId, type])
 }
+
+// ───────────── Integrations: Google Sheets one-way push and Drive mirror (PRD Modules F, G) ─────────────
+
+enum ConnectionStatus {
+  CONNECTED
+  NEEDS_REAUTH
+  DISCONNECTED
+}
+
+// One Google connection per event. Tokens are AES-256-GCM encrypted with a key held outside the database.
+model IntegrationConnection {
+  id               String           @id @default(cuid())
+  eventId          String           @unique
+  status           ConnectionStatus @default(CONNECTED)
+  googleEmail      String
+  connectedById    String
+  refreshTokenEnc  String?
+  spreadsheetId    String?
+  spreadsheetUrl   String?
+  tabIds           Json             @default("{}") // managed tab key -> sheet tab id
+  driveEnabled     Boolean          @default(false)
+  driveFolders     Json             @default("{}") // folder key -> Drive folder id
+  acknowledgedAt   DateTime
+  lastSuccessAt    DateTime?
+  lastAttemptAt    DateTime?
+  lastResult       String? // SUCCEEDED | FAILED
+  lastError        String?
+  lastErrorDetail  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  jobs             SyncJob[]
+}
+
+enum SyncKind {
+  SHEETS
+  DRIVE_MIRROR
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// Persistent, restart-safe queue. A partial unique index keeps at most one queued and one running job per kind and connection.
+model SyncJob {
+  id            String                @id @default(cuid())
+  eventId       String
+  connectionId  String
+  kind          SyncKind
+  status        SyncStatus            @default(QUEUED)
+  attempt       Int                   @default(0)
+  firstQueuedAt DateTime              @default(now())
+  runAfter      DateTime              @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  error         String?
+  errorDetail   String?
+  summary       String?
+  createdAt     DateTime              @default(now())
+  connection    IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter])
+  @@index([eventId, createdAt])
+}
+
+enum MirrorStatus {
+  PENDING
+  MIRRORED
+  FAILED
+}
+
+// One row per mirrored object, keyed so retries never create duplicate Drive files.
+model DriveMirror {
+  id          String       @id @default(cuid())
+  eventId     String
+  key         String // "file:<submissionFileId>" or "links:<submissionVersionId>"
+  status      MirrorStatus @default(PENDING)
+  driveFileId String?
+  error       String?
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([eventId, key])
+}

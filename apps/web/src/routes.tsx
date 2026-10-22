@@ -48,6 +48,7 @@ import { FeedbackAdminPage } from './features/engage/FeedbackAdminPage.js';
 import { FeedbackPage } from './features/engage/FeedbackPage.js';
 import { CertificatesAdminPage } from './features/engage/CertificatesAdminPage.js';
 import { MyCertificatesPage } from './features/engage/MyCertificatesPage.js';
+import { IntegrationsPage } from './features/ops/IntegrationsPage.js';
 import { useOutletContext } from 'react-router';
 import type { MyEvent } from '@arthakram/shared';
 
@@ -94,6 +95,7 @@ const routes: RouteObject[] = [
               { path: 'checkin', element: <CheckInPage /> },
               { path: 'issues', element: <IssuesPage /> },
               { path: 'audit', element: <AuditPage /> },
+              { path: 'integrations', element: <IntegrationsPage /> },
               { path: 'feedback', element: <FeedbackRoute /> },
               { path: 'certificates', element: <CertificatesRoute /> },
               { path: 'rubric', element: <RubricPage /> },

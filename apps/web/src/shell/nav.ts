@@ -39,6 +39,7 @@ export function navFor(role: Role): NavEntry[] {
         entry('structure', 'Tracks and problems', 'Set up'),
         entry('guidebook', 'Guidebook', 'Set up'),
         entry('announcements', 'Announcements', 'Set up'),
+        entry('integrations', 'Integrations', 'Set up'),
         entry('feedback', 'Feedback', 'After the event'),
         entry('certificates', 'Certificates', 'After the event'),
         entry('audit', 'Audit history', 'Records'),

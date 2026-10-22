@@ -13,6 +13,11 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  // Optional Google integration. Without all three, the integration screens say "not configured" and nothing is simulated.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // 32 bytes, base64 or 64 hex characters. Encrypts stored Google tokens; must live outside the database.
+  TOKEN_ENCRYPTION_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
 });
 

@@ -281,7 +281,7 @@ describe('operational dashboard (FR-043)', () => {
     expect(d.checkin.teams).toMatchObject({ partial: 1, notCheckedIn: 1 });
     expect(d.issues.urgent).toHaveLength(1);
     expect(d.deadlines.length).toBeGreaterThan(0);
-    expect(d.integrations).toEqual({ sheets: 'NOT_CONNECTED', drive: 'NOT_CONNECTED' });
+    expect(d.integrations).toMatchObject({ status: 'NOT_CONNECTED', driveEnabled: false });
     // the same numbers on the linked lists
     expect((await w.admin.get(`${w.base}/participants?team=none`)).body.total).toBe(1);
     expect((await w.admin.get(`${w.base}/teams`)).body.total).toBe(2);

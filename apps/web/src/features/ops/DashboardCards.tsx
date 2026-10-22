@@ -196,12 +196,44 @@ export function DashboardCards({ mine }: { mine: MyEvent }) {
               )))}
         </Card>
         <Card footerLabel="Integrations">
-          <p>
-            Google Sheets: <Badge tone="info">Not connected</Badge>
-          </p>
-          <p className="mt-1">
-            Google Drive: <Badge tone="info">Not connected</Badge>
-          </p>
+          {fail(d.integrations) ??
+            (!isError(d.integrations) && (
+              <>
+                <p>
+                  Google Sheets:{' '}
+                  <Badge
+                    tone={
+                      d.integrations.status === 'CONNECTED'
+                        ? 'success'
+                        : d.integrations.status === 'NOT_CONNECTED'
+                          ? 'info'
+                          : 'error'
+                    }
+                  >
+                    {
+                      {
+                        NOT_CONNECTED: 'Not connected',
+                        CONNECTED: 'Connected',
+                        FAILING: 'Last sync failed',
+                        NEEDS_REAUTH: 'Needs reconnecting',
+                      }[d.integrations.status]
+                    }
+                  </Badge>
+                </p>
+                {d.integrations.lastSuccessAt && (
+                  <p className="mt-1 text-sm">
+                    Last synced {formatDateTime(d.integrations.lastSuccessAt, mine.timeZone)}
+                  </p>
+                )}
+                {d.integrations.lastError && (
+                  <p className="mt-1 text-sm">{d.integrations.lastError}</p>
+                )}
+                <p className="mt-2 text-sm">
+                  <Link to={`${base}/integrations`}>Integrations</Link> ·{' '}
+                  <a href={`/api/v1/events/${mine.eventId}/exports/participants.csv`}>Export CSV</a>
+                </p>
+              </>
+            ))}
         </Card>
       </div>
     </section>

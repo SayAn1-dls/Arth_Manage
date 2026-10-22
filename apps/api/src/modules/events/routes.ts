@@ -18,6 +18,7 @@ import { submissionsRouter } from '../submissions/routes.js';
 import { staffRouter } from '../staff/routes.js';
 import { certificatesRouter } from '../certificates/routes.js';
 import { feedbackRouter } from '../feedback/routes.js';
+import { integrationsRouter } from '../integrations/routes.js';
 import { opsRouter } from '../ops/routes.js';
 import { resultsRouter } from '../results/routes.js';
 import { judgingRouter } from '../judging/routes.js';
@@ -128,6 +129,9 @@ export function eventsRouter(deps: Deps) {
   const certificates = certificatesRouter(deps);
   scoped.use(certificates.router);
   router.use(certificates.me);
+  const integrations = integrationsRouter(deps);
+  scoped.use(integrations.router);
+  router.use(integrations.top);
   const invitations = invitationsRouter(deps);
   scoped.use(invitations.scoped);
   router.use(invitations.accept);

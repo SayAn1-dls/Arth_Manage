@@ -184,7 +184,14 @@ export interface Dashboard {
   issues: Card<{ open: number; urgent: { id: string; category: string; description: string }[] }>;
   tasks: Card<{ blocked: number; open: number; unassigned: number }>;
   deadlines: Card<{ label: string; at: string }[]>;
-  integrations: { sheets: string; drive: string };
+  integrations: Card<{
+    configured: boolean;
+    status: 'NOT_CONNECTED' | 'CONNECTED' | 'FAILING' | 'NEEDS_REAUTH';
+    driveEnabled: boolean;
+    lastSuccessAt: string | null;
+    lastError: string | null;
+    spreadsheetUrl: string | null;
+  }>;
 }
 
 const e = (id: string) => `/events/${id}`;

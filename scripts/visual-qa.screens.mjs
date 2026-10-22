@@ -50,4 +50,6 @@ export const screens = [
   { name: 'certificates-admin', path: '/events/{cup}/certificates', as: 'admin' },
   { name: 'certificates-participant', path: '/events/{cup}/certificates', as: 'cup1' },
   { name: 'certificates-participant-empty', path: '/events/{event}/certificates', as: 'asha' },
+  // Phase 7: integrations
+  { name: 'integrations-admin', path: '/events/{cup}/integrations', as: 'admin' },
 ];
