@@ -184,13 +184,13 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Test tooling + visual-QA script
 
 **Phase 1 — Auth and permissions**
-- [ ] Schema: users, sessions, tokens, events, memberships, audit
-- [ ] Sign-up/verify/sign-in/out/reset/lockout
-- [ ] Email provider (dev outbox)
-- [ ] Permission matrix + `can()` + 404 scoping
-- [ ] Matrix test harness
-- [ ] Auth UI, protected routes, shell, role navigation
-- [ ] Seed accounts
+- [x] Schema: users, sessions, tokens, events, memberships, audit
+- [x] Sign-up/verify/sign-in/out/reset/lockout
+- [x] Email provider (dev outbox)
+- [x] Permission matrix + event-context/`requireAction` middleware + 404 scoping
+- [x] Matrix test harness
+- [x] Auth UI, protected routes, shell, role navigation
+- [x] Seed accounts
 
 **Phase 2 — Events and guidebook**
 - [ ] Event create/edit/publish/registration status

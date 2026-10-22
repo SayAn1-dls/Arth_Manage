@@ -32,6 +32,10 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-18 | Ranking | Standard competition ranking (1,2,2,4); ties flagged and resolved manually with reason; never auto-broken. Ranking scope default: per track if tracks exist else overall; 3 award positions. *Adopted* |
 | D-19 | Time | Server time is authoritative; stored UTC; shown in the event time zone (default Asia/Kolkata) with zone label. *Adopted* |
 | D-20 | Public IDs | `cuid2` ids in URLs; `teamCode` (T-0042) is a display label only. *Adopted* |
+| D-21 | Web forms | Plain controlled/uncontrolled forms with server-side Zod validation mapped to field errors via `useFormErrors`, instead of React Hook Form. Fewer dependencies; the server is the validator of record (PRD 6.0-4). *Adopted* |
+| D-22 | Session lifetime | Decided at sign-in: 12 h when the user is an active Core Admin of any event, otherwise 7 days (OQ-14 defaults); not sliding. *Adopted* |
+| D-23 | Unverified accounts | Sign-in is refused (403 `email_not_verified`) until the email is verified, with a resend option. Registration answers identically for new and existing emails to avoid account enumeration. *Adopted* |
+| D-24 | Prisma generated client | Generated to `apps/api/src/generated` (git-ignored) with ESM `.js` import extensions; regenerated on install and build. *Adopted* |
 
 ## PRD open questions — defaults in force
 

@@ -11,7 +11,7 @@ The platform database is the source of truth; Google Sheets/Drive are optional, 
 * Decisions and deviations: `docs/DECISIONS.md`
 * Visual identity rules: `docs/BRAND_IMPLEMENTATION.md`
 
-**Status:** Phase 0 (foundation) complete. See the checklist for what exists.
+**Status:** Phases 0–1 complete (foundation, authentication, permissions). See the checklist for what exists.
 
 ## Prerequisites
 
@@ -31,6 +31,14 @@ npm run db:seed                 # demo data (arrives with Phase 1; refuses to ru
 
 Apply migrations to the test database once: `DATABASE_URL=<test url> npm run db:deploy -w @arthakram/api`.
 Generate the Prisma client with `npm run db:generate -w @arthakram/api` (run automatically by `db:migrate`).
+
+## Development accounts
+
+`npm run db:seed` creates clearly fake accounts (all verified, password `Password!2345`) and the demo event
+`hacksonipat-2026`: `admin@`, `judge1@`, `judge2@`, `staff@`, `asha@`, `ravi@` + `arthakram.test`.
+They exist for local development only; the seed refuses to run when `NODE_ENV=production`.
+Emails are never sent in development: links appear in the API log and the `OutboxEmail` table
+(`GET /api/v1/dev/outbox?to=<email>`, mounted only outside production).
 
 ## Environment variables
 
