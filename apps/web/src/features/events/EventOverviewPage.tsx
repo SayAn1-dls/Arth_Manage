@@ -5,6 +5,7 @@ import type { MyEvent } from '@arthakram/shared';
 import { eventApi, MODE_LABEL, TYPE_LABEL, useEvent } from '../../lib/events.js';
 import { formatDateTime, ROLE_LABEL } from '../../lib/format.js';
 import { Alert, Badge, Card, Spinner } from '../../ui/index.js';
+import { ParticipantPanel } from '../participant/DashboardPanel.js';
 
 /** Role-aware overview built from real persisted data: dates, deadlines, setup progress and announcements. */
 export function EventOverviewPage() {
@@ -86,6 +87,8 @@ export function EventOverviewPage() {
           </ul>
         </Card>
       </div>
+
+      {mine.role === 'PARTICIPANT' && <ParticipantPanel mine={mine} />}
 
       {mine.role === 'ADMIN' && e.status === 'DRAFT' && (
         <Card footerLabel="Getting ready">

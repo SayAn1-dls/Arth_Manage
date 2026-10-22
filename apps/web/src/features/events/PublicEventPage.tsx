@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
+import { participantApi } from '../../lib/participant.js';
+import { useSession } from '../../shell/session.js';
 import { ApiError, request } from '../../lib/api.js';
 import { MODE_LABEL, TYPE_LABEL } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
@@ -89,6 +91,7 @@ export function PublicEventPage() {
         {e.description && <p className="mt-4 text-lg">{e.description}</p>}
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Badge tone={e.registrationStatus === 'OPEN' ? 'success' : 'info'}>{regText}</Badge>
+          <PrimaryAction slug={slug} registration={e.registrationStatus} />
         </div>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -140,4 +143,49 @@ export function PublicEventPage() {
       </main>
     </div>
   );
+}
+
+const actionCls =
+  'inline-flex min-h-11 items-center rounded-pill border border-ember bg-ember px-5 py-2 font-bold text-ink no-underline hover:brightness-95';
+
+/** Register / Go to my team / Registration closed, chosen from the visitor's real state (PRD FR-050). */
+function PrimaryAction({
+  slug,
+  registration,
+}: {
+  slug: string;
+  registration: 'NOT_OPEN' | 'OPEN' | 'CLOSED';
+}) {
+  const { user } = useSession();
+  const me = useQuery({
+    queryKey: ['public-me', slug],
+    queryFn: () => participantApi.publicMe(slug),
+    enabled: Boolean(user),
+    retry: false,
+  });
+  if (!user) {
+    return registration === 'OPEN' ? (
+      <Link to="/login" state={{ from: `/e/${slug}/register` }} className={actionCls}>
+        Sign in to register
+      </Link>
+    ) : null;
+  }
+  if (me.isPending) return null;
+  if (me.data?.role === 'PARTICIPANT' && me.data.registered)
+    return (
+      <Link to={`/events/${me.data.eventId}/team`} className={actionCls}>
+        Go to my team
+      </Link>
+    );
+  if (me.data?.role)
+    return (
+      <Link to={`/events/${me.data.eventId}`} className={actionCls}>
+        Open the event
+      </Link>
+    );
+  return registration === 'OPEN' ? (
+    <Link to={`/e/${slug}/register`} className={actionCls}>
+      Register
+    </Link>
+  ) : null;
 }
