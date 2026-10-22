@@ -98,3 +98,85 @@ export async function openEvent(
     app: kit.app as Express,
   };
 }
+
+type World = Awaited<ReturnType<typeof openEvent>>;
+
+export function upload(agent: Agent, url: string, bytes: Buffer, filename: string) {
+  return agent
+    .put(url)
+    .set('Content-Type', 'application/octet-stream')
+    .set('X-Filename', encodeURIComponent(filename))
+    .send(bytes);
+}
+
+/** A two-person team (the event minimum) created through the API. */
+export async function teamOfTwo(w: World, name = 'Byte Me') {
+  const lead = await w.participant(`${name} Lead`);
+  const created = await lead.agent.post(`${w.base}/teams`).send({ name });
+  const mate = await w.participant(`${name} Mate`);
+  await mate.agent.post(`${w.base}/teams/join`).send({ code: created.body.team.joinCode });
+  return { lead, mate, teamId: created.body.team.id as string };
+}
+
+/** Fills the default hackathon form with a real PDF and submits it as version 1. */
+export async function submitProject(
+  w: World,
+  team: Awaited<ReturnType<typeof teamOfTwo>>,
+  title = 'Fraud Radar',
+) {
+  const url = `${w.base}/rounds/${w.roundId}/submission`;
+  const s = (await team.lead.agent.get(url)).body;
+  const file = s.fields.find((f: { type: string }) => f.type === 'FILE');
+  const repo = s.fields.find((f: { type: string }) => f.type === 'REPO_URL');
+  const up = await upload(team.lead.agent, `${url}/files/${file.id}`, pdfBytes(title), 'deck.pdf');
+  if (up.status !== 201) throw new Error(`upload failed ${JSON.stringify(up.body)}`);
+  const draft = await team.lead.agent.put(`${url}/draft`).send({
+    title,
+    summary: `${title} summary`,
+    version: up.body.version,
+    values: { [file.id]: up.body.file.id, [repo.id]: 'https://github.com/owner/repo' },
+  });
+  const submitted = await team.lead.agent
+    .post(`${url}/submit`)
+    .send({ version: draft.body.version });
+  if (submitted.status !== 201) throw new Error(`submit failed ${JSON.stringify(submitted.body)}`);
+  return { fileId: up.body.file.id as string, fileFieldId: file.id as string };
+}
+
+/** Closes the submission window by moving the deadline into the past (what time passing would do). */
+export async function closeSubmissions(kit: TestKit, w: World) {
+  await kit.db.round.update({
+    where: { id: w.roundId },
+    data: { submissionDeadline: new Date(Date.now() - 60_000) },
+  });
+}
+
+export async function addJudge(kit: TestKit, w: World, name: string) {
+  const user = await createUser(kit.db, { name });
+  const membership = await kit.db.eventMembership.create({
+    data: { eventId: w.eventId, userId: user.id, role: 'JUDGE' },
+  });
+  return { user, membershipId: membership.id, agent: await signedInAgent(kit.app, user.email) };
+}
+
+/** The PRD E.1 worked-example rubric: weights 30/40/30 over ranges 1-10, 1-10 and 0-5. */
+export async function workedExampleRubric(w: World) {
+  const put = await w.admin.put(`${w.base}/rounds/${w.roundId}/rubric`).send({
+    name: 'Worked example',
+    teamCommentMode: 'OPTIONAL',
+    criteria: [
+      { name: 'A', description: 'Criterion A', weight: 30, min: 1, max: 10 },
+      { name: 'B', description: 'Criterion B', weight: 40, min: 1, max: 10 },
+      { name: 'C', description: 'Criterion C', weight: 30, min: 0, max: 5 },
+    ],
+  });
+  if (put.status !== 200) throw new Error(`rubric failed ${JSON.stringify(put.body)}`);
+  const act = await w.admin.post(`${w.base}/rounds/${w.roundId}/rubric/activate`);
+  if (act.status !== 200) throw new Error(`activate failed ${JSON.stringify(act.body)}`);
+  return act.body.rubric as { criteria: { id: string; name: string }[] };
+}
+
+export async function openJudging(w: World) {
+  const res = await w.admin.put(`${w.base}/rounds/${w.roundId}/judging`).send({ status: 'OPEN' });
+  if (res.status !== 200) throw new Error(`open judging failed ${JSON.stringify(res.body)}`);
+}
