@@ -148,6 +148,8 @@ model Event {
   registrationFieldDefs RegistrationFieldDef[]
   teams                 Team[]
   invitations           Invitation[]
+  staffTasks            StaffTask[]
+  issueReports          IssueReport[]
 }
 
 enum EventRole {
@@ -258,6 +260,9 @@ model Round {
   judgingStatus       JudgingStatus         @default(NOT_OPEN)
   formFields          SubmissionFormField[]
   rubric              Rubric?
+  snapshots           ResultSnapshot[]
+  tieResolutions      TieResolution[]
+  notRanked           NotRankedMark[]
   assignments         JudgeAssignment[]
   submissions         Submission[]
 
@@ -664,4 +669,179 @@ model EvaluationVersion {
   evaluation    Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
 
   @@unique([evaluationId, versionNo])
+}
+
+// ───────────── Results (PRD FR-032..035, FR-149..156) ─────────────
+
+enum SnapshotStatus {
+  APPROVED
+  INVALIDATED
+}
+
+// Content columns are immutable (trigger in the migration). Only status, invalidation and publication
+// bookkeeping may change, so an approved result is always explainable.
+model ResultSnapshot {
+  id                String         @id @default(cuid())
+  eventId           String
+  roundId           String
+  versionNo         Int
+  entries           Json // ranked teams: rank, score at 4 dp, per-judge and per-criterion breakdown
+  unranked          Json // teams not ranked and why
+  tieDecisions      Json // resolutions in force when approved
+  exclusions        Json // excluded assignments with reasons
+  fingerprint       String // hash of everything the ranking depended on
+  approvedById      String
+  approvedAt        DateTime       @default(now())
+  status            SnapshotStatus @default(APPROVED)
+  invalidatedAt     DateTime?
+  invalidatedReason String?
+  publishedAt       DateTime?
+  publishedById     String?
+  unpublishedAt     DateTime?
+  unpublishReason   String?
+  round             Round          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, versionNo])
+  @@index([eventId, roundId])
+}
+
+enum TieMode {
+  SHARE
+  ORDER
+}
+
+model TieResolution {
+  id        String   @id @default(cuid())
+  eventId   String
+  roundId   String
+  group     String
+  rank      Int
+  teamIds   String[]
+  mode      TieMode
+  order     String[] // team ids in the chosen order (ORDER only)
+  reason    String
+  createdBy String
+  createdAt DateTime @default(now())
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, group, rank])
+}
+
+model NotRankedMark {
+  id        String   @id @default(cuid())
+  eventId   String
+  roundId   String
+  teamId    String
+  reason    String
+  createdBy String
+  createdAt DateTime @default(now())
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, teamId])
+}
+
+// ───────────── Staff operations (PRD Module D) ─────────────
+
+enum StaffTaskType {
+  CHECKIN
+  VERIFICATION
+  GENERAL
+}
+
+enum StaffTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+model StaffTask {
+  id                String              @id @default(cuid())
+  eventId           String
+  title             String
+  description       String?
+  type              StaffTaskType       @default(GENERAL)
+  dueAt             DateTime?
+  location          String?
+  status            StaffTaskStatus     @default(TODO)
+  note              String? // blocked reason or completion note
+  statusChangedById String?
+  statusChangedAt   DateTime            @default(now())
+  createdById       String
+  createdAt         DateTime            @default(now())
+  event             Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignees         StaffTaskAssignee[]
+  teams             StaffTaskTeam[]
+
+  @@index([eventId, status])
+}
+
+model StaffTaskAssignee {
+  taskId       String
+  membershipId String
+  task         StaffTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, membershipId])
+  @@index([membershipId])
+}
+
+model StaffTaskTeam {
+  taskId String
+  teamId String
+  task   StaffTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, teamId])
+}
+
+// Attendance and ID verification per participant. Undo keeps the row (undoneAt) so the history stays explainable.
+model CheckIn {
+  id             String    @id @default(cuid())
+  eventId        String
+  membershipId   String
+  checkedInAt    DateTime  @default(now())
+  checkedInById  String
+  idVerifiedAt   DateTime?
+  idVerifiedById String?
+  note           String?
+  undoneAt       DateTime?
+  undoneById     String?
+
+  @@index([eventId, membershipId])
+}
+
+enum IssueCategory {
+  REGISTRATION_MISMATCH
+  TECHNICAL
+  FACILITIES
+  CONDUCT
+  OTHER
+}
+
+enum IssueSeverity {
+  NORMAL
+  URGENT
+}
+
+enum IssueStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model IssueReport {
+  id                   String        @id @default(cuid())
+  eventId              String
+  reporterMembershipId String
+  category             IssueCategory
+  description          String
+  teamId               String?
+  severity             IssueSeverity @default(NORMAL)
+  status               IssueStatus   @default(OPEN)
+  resolutionNote       String?
+  resolvedById         String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  event                Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status])
 }
