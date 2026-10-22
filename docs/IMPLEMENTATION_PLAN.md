@@ -173,15 +173,15 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 **Phase 0 — Foundation**
 - [x] Branch `v1_runthrough` created; brand PDF ignored; PRD committed
 - [x] Implementation plan, architecture, decisions, brand notes
-- [ ] Workspace, TS, lint, format
-- [ ] API skeleton, env validation, health check
-- [ ] Prisma + PostgreSQL, migrations, test DB
-- [ ] Web app, routing shell
-- [ ] Design tokens, fonts, base styles
-- [ ] Brand component library + gallery page
-- [ ] Logo/favicon assets (pending D-09)
-- [ ] README, `.env.example`
-- [ ] Test tooling + visual-QA script
+- [x] Workspace, TS, lint, format
+- [x] API skeleton, env validation, health check
+- [x] Prisma + PostgreSQL, migrations, test DB
+- [x] Web app, routing shell
+- [x] Design tokens, fonts, base styles
+- [x] Brand component library + gallery page (dev route `/_design`; visually inspected at 1440 and 390 px)
+- [x] Logo/favicon assets (D-09 resolved)
+- [x] README, `.env.example`
+- [x] Test tooling + visual-QA script
 
 **Phase 1 — Auth and permissions**
 - [ ] Schema: users, sessions, tokens, events, memberships, audit

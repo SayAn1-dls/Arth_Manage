@@ -92,9 +92,7 @@ raw hex values never appear in feature code (enforced by a lint/grep check in CI
   co-branded material and is not used in the application UI (the kit says co-branded lockups are for
   external audiences). If a public event landing page is later deemed "external", the shield would be
   supplied artwork on a White panel, never redrawn.
-* Source: only the live vector inside the local kit PDF exists (DECISIONS D-09). Until the extracted SVGs
-  are approved for the repo, the UI shows a neutral placeholder block labelled "Arthakram" in Instrument
-  Sans — no imitation lettering.
+* Source: vector extracted from the local kit PDF and committed as static SVGs in `apps/web/src/assets/logo/` (DECISIONS D-09). The `Logo` component only renders these files, derives height from the aspect ratio, and switches to the feather mark below 120 px.
 
 ## 7. Visual devices and where they go
 
