@@ -43,16 +43,21 @@ Logs are JSON on stdout (pino). Secrets and tokens are never logged; passwords a
 PostgreSQL holds everything except uploaded files (`STORAGE_DIR`).
 
 ```bash
-# Backup (database + files)
-pg_dump --format=custom --file=arthakram-$(date +%F-%H%M).dump "$DATABASE_URL"
-tar -czf uploads-$(date +%F-%H%M).tgz "$STORAGE_DIR"
+# Backup (database + files), verified readable, with checksums
+DATABASE_URL=... STORAGE_DIR=... scripts/backup.sh /path/to/backups
 
-# Restore into an empty database
+# Rehearse a restore into a scratch database (never touches the source) and compare
+DATABASE_URL=... scripts/restore-check.sh /path/to/backups/arthakram-<stamp>.dump /path/to/backups/uploads-<stamp>.tgz
+
+# Real restore into an empty database
 createdb arthakram_restore
-pg_restore --no-owner --dbname=arthakram_restore arthakram-YYYY-MM-DD-HHMM.dump
-tar -xzf uploads-YYYY-MM-DD-HHMM.tgz -C "$(dirname "$STORAGE_DIR")"
-# then point DATABASE_URL at arthakram_restore and start the app
+pg_restore --no-owner --dbname=arthakram_restore arthakram-<stamp>.dump
+tar -xzf uploads-<stamp>.tgz -C "$(dirname "$STORAGE_DIR")"
+# then point DATABASE_URL and STORAGE_DIR at the restored copies and start the app
 ```
+
+A restore was rehearsed on the development database: 2,141 rows, all triggers and 552 audit entries came
+back, the API started on the restored data and a restored file downloaded. Repeat it on real data before the pilot.
 
 Policy to follow (PRD 11.3): automatic daily database backups kept 30 days, plus manual backups right
 after the submission deadline and after result approval. Test a restore before the pilot. The audit log

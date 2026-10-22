@@ -17,7 +17,7 @@ question (PRD OQ-01), so this guide stays provider-neutral.
 
 ## 2. Configuration
 
-Copy `.env.example` to `.env` and fill it in. The server refuses to start in production unless
+Copy `.env.example` to `.env` and fill it in. `TRUST_PROXY_HOPS` is the number of reverse proxies in front of the API (default 1; use 0 when the API is exposed directly, otherwise a client could fake its address and dodge rate limits). The server refuses to start in production unless
 `EMAIL_PROVIDER=smtp` (with `SMTP_URL`) and `APP_BASE_URL` is `https://`. `SESSION_SECRET` must be at
 least 32 characters. Never commit `.env`.
 
@@ -75,3 +75,25 @@ Take a backup (see the runbook), `git pull`, `npm ci`, `npm run build`, `npm run
   untested under load.
 * Rate limiting is in memory per process.
 * No email reminders, withdraw flow, public certificate verification or appreciation certificates (P1/P2).
+
+## 8. Staging rehearsal (what was actually run)
+
+`scripts/staging/rehearse.sh` builds the production configuration on one machine: empty database, `migrate deploy`
+(never the seed), `NODE_ENV=production`, a self-signed HTTPS terminator standing in for your proxy, a local SMTP
+sink standing in for your mail provider, a real storage directory. It checks that production refuses unsafe
+settings, health over HTTPS, no dev routes, Secure/HttpOnly cookies, that a session survives an API restart, and
+runs the browser acceptance specs against it. Results and the defects it found are in `docs/RELEASE_READINESS.md`.
+It does **not** prove a real host, certificate, DNS or mail provider; repeat the rehearsal there with a throwaway event.
+
+## 9. Storage: when local disk is and is not acceptable
+
+Acceptable: one API instance on a host whose disk persists across restarts and redeploys, with the backup in the
+runbook. Not acceptable: platforms with ephemeral filesystems or more than one instance. In those cases an
+object-storage adapter implementing `put`, `get` and `check` (`apps/api/src/storage/provider.ts`) must be written
+and tested before the event. It has not been built.
+
+## 10. Backups
+
+`scripts/backup.sh` (database dump verified readable, uploads archive, checksums) and `scripts/restore-check.sh`
+(restore into a scratch database, compare row counts and triggers, drop it). Schedule the first daily and run the
+second after each backup rehearsal. Backups contain personal data: restrict access and delete on the same schedule as the data.

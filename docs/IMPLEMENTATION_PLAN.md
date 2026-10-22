@@ -236,6 +236,14 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Load test at PRD profile (`npm run test:load -w @arthakram/api`)
 - [x] Deployment + runbook docs (`docs/DEPLOYMENT.md`, `docs/RUNBOOK.md`)
 
+**Release readiness (controlled pilot)** — see `docs/RELEASE_READINESS.md`
+- [x] Production-readiness audit with regression tests (16 defects fixed)
+- [x] Empty-database workflow journey; staging rehearsal over HTTPS with SMTP
+- [x] Backup and restore rehearsed
+- [x] Visual QA of every role and key states (partial list of inspected screens in the report)
+- [ ] Google Sheets/Drive verified against real Google (needs credentials; manual steps documented)
+- [ ] Real host, certificate, mail provider rehearsal (needs hosting decision)
+
 ## 7. Reporting at the end of each session
 
 Features implemented · features tested · test results (actual output) · visual QA performed (which

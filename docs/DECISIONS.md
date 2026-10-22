@@ -62,6 +62,9 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-48 | Sync queue | Postgres-backed `SyncJob` with partial unique indexes (one queued, one running per kind and connection), 60 s debounce capped at 5 min, retries at 1/2/4/8/16 min, a newer queued job supersedes a failed one, stuck jobs recover on start, claims are conditional updates. Changes are detected by one response hook on the API router, not by editing every write path. *Adopted* |
 | D-49 | Production build | Shared package compiles to `dist`; a `source` export condition keeps dev tooling on TypeScript sources. The API serves `apps/web/dist` in production. Production refuses to start without SMTP email and an https `APP_BASE_URL`. *Adopted* |
 | D-50 | Email | `SmtpEmailProvider` (nodemailer) added so production can deliver verification, reset and invitation emails; the dev outbox remains non-production only. *Adopted* |
+| D-51 | Release audit | Findings and fixes are in `docs/RELEASE_READINESS.md`. Two decisions: `TRUST_PROXY_HOPS` is configurable (default 1) because rate limits key on the client address; API responses are `no-store`. *Adopted* |
+| D-52 | Google verification status | Real Google has not been tested. A local stand-in server exercises the real REST client and queue and is labelled as not-Google in code and docs. The integration stays "unverified" until the manual steps in RELEASE_READINESS section 5 are recorded. *Adopted* |
+| D-53 | Storage for the pilot | Local disk, one instance, persistent volume, backed up. An object-storage adapter is required if the host has an ephemeral disk; not built because no host is chosen. *Adopted* |
 
 ## PRD open questions — defaults in force
 
