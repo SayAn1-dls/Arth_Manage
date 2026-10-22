@@ -12,6 +12,11 @@ import { createEventService } from './service.js';
 import { structureRouter } from './structure.js';
 import { guidebookRouter } from './guidebook.js';
 import { announcementsRouter } from './announcements.js';
+import { peopleRouter } from '../people/routes.js';
+import { participantTeamsRouter } from '../teams/routes.js';
+import { submissionsRouter } from '../submissions/routes.js';
+import { invitationsRouter } from '../invitations/routes.js';
+import { registrationRouter } from '../registration/routes.js';
 
 export function eventsRouter(deps: Deps) {
   const router = Router();
@@ -106,6 +111,13 @@ export function eventsRouter(deps: Deps) {
   scoped.use(structureRouter(deps));
   scoped.use(guidebookRouter(deps));
   scoped.use(announcementsRouter(deps));
+  scoped.use(peopleRouter(deps));
+  scoped.use(participantTeamsRouter(deps));
+  scoped.use(submissionsRouter(deps));
+  const invitations = invitationsRouter(deps);
+  scoped.use(invitations.scoped);
+  router.use(invitations.accept);
+  router.use(registrationRouter(deps));
 
   router.use('/events/:eventId', scoped);
   return router;

@@ -10,6 +10,7 @@ import { writeAudit } from '../../audit/audit.js';
 import type { EventContext } from '../../http/context.js';
 import type { Event, User } from '../../generated/prisma/client.js';
 import { changed } from './dto.js';
+import { createDefaultFormFields } from '../submissions/service.js';
 
 const EVENT_AUDIT_KEYS = [
   'name',
@@ -89,7 +90,10 @@ export function createEventService({ db, logger }: Deps) {
         await tx.eventMembership.create({
           data: { eventId: event.id, userId: user.id, role: 'ADMIN' },
         });
-        await tx.round.create({ data: { eventId: event.id, order: 1, name: 'Round 1' } });
+        const round1 = await tx.round.create({
+          data: { eventId: event.id, order: 1, name: 'Round 1' },
+        });
+        await createDefaultFormFields(tx, round1.id, event.type);
         await tx.guidebook.create({
           data: {
             eventId: event.id,
@@ -141,6 +145,23 @@ export function createEventService({ db, logger }: Deps) {
           throw AppError.invalid('Maximum team size must be at least the minimum', {
             teamMax: 'Must be at least the minimum',
           });
+        if (max < before.teamMax) {
+          // Reducing the maximum below an existing team is blocked, listing those teams (PRD FR-014).
+          const teams = await db.team.findMany({
+            where: { eventId: before.id, status: { not: 'DISSOLVED' } },
+            include: { _count: { select: { members: { where: { leftAt: null } } } } },
+          });
+          const over = teams.filter((t) => t._count.members > max);
+          if (over.length) {
+            throw AppError.conflict(
+              'teams_exceed_max',
+              `These teams are larger than ${max}: ${over
+                .slice(0, 5)
+                .map((t) => `${t.teamCode} ${t.name}`)
+                .join(', ')}. Resolve them first.`,
+            );
+          }
+        }
       }
       const datesChanged =
         (rest.startsAt && new Date(rest.startsAt).getTime() !== before.startsAt.getTime()) ||

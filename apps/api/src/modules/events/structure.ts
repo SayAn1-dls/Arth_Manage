@@ -8,6 +8,7 @@ import { parse } from '../../http/validate.js';
 import { writeAudit } from '../../audit/audit.js';
 import { roundDto } from './dto.js';
 import { assertWritable } from './service.js';
+import { createDefaultFormFields } from '../submissions/service.js';
 import { assertProblemUnused, assertTrackUnused, roundHasSubmissions } from './usage.js';
 
 const MAX_TRACKS = 20;
@@ -271,6 +272,7 @@ export function structureRouter({ db }: Deps) {
           awardPositions: input.awardPositions,
         },
       });
+      await createDefaultFormFields(tx, r.id, ctx.event.type);
       await writeAudit(tx, {
         ...auditBase(req),
         action: 'round.created',
