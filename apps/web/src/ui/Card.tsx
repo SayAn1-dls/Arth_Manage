@@ -10,8 +10,11 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
 /** White panel on Paper, ~8px radius, optional Blush footer strip. */
 export function Card({ footerLabel, className, children, ...rest }: CardProps) {
   return (
-    <div className={cn('overflow-hidden rounded-card bg-white shadow-card', className)} {...rest}>
-      <div className="p-5 sm:p-6">{children}</div>
+    <div
+      className={cn('flex flex-col overflow-hidden rounded-card bg-white shadow-card', className)}
+      {...rest}
+    >
+      <div className="flex-1 p-5 sm:p-6">{children}</div>
       {footerLabel && (
         <div className="border-t border-line bg-blush px-5 py-2.5 sm:px-6">
           <Eyebrow>{footerLabel}</Eyebrow>
