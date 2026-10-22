@@ -1,5 +1,5 @@
-// Domain models are added phase by phase (see docs/IMPLEMENTATION_PLAN.md).
-// Phase 0 only establishes the datasource, generator and baseline migration.
+// Domain schema, grown phase by phase (see docs/IMPLEMENTATION_PLAN.md).
+// Constraints that Prisma cannot express (partial/functional unique indexes, triggers) live in the SQL migrations.
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -7,4 +7,177 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ───────────── Identity ─────────────
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique // always stored lower-case
+  name              String
+  passwordHash      String
+  emailVerifiedAt   DateTime?
+  failedLoginCount  Int       @default(0)
+  lastFailedLoginAt DateTime?
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions    Session[]
+  tokens      AuthToken[]
+  memberships EventMembership[]
+  ownedEvents Event[]           @relation("EventOwner")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique // sha256 of the opaque cookie value; the raw token is never stored
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum AuthTokenType {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+// Development outbox for the console email provider (never used to send real mail).
+model OutboxEmail {
+  id        String   @id @default(cuid())
+  toEmail   String
+  subject   String
+  body      String
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([toEmail, createdAt])
+}
+
+// ───────────── Events and membership ─────────────
+
+enum EventType {
+  HACKATHON
+  CASE_COMPETITION
+  OTHER
+}
+
+enum EventMode {
+  IN_PERSON
+  ONLINE
+  HYBRID
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CONCLUDED
+  ARCHIVED
+}
+
+enum RegistrationStatus {
+  NOT_OPEN
+  OPEN
+  CLOSED
+}
+
+model Event {
+  id                   String             @id @default(cuid())
+  slug                 String             @unique
+  name                 String
+  type                 EventType
+  mode                 EventMode
+  startsAt             DateTime
+  endsAt               DateTime
+  timeZone             String             @default("Asia/Kolkata")
+  institution          String
+  contactEmail         String
+  venue                String?
+  description          String?
+  eligibility          String?
+  status               EventStatus        @default(DRAFT)
+  registrationStatus   RegistrationStatus @default(NOT_OPEN)
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+  teamMin              Int                @default(1)
+  teamMax              Int                @default(4)
+  // What teams see when results publish (PRD OQ-05 defaults: winners on, own rank/score off)
+  showWinners          Boolean            @default(true)
+  showOwnRank          Boolean            @default(false)
+  showOwnScores        Boolean            @default(false)
+  teamCodeSeq          Int                @default(0)
+  ownerId              String
+  version              Int                @default(1)
+  publishedAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  owner       User              @relation("EventOwner", fields: [ownerId], references: [id])
+  memberships EventMembership[]
+  audit       AuditLog[]
+}
+
+enum EventRole {
+  ADMIN
+  JUDGE
+  STAFF
+  PARTICIPANT
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  REMOVED
+}
+
+model EventMembership {
+  id          String           @id @default(cuid())
+  eventId     String
+  userId      String
+  role        EventRole
+  status      MembershipStatus @default(ACTIVE)
+  invitedById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One role per user per event (PRD 8.2)
+  @@unique([eventId, userId])
+  @@index([userId])
+}
+
+// ───────────── Audit (append-only, enforced by a trigger in the migration) ─────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  eventId    String?
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  reason     String?
+  at         DateTime @default(now())
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, at])
 }
