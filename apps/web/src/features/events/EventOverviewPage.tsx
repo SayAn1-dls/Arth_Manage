@@ -6,6 +6,7 @@ import { eventApi, MODE_LABEL, TYPE_LABEL, useEvent } from '../../lib/events.js'
 import { formatDateTime, ROLE_LABEL } from '../../lib/format.js';
 import { Alert, Badge, Card, Spinner } from '../../ui/index.js';
 import { ParticipantPanel } from '../participant/DashboardPanel.js';
+import { JudgeRoundsPanel } from '../judging/JudgePages.js';
 
 /** Role-aware overview built from real persisted data: dates, deadlines, setup progress and announcements. */
 export function EventOverviewPage() {
@@ -89,6 +90,12 @@ export function EventOverviewPage() {
       </div>
 
       {mine.role === 'PARTICIPANT' && <ParticipantPanel mine={mine} />}
+      {mine.role === 'JUDGE' && (
+        <section aria-labelledby="judge-h" className="flex flex-col gap-3">
+          <h3 id="judge-h">Your rounds</h3>
+          <JudgeRoundsPanel mine={mine} />
+        </section>
+      )}
 
       {mine.role === 'ADMIN' && e.status === 'DRAFT' && (
         <Card footerLabel="Getting ready">

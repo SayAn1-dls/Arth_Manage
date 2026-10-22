@@ -32,6 +32,10 @@ import {
   SubmissionDetailPage,
 } from './features/admin/SubmissionsMonitorPage.js';
 import { PeoplePage } from './features/admin/PeoplePage.js';
+import { RubricPage } from './features/judging/RubricPage.js';
+import { JudgingPage } from './features/judging/JudgingPage.js';
+import { JudgeIndexPage, JudgeTeamsPage } from './features/judging/JudgePages.js';
+import { EvaluationPage } from './features/judging/EvaluationPage.js';
 import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage.js';
 import { ProfilePage } from './features/participant/ProfilePage.js';
 import { SubmissionPage } from './features/participant/SubmissionPage.js';
@@ -70,6 +74,11 @@ const routes: RouteObject[] = [
               { path: 'structure', element: <StructurePage /> },
               { path: 'guidebook', element: <GuidebookPage /> },
               { path: 'announcements', element: <AnnouncementsPage /> },
+              { path: 'rubric', element: <RubricPage /> },
+              { path: 'judging', element: <JudgingPage /> },
+              { path: 'judge', element: <JudgeIndexPage /> },
+              { path: 'judge/:roundId', element: <JudgeTeamsPage /> },
+              { path: 'judge/:roundId/:teamId', element: <EvaluationPage /> },
               { path: 'participants', element: <ParticipantsPage /> },
               { path: 'participants/:membershipId', element: <ParticipantDetailPage /> },
               { path: 'teams', element: <TeamsPage /> },

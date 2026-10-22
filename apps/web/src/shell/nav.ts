@@ -23,6 +23,8 @@ export function navFor(role: Role): NavEntry[] {
         overview,
         { to: 'setup', label: 'Setup' },
         { to: 'participants', label: 'Participants' },
+        { to: 'rubric', label: 'Rubric' },
+        { to: 'judging', label: 'Judging' },
         { to: 'teams', label: 'Teams' },
         { to: 'submissions', label: 'Submissions' },
         { to: 'people', label: 'People' },
@@ -43,6 +45,7 @@ export function navFor(role: Role): NavEntry[] {
         announcements,
       ];
     case 'JUDGE':
+      return [overview, { to: 'judge', label: 'My teams' }, guidebook, announcements];
     case 'STAFF':
       return [overview, guidebook, announcements];
   }
