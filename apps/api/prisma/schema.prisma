@@ -255,7 +255,10 @@ model Round {
   awardPositions      Int                   @default(3)
   version             Int                   @default(1)
   event               Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judgingStatus       JudgingStatus         @default(NOT_OPEN)
   formFields          SubmissionFormField[]
+  rubric              Rubric?
+  assignments         JudgeAssignment[]
   submissions         Submission[]
 
   @@unique([eventId, order])
@@ -525,4 +528,140 @@ model SubmissionFile {
   submission             Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
   @@index([submissionId])
+}
+
+// ───────────── Rubrics, assignments and evaluations (PRD Modules A.5, C, E) ─────────────
+
+enum JudgingStatus {
+  NOT_OPEN
+  OPEN
+  CLOSED
+}
+
+enum RubricState {
+  DRAFT
+  ACTIVE
+  LOCKED
+}
+
+enum CommentMode {
+  OFF
+  OPTIONAL
+  REQUIRED
+}
+
+model Rubric {
+  id               String            @id @default(cuid())
+  roundId          String            @unique // one rubric per round
+  name             String
+  state            RubricState       @default(DRAFT)
+  teamCommentMode  CommentMode       @default(OPTIONAL)
+  sourceTemplate   String?
+  /**
+   * Increments whenever the structure changes, so evaluations record which structure they scored.
+   */
+  structureVersion Int               @default(1)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  round            Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  criteria         RubricCriterion[]
+}
+
+model RubricCriterion {
+  id          String           @id @default(cuid())
+  rubricId    String
+  name        String
+  description String           @default("")
+  weight      Int
+  min         Int
+  max         Int
+  order       Int              @default(0)
+  rubric      Rubric           @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  scores      CriterionScore[]
+
+  @@unique([rubricId, name])
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  CONFLICT
+  EXCLUDED
+  UNASSIGNED
+}
+
+model JudgeAssignment {
+  id                 String           @id @default(cuid())
+  eventId            String
+  roundId            String
+  teamId             String
+  judgeMembershipId  String
+  status             AssignmentStatus @default(ACTIVE)
+  reason             String? // exclusion or conflict reason
+  conflictDeclaredBy String? // 'JUDGE' | 'ADMIN'
+  createdAt          DateTime         @default(now())
+  round              Round            @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  evaluation         Evaluation?
+
+  // One assignment per judge per team per round (PRD 9.1), so one evaluation per judge per team per round.
+  @@unique([roundId, teamId, judgeMembershipId])
+  @@index([judgeMembershipId, roundId])
+  @@index([eventId, roundId])
+}
+
+enum EvaluationStatus {
+  DRAFT
+  SUBMITTED
+  REOPENED
+}
+
+model Evaluation {
+  id                       String              @id @default(cuid())
+  assignmentId             String              @unique
+  eventId                  String
+  status                   EvaluationStatus    @default(DRAFT)
+  /**
+   * Optimistic lock for the judge's own tabs and the submit race.
+   */
+  version                  Int                 @default(1)
+  structureVersion         Int                 @default(1)
+  weightedScore            Decimal?            @db.Decimal(9, 4)
+  teamComment              String?
+  privateNote              String?
+  submittedAt              DateTime?
+  submissionCount          Int                 @default(0)
+  correctionReason         String?
+  correctionRequestedAt    DateTime?
+  correctionDeclinedReason String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  assignment               JudgeAssignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  scores                   CriterionScore[]
+  history                  EvaluationVersion[]
+}
+
+model CriterionScore {
+  id           String          @id @default(cuid())
+  evaluationId String
+  criterionId  String
+  score        Int
+  evaluation   Evaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterion    RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, criterionId])
+}
+
+// Every submission of an evaluation is kept (immutable, trigger in the migration) so corrections are explainable.
+model EvaluationVersion {
+  id            String     @id @default(cuid())
+  evaluationId  String
+  versionNo     Int
+  scores        Json // { criterionId: score }
+  criteria      Json // the rubric structure that was scored: [{ id, name, weight, min, max }]
+  teamComment   String?
+  privateNote   String?
+  weightedScore Decimal    @db.Decimal(9, 4)
+  submittedAt   DateTime   @default(now())
+  evaluation    Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, versionNo])
 }
