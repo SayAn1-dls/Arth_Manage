@@ -4,3 +4,5 @@ export * from './auth.js';
 export * from './time.js';
 export * from './markdown.js';
 export * from './event.js';
+export * from './registration.js';
+export * from './submission.js';
