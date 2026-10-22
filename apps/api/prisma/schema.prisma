@@ -101,40 +101,43 @@ enum RegistrationStatus {
 }
 
 model Event {
-  id                   String             @id @default(cuid())
-  slug                 String             @unique
-  name                 String
-  type                 EventType
-  mode                 EventMode
-  startsAt             DateTime
-  endsAt               DateTime
-  timeZone             String             @default("Asia/Kolkata")
-  institution          String
-  contactEmail         String
-  venue                String?
-  description          String?
-  eligibility          String?
-  status               EventStatus        @default(DRAFT)
-  registrationStatus   RegistrationStatus @default(NOT_OPEN)
-  registrationOpensAt  DateTime?
-  registrationClosesAt DateTime?
-  teamMin              Int                @default(1)
-  teamMax              Int                @default(4)
+  id                         String                @id @default(cuid())
+  slug                       String                @unique
+  name                       String
+  type                       EventType
+  mode                       EventMode
+  startsAt                   DateTime
+  endsAt                     DateTime
+  timeZone                   String                @default("Asia/Kolkata")
+  institution                String
+  contactEmail               String
+  venue                      String?
+  description                String?
+  eligibility                String?
+  status                     EventStatus           @default(DRAFT)
+  registrationStatus         RegistrationStatus    @default(NOT_OPEN)
+  registrationOpensAt        DateTime?
+  registrationClosesAt       DateTime?
+  teamMin                    Int                   @default(1)
+  teamMax                    Int                   @default(4)
   // What teams see when results publish (PRD OQ-05 defaults: winners on, own rank/score off)
-  showWinners          Boolean            @default(true)
-  showOwnRank          Boolean            @default(false)
-  showOwnScores        Boolean            @default(false)
+  showWinners                Boolean               @default(true)
+  showOwnRank                Boolean               @default(false)
+  showOwnScores              Boolean               @default(false)
+  // Certificate eligibility (PRD FR-231, OQ-09 default: a submitted version in Round 1)
+  certParticipationRule      CertParticipationRule @default(SUBMITTED)
+  certWinnersAlsoParticipate Boolean               @default(true)
   // Up to five participant declarations to tick at registration (PRD FR-013)
-  declarations         String[]           @default([])
-  trackRequired        Boolean            @default(false)
-  teamCodeSeq          Int                @default(0)
-  ownerId              String
-  version              Int                @default(1)
-  publishedAt          DateTime?
-  concludedAt          DateTime?
-  archivedAt           DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  declarations               String[]              @default([])
+  trackRequired              Boolean               @default(false)
+  teamCodeSeq                Int                   @default(0)
+  ownerId                    String
+  version                    Int                   @default(1)
+  publishedAt                DateTime?
+  concludedAt                DateTime?
+  archivedAt                 DateTime?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
 
   owner                 User                   @relation("EventOwner", fields: [ownerId], references: [id])
   memberships           EventMembership[]
@@ -258,6 +261,7 @@ model Round {
   version             Int                   @default(1)
   event               Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
   judgingStatus       JudgingStatus         @default(NOT_OPEN)
+  commentsReleasedAt  DateTime?
   formFields          SubmissionFormField[]
   rubric              Rubric?
   snapshots           ResultSnapshot[]
@@ -637,6 +641,7 @@ model Evaluation {
   correctionReason         String?
   correctionRequestedAt    DateTime?
   correctionDeclinedReason String?
+  commentHiddenReason      String?
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   assignment               JudgeAssignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
@@ -844,4 +849,155 @@ model IssueReport {
   event                Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, status])
+}
+
+// ───────────── Feedback (PRD Module H) ─────────────
+
+enum FeedbackAudience {
+  PARTICIPANT
+  JUDGE
+}
+
+enum FormState {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+model FeedbackForm {
+  id           String             @id @default(cuid())
+  eventId      String
+  audience     FeedbackAudience
+  state        FormState          @default(DRAFT)
+  // Confidential: organisers never see who answered; identity is stored only to prevent duplicates.
+  confidential Boolean
+  closeAt      DateTime?
+  questions    Json // [{ id, type: RATING|CHOICE|SHORT_TEXT|LONG_TEXT, text, required, options? }]
+  version      Int                @default(1)
+  createdAt    DateTime           @default(now())
+  responses    FeedbackResponse[]
+
+  @@unique([eventId, audience])
+}
+
+model FeedbackResponse {
+  id                     String       @id @default(cuid())
+  formId                 String
+  respondentMembershipId String
+  answers                Json
+  submittedAt            DateTime     @default(now())
+  form                   FeedbackForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  // One response per user per form, enforced by the database (PRD FR-212).
+  @@unique([formId, respondentMembershipId])
+}
+
+// ───────────── Certificates (PRD Module I) ─────────────
+
+enum CertParticipationRule {
+  SUBMITTED
+  CHECKED_IN
+}
+
+enum CertificateType {
+  PARTICIPATION
+  WINNER
+}
+
+enum CertificateStatus {
+  GENERATED
+  NEEDS_REGENERATION
+  RELEASED
+  REVOKED
+  FLAGGED
+}
+
+model CertificateTemplate {
+  id             String          @id @default(cuid())
+  eventId        String
+  type           CertificateType
+  backgroundKey  String?
+  backgroundName String?
+  fields         Json            @default("[]") // placements: { field, x, y, font, size, color, align, maxWidth }
+  awardTexts     Json            @default("{}") // position -> text, e.g. { "1": "First Place" }
+  version        Int             @default(1)
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([eventId, type])
+}
+
+model Certificate {
+  id              String            @id @default(cuid())
+  certificateCode String            @unique // e.g. CERT-7F3K-9Q2M, never reused
+  eventId         String
+  membershipId    String
+  type            CertificateType
+  awardKey        String            @default("") // "" for participation; "R1:2:Overall" for a winner position
+  awardText       String?
+  nameSnapshot    String
+  teamName        String?
+  version         Int               @default(1)
+  status          CertificateStatus @default(GENERATED)
+  pdfKey          String
+  releasedAt      DateTime?
+  revokedReason   String?
+  flaggedReason   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  corrections     NameCorrection[]
+
+  @@unique([eventId, membershipId, type, awardKey])
+  @@index([eventId, type, status])
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model NameCorrection {
+  id            String           @id @default(cuid())
+  certificateId String
+  requestedName String
+  status        CorrectionStatus @default(PENDING)
+  decisionNote  String?
+  decidedById   String?
+  createdAt     DateTime         @default(now())
+  certificate   Certificate      @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+}
+
+// Admin decisions to include or exclude one person from a certificate type, with a reason (FR-231).
+model CertificateException {
+  id           String          @id @default(cuid())
+  eventId      String
+  membershipId String
+  type         CertificateType
+  include      Boolean
+  reason       String
+  createdBy    String
+  createdAt    DateTime        @default(now())
+
+  @@unique([eventId, membershipId, type])
+}
+
+enum JobStatus {
+  RUNNING
+  DONE
+  FAILED
+}
+
+model CertificateJob {
+  id         String          @id @default(cuid())
+  eventId    String
+  type       CertificateType
+  status     JobStatus       @default(RUNNING)
+  total      Int             @default(0)
+  done       Int             @default(0)
+  failed     Int             @default(0)
+  error      String?
+  startedAt  DateTime        @default(now())
+  finishedAt DateTime?
+
+  @@index([eventId, type])
 }
