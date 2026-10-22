@@ -6,3 +6,6 @@ export * from './markdown.js';
 export * from './event.js';
 export * from './registration.js';
 export * from './submission.js';
+export * from './scoring/engine.js';
+export * from './scoring/ranking.js';
+export * from './scoring/templates.js';
