@@ -1,8 +1,10 @@
 // Domain schema, grown phase by phase (see docs/IMPLEMENTATION_PLAN.md).
 // Constraints that Prisma cannot express (partial/functional unique indexes, triggers) live in the SQL migrations.
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
 }
 
 datasource db {
