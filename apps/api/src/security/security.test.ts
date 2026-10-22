@@ -322,3 +322,47 @@ describe('regressions found in the release audit', () => {
     expect(bad).toEqual([]);
   }, 300_000);
 });
+
+describe('mail outage handling', () => {
+  it('reports an email outage as 503 without losing the account, and recovers when mail returns', async () => {
+    const flaky = createTestKit();
+    let down = true;
+    const real = flaky.deps.email;
+    flaky.deps.email = {
+      send: async (m) => {
+        if (down) throw new Error('ECONNREFUSED smtp');
+        return real.send(m);
+      },
+    };
+    const mailApp = (await import('../http/app.js')).createApp(flaky.deps);
+    const email = `outage-${Date.now()}@example.test`;
+    const body = { name: 'Outage Tester', email, password: 'A-long-passphrase-1' };
+    const first = await request(mailApp)
+      .post('/api/v1/auth/register')
+      .set('X-Requested-With', 'arthakram')
+      .send(body);
+    expect(first.status).toBe(503);
+    expect(first.body.error.code).toBe('email_unavailable');
+    expect(JSON.stringify(first.body)).not.toContain('ECONNREFUSED');
+    expect(await db.user.count({ where: { email } })).toBe(1);
+    down = false;
+    expect(
+      (
+        await request(mailApp)
+          .post('/api/v1/auth/resend-verification')
+          .set('X-Requested-With', 'arthakram')
+          .send({ email })
+      ).status,
+    ).toBe(202);
+    const mail = await db.outboxEmail.findFirstOrThrow({ where: { toEmail: email } });
+    const token = new URL(mail.link!).searchParams.get('token');
+    expect(
+      (
+        await request(mailApp)
+          .post('/api/v1/auth/verify-email')
+          .set('X-Requested-With', 'arthakram')
+          .send({ token })
+      ).status,
+    ).toBe(200);
+  });
+});

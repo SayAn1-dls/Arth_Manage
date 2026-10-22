@@ -12,7 +12,23 @@ const OTHER_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const GENERIC_CREDENTIALS_ERROR = 'Email or password is incorrect';
 
-export function createAuthService({ db, email, env }: Deps) {
+export function createAuthService({ db, email: provider, env, logger }: Deps) {
+  /** A mail outage is reported as such, not as a generic failure, and the account is never lost. */
+  const email = {
+    async send(message: Parameters<typeof provider.send>[0]) {
+      try {
+        await provider.send(message);
+      } catch (err) {
+        logger.error({ err }, 'email delivery failed');
+        throw new AppError(
+          503,
+          'email_unavailable',
+          "We couldn't send the email right now. Please try again in a few minutes.",
+        );
+      }
+    },
+  };
+
   async function issueToken(userId: string, type: 'VERIFY_EMAIL' | 'RESET_PASSWORD') {
     const raw = newToken();
     await db.authToken.create({
