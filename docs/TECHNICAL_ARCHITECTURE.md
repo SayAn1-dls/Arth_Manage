@@ -93,10 +93,10 @@ are testable without a database and reusable by the UI for previews.
 * `User` is a global account. Authority comes from `EventMembership(event, user, role)`;
   **one row per (event, user)**, unique constraint (PRD 8.2). Roles: `ADMIN` (Core Admin), `JUDGE`,
   `STAFF`, `PARTICIPANT`. A user can be a Judge in event A and a Participant in event B.
-* **Platform-level vs event-level scope** (brief requirement). The PRD has no platform admin. We add one
-  narrow, global capability: `User.isOperator` (the pilot allowlist from OQ-02). An operator may
-  *create events* and manage the allowlist. It grants **no read or write access to any event's data**;
-  event data is reachable only through an `ADMIN` membership. The event creator becomes owner and Core Admin.
+* **Platform-level vs event-level scope** (brief requirement). There is no platform-admin role and no operator
+  allowlist (DECISIONS D-06, OQ-02 default): any verified user may create an event and becomes its owner and
+  Core Admin. Event data is reachable only through an event membership; creating events grants nothing
+  elsewhere.
 * "Event organisers / POCs" are Core Admins of that event. Admin can never see another event's records.
 
 ### 4.2 Enforcement

@@ -11,7 +11,7 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-03 | AI features | "valuable later, not a priority" | Non-goal for V1 | **No AI in V1.** No provider abstraction built. *Adopted* |
 | D-04 | Google Sheets | "registration exports and synchronisation… updates without duplicate rows" | One-way snapshot push; no row upserts; sheet edits overwritten | **PRD wins:** whole-tab rewrite ⇒ duplicates are impossible by design; CSV is the guaranteed fallback. *Adopted* |
 | D-05 | Drive | "event/team file organisation" | Native storage canonical; Drive is an optional one-way mirror (P1) | **PRD wins.** *Adopted* |
-| D-06 | "Platform administrator" vs "organiser" | Separate permission scopes | No platform admin; Core Admin per event | Add only `User.isOperator` (event-creation allowlist, OQ-02). Grants no data access. Organisers/POCs = Core Admins of their event. *Adopted* |
+| D-06 | "Platform administrator" vs "organiser" | Separate permission scopes | No platform admin; Core Admin per event | No platform-admin role and no operator allowlist (resolves the earlier conflict with OQ-02): any verified user may create an event and becomes its owner and Core Admin; event data is reachable only through event membership. Organisers/POCs = Core Admins of their event. An allowlist is added only if explicitly required later. *Adopted* |
 | D-07 | Roles | Admin, organiser/POC, participant, judge, staff | Core Admin, Participant, Judge, Helping Staff; one role per user per event | Four roles per PRD. *Adopted* |
 | D-08 | Certificate eligibility etc. | "eligibility rules" | OQ-09 default: submitted in Round 1; OQ-16 Latin script only | Use PRD defaults. *Adopted* |
 
@@ -35,7 +35,7 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 
 ## PRD open questions — defaults in force
 
-OQ-02 any verified user may create events *(pilot may flip to the operator allowlist via config)* ·
+OQ-02 any verified user may create events; creator becomes Core Admin (no allowlist, see D-06) ·
 OQ-04 no auto-submit at deadline · OQ-05 winners list on, own rank/scores off by default (per-event toggle) ·
 OQ-06 per-track ranking when tracks exist, 3 awards · OQ-07 email not changeable · OQ-09 participation
 certificate = team submitted in Round 1 · OQ-11 PPT download only · OQ-12 admins extend deadlines, never
