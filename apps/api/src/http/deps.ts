@@ -3,6 +3,7 @@ import type { Db } from '../db/client.js';
 import type { Env } from '../config/env.js';
 import type { EmailProvider } from '../email/provider.js';
 import type { RateLimiter } from './rateLimit.js';
+import type { StorageProvider } from '../storage/provider.js';
 
 /** Everything a module needs, passed explicitly so tests can swap pieces. */
 export interface Deps {
@@ -11,4 +12,5 @@ export interface Deps {
   env: Env;
   email: EmailProvider;
   limit: RateLimiter;
+  storage: StorageProvider;
 }

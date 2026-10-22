@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import request from 'supertest';
 import type { Express } from 'express';
 import { loadEnv } from '../config/env.js';
@@ -5,6 +8,7 @@ import { createLogger } from '../config/logger.js';
 import { createDb, type Db } from '../db/client.js';
 import { ConsoleEmailProvider } from '../email/provider.js';
 import { createApp } from '../http/app.js';
+import { LocalDiskStorage } from '../storage/provider.js';
 import { createRateLimiter } from '../http/rateLimit.js';
 import type { Deps } from '../http/deps.js';
 import { hashPassword } from '../auth/crypto.js';
@@ -29,6 +33,7 @@ export function createTestKit(opts: { rateLimit?: boolean } = {}): TestKit {
     env,
     email: new ConsoleEmailProvider(db, logger),
     limit: createRateLimiter(opts.rateLimit ?? false),
+    storage: new LocalDiskStorage(mkdtempSync(join(tmpdir(), 'ak-test-storage-'))),
   };
   return { db, deps, app: createApp(deps) };
 }

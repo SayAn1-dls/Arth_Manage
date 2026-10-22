@@ -2,6 +2,7 @@ import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createDb } from './db/client.js';
 import { ConsoleEmailProvider } from './email/provider.js';
+import { LocalDiskStorage } from './storage/provider.js';
 import { createApp } from './http/app.js';
 import { createRateLimiter } from './http/rateLimit.js';
 
@@ -13,6 +14,7 @@ const app = createApp({
   logger,
   env,
   email: new ConsoleEmailProvider(db, logger),
+  storage: new LocalDiskStorage(env.STORAGE_DIR),
   limit: createRateLimiter(env.NODE_ENV !== 'test' && !env.RATE_LIMIT_DISABLED),
 });
 
