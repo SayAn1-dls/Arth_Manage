@@ -36,7 +36,7 @@ export async function roundHasSubmissions(db: Db, roundId: string): Promise<bool
   return (await db.submission.count({ where: { roundId } })) > 0;
 }
 
-/** Certificates arrive in Phase 6; until then no participant can hold one, so profile edits are never locked by it. */
-export async function hasCertificate(_db: Db, _membershipId: string): Promise<boolean> {
-  return false;
+/** Once a certificate exists for a participant, they can no longer edit their own details (PRD FR-056). */
+export async function hasCertificate(db: Db, membershipId: string): Promise<boolean> {
+  return (await db.certificate.count({ where: { membershipId } })) > 0;
 }

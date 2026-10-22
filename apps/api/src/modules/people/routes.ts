@@ -455,7 +455,16 @@ export function peopleRouter(deps: Deps) {
           before: pickChanged(reg, changes),
           after: pickChanged(after, changes),
         });
-        // A changed certificate name after certificates exist marks them for regeneration (Phase 6 reads this audit trail).
+        // A changed name on the certificate after certificates exist marks them for regeneration (PRD FR-019).
+        if (
+          changes.certificateName !== undefined &&
+          changes.certificateName !== reg.certificateName
+        ) {
+          await tx.certificate.updateMany({
+            where: { membershipId: m.id, status: { in: ['GENERATED', 'RELEASED'] } },
+            data: { status: 'NEEDS_REGENERATION' },
+          });
+        }
       });
       res.json({ ok: true });
     },

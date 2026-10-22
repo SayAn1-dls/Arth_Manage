@@ -344,7 +344,9 @@ export function feedbackRouter(deps: Deps) {
       const ctx = requireCtx(req);
       adminOnly(ctx);
       const a = await aggregate(ctx, parse(audienceSchema, req.params.audience));
-      const { rows: _rows, questionList: _q, ...rest } = a;
+      const rest: Partial<typeof a> = { ...a };
+      delete rest.rows;
+      delete rest.questionList;
       res.json(rest);
     },
   );

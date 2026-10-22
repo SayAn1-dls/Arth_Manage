@@ -32,6 +32,8 @@ const EVENT_AUDIT_KEYS = [
   'showWinners',
   'showOwnRank',
   'showOwnScores',
+  'certParticipationRule',
+  'certWinnersAlsoParticipate',
 ] as const;
 
 /** Archived events are read-only for everyone except the owner (PRD FR-005/008). */

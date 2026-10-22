@@ -10,3 +10,4 @@ export * from './scoring/engine.js';
 export * from './scoring/ranking.js';
 export * from './scoring/templates.js';
 export * from './feedback.js';
+export * from './certificates.js';

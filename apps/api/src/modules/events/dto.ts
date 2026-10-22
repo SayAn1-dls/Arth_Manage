@@ -27,6 +27,8 @@ export function eventDto(e: Event): EventDto {
     showWinners: e.showWinners,
     showOwnRank: e.showOwnRank,
     showOwnScores: e.showOwnScores,
+    certParticipationRule: e.certParticipationRule,
+    certWinnersAlsoParticipate: e.certWinnersAlsoParticipate,
     ownerId: e.ownerId,
     version: e.version,
     publishedAt: e.publishedAt?.toISOString() ?? null,

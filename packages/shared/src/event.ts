@@ -74,6 +74,8 @@ export const updateEventSchema = z
     showWinners: z.boolean(),
     showOwnRank: z.boolean(),
     showOwnScores: z.boolean(),
+    certParticipationRule: z.enum(['SUBMITTED', 'CHECKED_IN']),
+    certWinnersAlsoParticipate: z.boolean(),
     /** Optimistic lock: the version the editor loaded (PRD 6.0-3). */
     version: z.number().int().min(1),
     /** Required confirmation when dates change after people have registered. */
@@ -229,6 +231,8 @@ export interface EventDto {
   showWinners: boolean;
   showOwnRank: boolean;
   showOwnScores: boolean;
+  certParticipationRule: 'SUBMITTED' | 'CHECKED_IN';
+  certWinnersAlsoParticipate: boolean;
   ownerId: string;
   version: number;
   publishedAt: string | null;

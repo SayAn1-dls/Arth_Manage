@@ -180,17 +180,15 @@ describe('feedback forms (FR-210..215)', () => {
     });
     expect(rewording.status).toBe(200);
     expect(await db.auditLog.count({ where: { action: 'feedback_form.updated' } })).toBe(1);
-    const tooMany = await w.admin
-      .put(forms(w, '/forms/JUDGE'))
-      .send({
-        confidential: false,
-        questions: Array.from({ length: 16 }, (_, i) => ({
-          id: `x${i}`,
-          type: 'SHORT_TEXT',
-          text: `Q${i}`,
-          required: false,
-        })),
-      });
+    const tooMany = await w.admin.put(forms(w, '/forms/JUDGE')).send({
+      confidential: false,
+      questions: Array.from({ length: 16 }, (_, i) => ({
+        id: `x${i}`,
+        type: 'SHORT_TEXT',
+        text: `Q${i}`,
+        required: false,
+      })),
+    });
     expect(tooMany.status).toBe(422);
   });
 });
@@ -254,7 +252,15 @@ describe('reviewing feedback (FR-213..215)', () => {
 
 describe('releasing judge comments (FR-216)', () => {
   async function commentScene() {
-    const s = await judgedRound(kit, { teams: { Zeta: T74, Xray: [[5, 5, 3], [5, 5, 3]] } });
+    const s = await judgedRound(kit, {
+      teams: {
+        Zeta: T74,
+        Xray: [
+          [5, 5, 3],
+          [5, 5, 3],
+        ],
+      },
+    });
     // each judge leaves a team comment and a private note (re-submission of the comment via reopen is not needed: set directly)
     await db.evaluation.updateMany({
       data: { teamComment: 'Clear structure', privateNote: 'SECRET NOTE' },
