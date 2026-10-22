@@ -5,19 +5,20 @@ competitions from event setup to certificates: registration and teams, submissio
 feedback and certificates, with four role-specific interfaces (Core Admin, Participant, Judge, Helping Staff).
 The platform database is the source of truth; Google Sheets/Drive are optional, late integrations.
 
-* Product requirements: `docs/PRD-Hackathon-and-Case-Competition-Platform.pdf`
-* How it is built: `docs/TECHNICAL_ARCHITECTURE.md`
-* Plan, commit trail and live checklist: `docs/IMPLEMENTATION_PLAN.md`
-* Decisions and deviations: `docs/DECISIONS.md`
-* Visual identity rules: `docs/BRAND_IMPLEMENTATION.md`
+- Product requirements: `docs/PRD-Hackathon-and-Case-Competition-Platform.pdf`
+- How it is built: `docs/TECHNICAL_ARCHITECTURE.md`
+- Plan, commit trail and live checklist: `docs/IMPLEMENTATION_PLAN.md`
+- Decisions and deviations: `docs/DECISIONS.md`
+- Visual identity rules: `docs/BRAND_IMPLEMENTATION.md`
+- Running it for real: `docs/DEPLOYMENT.md`; event-day operations and backups: `docs/RUNBOOK.md`
 
-**Status:** Phases 0–6 complete (foundation, authentication, permissions, events, guidebook, registration, teams, submissions, judging, results, staff operations, dashboard and audit history, feedback and certificates). See the checklist for what exists.
+**Status:** V1 implemented through Phase 7 (foundation, authentication, permissions, events, guidebook, registration, teams, submissions, judging, results, staff operations, dashboard and audit history, feedback and certificates, Google Sheets/Drive integration with a persistent sync queue, security pass, deployment and runbook docs). The Google REST client has not been exercised against real Google. See the checklist and `docs/DEPLOYMENT.md`.
 
 ## Prerequisites
 
-* Node.js 26 (see `.nvmrc`; 22.18+ also satisfies `engines`) and npm 11
-* PostgreSQL 16 running locally
-* For browser tests: `npx playwright install chromium`, or set `PW_CHANNEL=chrome` to use installed Chrome
+- Node.js 26 (see `.nvmrc`; 22.18+ also satisfies `engines`) and npm 11
+- PostgreSQL 16 running locally
+- For browser tests: `npx playwright install chromium`, or set `PW_CHANNEL=chrome` to use installed Chrome
 
 ## Setup
 
@@ -47,16 +48,18 @@ See `.env.example`. Placeholders only; real values live in your untracked `.env`
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | API on :4000 and web on :5173 (web proxies `/api`) |
-| `npm run build` | Type-check and build shared, API and web |
-| `npm run typecheck` | `tsc --noEmit` in every workspace |
-| `npm run lint` / `npm run format:check` | ESLint / Prettier |
-| `npm run lint:brand` | Brand guardrails (no raw colours outside tokens, no forbidden fonts, etc.) |
-| `npm test` | Unit and API integration tests (Vitest) |
-| `npm run test:e2e` | Playwright end-to-end tests (starts/reuses `npm run dev`) |
-| `npm run qa:visual` | Screenshots at 1440 and 390 px into `.qa-screenshots/` for brand review |
+| Command                                 | What it does                                                                       |
+| --------------------------------------- | ---------------------------------------------------------------------------------- |
+| `npm run dev`                           | API on :4000 and web on :5173 (web proxies `/api`)                                 |
+| `npm run build`                         | Type-check and build shared, API and web                                           |
+| `npm run typecheck`                     | `tsc --noEmit` in every workspace                                                  |
+| `npm run lint` / `npm run format:check` | ESLint / Prettier                                                                  |
+| `npm run lint:brand`                    | Brand guardrails (no raw colours outside tokens, no forbidden fonts, etc.)         |
+| `npm test`                              | Unit and API integration tests (Vitest)                                            |
+| `npm run test:load -w @arthakram/api`   | PRD load profile (1,000 participants, 250 teams) timings against the test database |
+| `npm run start -w @arthakram/api`       | Run the built API (serves `apps/web/dist` in production)                           |
+| `npm run test:e2e`                      | Playwright end-to-end tests (starts/reuses `npm run dev`)                          |
+| `npm run qa:visual`                     | Screenshots at 1440 and 390 px into `.qa-screenshots/` for brand review            |
 
 Open `http://localhost:5173/_design` (development only) for the component gallery.
 
@@ -77,7 +80,7 @@ functional and shows integrations as "Not connected". Setup instructions will be
 
 ## Troubleshooting
 
-* `Invalid environment configuration` on API start: check `.env` against `.env.example`.
-* Prisma "Connection url is empty": `DATABASE_URL` is missing from `.env`.
-* Playwright "Executable doesn't exist": run `npx playwright install chromium` or use `PW_CHANNEL=chrome`.
-* Port in use: change `API_PORT` or stop the other process on 4000/5173.
+- `Invalid environment configuration` on API start: check `.env` against `.env.example`.
+- Prisma "Connection url is empty": `DATABASE_URL` is missing from `.env`.
+- Playwright "Executable doesn't exist": run `npx playwright install chromium` or use `PW_CHANNEL=chrome`.
+- Port in use: change `API_PORT` or stop the other process on 4000/5173.

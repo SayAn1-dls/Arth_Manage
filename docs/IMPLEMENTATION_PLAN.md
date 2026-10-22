@@ -230,11 +230,11 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - Deferred (P1/P2): judge/staff appreciation certificates, public verification page, email reminders
 
 **Phase 7 — Integrations and hardening**
-- [ ] Sync queue; Sheets push; Drive mirror (credential-dependent)
-- [ ] Security pass; CSP; rate limits
-- [ ] Full E2E acceptance journey
-- [ ] Load test at PRD profile
-- [ ] Deployment + runbook docs
+- [x] Sync queue; Sheets push; Drive mirror (fake-provider tested; real Google REST client unverified, needs credentials)
+- [x] Security pass; CSP; rate limits (route probe test, 413 handling, production config guards, SMTP provider)
+- [x] Full E2E acceptance journey (cross-role boundaries spec plus the seven workflow specs)
+- [x] Load test at PRD profile (`npm run test:load -w @arthakram/api`)
+- [x] Deployment + runbook docs (`docs/DEPLOYMENT.md`, `docs/RUNBOOK.md`)
 
 ## 7. Reporting at the end of each session
 

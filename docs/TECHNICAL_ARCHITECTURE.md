@@ -235,6 +235,8 @@ T   = mean of counted J over m ≥ 1     team score for the round
 
 ## 9. Integrations (optional, last)
 
+*Status: built in Phase 7 (`apps/api/src/integrations`, `modules/integrations`). Tested with a fake provider; the REST client is unverified against real Google. See DECISIONS D-47, D-48.*
+
 * **Sheets (P1):** one-way snapshot push of platform-owned tabs to a platform-created spreadsheet, queued
   through a persistent `SyncJob` table (idempotent by `(connectionId, key)`, coalescing, exponential
   backoff, restart-safe). Sheet edits are never imported; banner row and connection UI say so. Honest
