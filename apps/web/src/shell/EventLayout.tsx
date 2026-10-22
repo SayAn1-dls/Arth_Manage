@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Outlet, useParams } from 'react-router';
+import { NavLink, Outlet, useLocation, useParams } from 'react-router';
 import { api } from '../lib/api.js';
 import { ROLE_LABEL } from '../lib/format.js';
 import { Alert, Badge, cn, Spinner } from '../ui/index.js';
@@ -9,6 +9,7 @@ import { navFor } from './nav.js';
 /** Event workspace: header with role badge plus the navigation for the caller's role in this event. */
 export function EventLayout() {
   const { eventId = '' } = useParams();
+  const { pathname } = useLocation();
   const events = useQuery({ queryKey: ['my-events'], queryFn: api.myEvents });
 
   if (events.isPending)
@@ -28,6 +29,9 @@ export function EventLayout() {
     );
   }
   const items = navFor(mine.role);
+  // A screen outside the caller's role is not rendered at all; the API enforces this independently (PRD §8.1).
+  const section = pathname.split('/')[3] ?? '';
+  const allowed = !section || items.some((i) => i.to.split('/')[0] === section);
 
   return (
     <div className="mx-auto max-w-content px-4 pb-16 sm:px-8">
@@ -60,7 +64,13 @@ export function EventLayout() {
           ))}
         </nav>
         <main className="min-w-0">
-          <Outlet context={mine} />
+          {allowed ? (
+            <Outlet context={mine} />
+          ) : (
+            <Alert tone="info" title="This page isn't available to you">
+              Use the menu to open the screens for your role in this event.
+            </Alert>
+          )}
         </main>
       </div>
     </div>

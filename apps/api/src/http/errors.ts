@@ -44,6 +44,18 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       .json({ error: { code: 'bad_json', message: 'Request body is not valid JSON' } });
     return;
   }
+  if (err && typeof err === 'object' && 'type' in err && err.type === 'entity.too.large') {
+    res
+      .status(413)
+      .json({ error: { code: 'too_large', message: 'The request is larger than allowed' } });
+    return;
+  }
+  if (err && typeof err === 'object' && 'type' in err && err.type === 'encoding.unsupported') {
+    res
+      .status(415)
+      .json({ error: { code: 'unsupported', message: 'Unsupported request encoding' } });
+    return;
+  }
   // Unknown errors: log in full, return a generic message (no stack traces to clients).
   req.log?.error({ err }, 'unhandled error');
   res.status(500).json({ error: { code: 'internal_error', message: 'Something went wrong' } });
