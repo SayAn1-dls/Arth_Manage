@@ -9,6 +9,7 @@ import { authRouter } from '../auth/routes.js';
 import { csrfGuard, sessionLoader } from '../auth/middleware.js';
 import { meRouter } from '../modules/me.js';
 import { devRouter } from '../modules/dev.js';
+import { eventsRouter } from '../modules/events/routes.js';
 
 export function createApp(deps: Deps) {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp(deps: Deps) {
   api.use(healthRouter(deps.db));
   api.use(authRouter(deps));
   api.use(meRouter(deps));
+  api.use(eventsRouter(deps));
   if (deps.env.NODE_ENV !== 'production') api.use(devRouter(deps));
   app.use('/api/v1', api);
 
