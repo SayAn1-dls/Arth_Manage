@@ -1,4 +1,4 @@
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 
 /**
  * The scoring engine (PRD Module E.1). Pure functions, exact decimal arithmetic, no intermediate rounding.
