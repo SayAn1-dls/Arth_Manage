@@ -199,13 +199,11 @@ describe('issues (FR-128, FR-129)', () => {
       (await sahil.agent.post(`${w.base}/issues`).send({ category: 'TECHNICAL', description: '' }))
         .status,
     ).toBe(422);
-    const made = await sahil.agent
-      .post(`${w.base}/issues`)
-      .send({
-        category: 'REGISTRATION_MISMATCH',
-        description: 'Name does not match ID',
-        teamId: team.teamId,
-      });
+    const made = await sahil.agent.post(`${w.base}/issues`).send({
+      category: 'REGISTRATION_MISMATCH',
+      description: 'Name does not match ID',
+      teamId: team.teamId,
+    });
     expect(made.status).toBe(201);
     const id = made.body.id as string;
     expect((await rita.agent.get(`${w.base}/issues`)).body.issues).toHaveLength(0); // staff see only their own

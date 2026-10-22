@@ -44,6 +44,16 @@ export function assertWritable(ctx: EventContext) {
   }
 }
 
+function isSlugCollision(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    err.code === 'P2002' &&
+    JSON.stringify(err).includes('slug')
+  );
+}
+
 export function createEventService({ db, logger }: Deps) {
   async function uniqueSlug(base: string): Promise<string> {
     let slug = base;
@@ -68,8 +78,23 @@ export function createEventService({ db, logger }: Deps) {
   return {
     staleMessage,
 
+    /** Two organisers creating an event with the same name at the same instant both get a unique link. */
     async create(user: User, input: CreateEventInput) {
-      const slug = await uniqueSlug(input.slug ?? slugify(input.name));
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await this.createOnce(user, input, attempt);
+        } catch (err) {
+          if (attempt < 4 && isSlugCollision(err)) continue;
+          throw err;
+        }
+      }
+    },
+
+    async createOnce(user: User, input: CreateEventInput, attempt: number) {
+      const base = input.slug ?? slugify(input.name);
+      const slug = await uniqueSlug(
+        attempt === 0 ? base : `${base}-${Math.random().toString(36).slice(2, 6)}`,
+      );
       return db.$transaction(async (tx) => {
         const event = await tx.event.create({
           data: {
