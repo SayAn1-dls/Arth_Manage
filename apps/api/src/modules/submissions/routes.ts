@@ -16,6 +16,7 @@ import { parse } from '../../http/validate.js';
 import { writeAudit } from '../../audit/audit.js';
 import { checkUpload, extensionOf, safeFilename } from '../../storage/validate.js';
 import { assertWritable } from '../events/service.js';
+import { judgeMayViewTeam } from '../judging/common.js';
 import { activeTeamOf } from '../teams/service.js';
 import { cutoffFor, decideSubmit, submissionStatus, STATUS_LABEL } from './logic.js';
 import {
@@ -501,6 +502,12 @@ export function submissionsRouter(deps: Deps) {
         file.submission.teamId,
       );
       if (!assigned) throw AppError.notFound();
+      // Judges see only files of the version being judged, never a team's unsubmitted draft files.
+      const judged = await db.submissionVersion.findFirst({
+        where: { submissionId: file.submissionId, versionNo: file.submission.lastVersionNo },
+      });
+      if (!judged || !Object.values(judged.values as Record<string, string>).includes(file.id))
+        throw AppError.notFound();
     } // ADMIN: FULL
     const bytes = await storage.get(file.storageKey);
     const inlinePdf = req.query.inline === '1' && file.contentType === 'application/pdf';
@@ -769,14 +776,4 @@ function contentTypeFor(ext: string): string {
       zip: 'application/zip',
     }[ext] ?? 'application/octet-stream'
   );
-}
-
-/** Judges only see teams assigned to them. Judge assignments arrive in Phase 4; until then no judge can be assigned. */
-async function judgeMayViewTeam(
-  _db: Deps['db'],
-  _judgeMembershipId: string,
-  _roundId: string,
-  _teamId: string,
-): Promise<boolean> {
-  return false;
 }
