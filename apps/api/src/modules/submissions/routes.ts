@@ -517,7 +517,11 @@ export function submissionsRouter(deps: Deps) {
       `${inlinePdf ? 'inline' : 'attachment'}; filename="${file.originalName.replace(/"/g, '')}"`,
     );
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    // Downloads are sandboxed; inline PDFs may only be framed by this app (Chrome's PDF viewer needs the sandbox off).
+    res.setHeader(
+      'Content-Security-Policy',
+      inlinePdf ? "default-src 'none'; frame-ancestors 'self'" : "sandbox; default-src 'none'",
+    );
     res.setHeader('Cache-Control', 'private, no-store');
     res.send(bytes);
   });
