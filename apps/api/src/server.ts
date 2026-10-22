@@ -31,6 +31,11 @@ const deps: Deps = {
     encryptionKeyOk: parseKey(env.TOKEN_ENCRYPTION_KEY) !== null,
   }),
 };
+// Fail fast: a server that cannot write uploads would accept registrations and then lose submissions.
+await deps.storage.check().catch((err: unknown) => {
+  logger.fatal({ err }, `File storage at ${env.STORAGE_DIR} is not writable`);
+  process.exit(1);
+});
 const app = createApp(deps);
 const stopWorker = startSyncWorker(deps);
 const stopMaintenance = startMaintenance(deps);

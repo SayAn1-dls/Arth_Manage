@@ -63,7 +63,7 @@ export function createApp(deps: Deps) {
   });
   api.use(csrfGuard);
   api.use(sessionLoader(deps));
-  api.use(healthRouter(deps.db));
+  api.use(healthRouter(deps.db, deps.storage));
   api.use(authRouter(deps));
   api.use(syncHooks(deps));
   api.use(meRouter(deps));

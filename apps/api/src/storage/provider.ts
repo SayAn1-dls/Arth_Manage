@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 
 /**
@@ -9,6 +10,8 @@ import { dirname, resolve, sep } from 'node:path';
 export interface StorageProvider {
   put(key: string, bytes: Buffer): Promise<void>;
   get(key: string): Promise<Buffer>;
+  /** Proves the store accepts, returns and removes an object. Used by the health check and at start-up. */
+  check(): Promise<void>;
 }
 
 export class LocalDiskStorage implements StorageProvider {
@@ -32,5 +35,14 @@ export class LocalDiskStorage implements StorageProvider {
 
   async get(key: string): Promise<Buffer> {
     return readFile(this.pathFor(key));
+  }
+
+  async check(): Promise<void> {
+    const key = `.health/${randomUUID()}`;
+    const probe = Buffer.from('ok');
+    await this.put(key, probe);
+    const back = await this.get(key);
+    await rm(this.pathFor(key), { force: true });
+    if (!back.equals(probe)) throw new Error('Storage returned different bytes than were written');
   }
 }
