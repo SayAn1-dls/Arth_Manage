@@ -218,11 +218,11 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [x] Access-isolation tests
 
 **Phase 5 — Results and operations**
-- [ ] Rankings, completeness, ties, exclusions
-- [ ] Approve / invalidate / publish
-- [ ] Participant results view
-- [ ] Staff tasks, issues, check-in
-- [ ] Audit viewer
+- [x] Rankings, completeness, ties, exclusions
+- [x] Approve / invalidate / publish
+- [x] Participant results view
+- [x] Staff tasks, issues, check-in
+- [x] Audit viewer
 
 **Phase 6 — Feedback and certificates**
 - [ ] Feedback forms + review

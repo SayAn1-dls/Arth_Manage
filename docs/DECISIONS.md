@@ -52,6 +52,10 @@ a default is used meanwhile). PRD open questions (OQ-xx) keep the PRD's own defa
 | D-38 | Draft rubrics | Drafts may total any weight (they must total 100 to activate), but each criterion must individually be valid (weight 1-100, min 0 or 1, max above min) so the database constraints can mirror the PRD limits. *Adopted* |
 | D-39 | Judge visibility | Before judging opens a judge sees only their assigned team names; project content, files and the rubric appear when judging is Open or Closed. Files are served for the judged (last submitted) version only. *Adopted* |
 | D-40 | Not required | "Did not submit" assignments are derived (no submitted version once the submission window closed) rather than stored, so granting an extension restores them automatically. *Adopted* |
+| D-41 | Result invalidation | Instead of hooking every write path, the ranking inputs are fingerprinted (evaluations and versions, assignment statuses, team states, tie decisions, not-ranked marks, round and rubric settings) and compared whenever results are reviewed or published; a mismatch marks the snapshot withdrawn and writes an audit entry. Participants keep the last published version. *Adopted* |
+| D-42 | Approvable team | A team is ready for approval when it has all required counted evaluations, or no pending assignment and at least one counted evaluation (after exclusions with reasons), or is explicitly marked Not ranked. Teams that did not submit or are disqualified never block approval. *Adopted (FR-149 reading)* |
+| D-43 | Judge file report | Resolved: an assigned judge's "Report a missing file" creates a Technical issue linked to the team in the admin issue queue (supersedes D-37). *Adopted* |
+| D-44 | Staff phone numbers | Staff cards show name, institution, year, track and attendance only. The optional "staff can see phone numbers" and "visible to staff" custom-field settings (P1) are not built. *Adopted* |
 
 ## PRD open questions — defaults in force
 

@@ -373,6 +373,40 @@ async function seedCaseCup(users: Record<string, string>) {
       },
     });
   }
+  // Event-day demo data: a task for staff, an urgent issue and one team checked in.
+  const staffMembership = await db.eventMembership.findFirstOrThrow({
+    where: { eventId: event.id, role: 'STAFF' },
+  });
+  const task = await db.staffTask.create({
+    data: {
+      eventId: event.id,
+      title: 'Run the check-in desk',
+      type: 'CHECKIN',
+      location: 'Main hall',
+      createdById: users.admin!,
+      dueAt: new Date('2026-10-05T03:30:00Z'),
+    },
+  });
+  await db.staffTaskAssignee.create({
+    data: { taskId: task.id, membershipId: staffMembership.id },
+  });
+  await db.issueReport.create({
+    data: {
+      eventId: event.id,
+      reporterMembershipId: staffMembership.id,
+      category: 'FACILITIES',
+      severity: 'URGENT',
+      description: 'Projector in hall B is not working.',
+    },
+  });
+  for (const idx of [0, 1])
+    await db.checkIn.create({
+      data: {
+        eventId: event.id,
+        membershipId: memberships[idx]!,
+        checkedInById: staffMembership.id,
+      },
+    });
   // Every team gets both judges; judge1 has already scored Alpha so progress is visible.
   for (const team of created)
     for (const judge of judges) {

@@ -32,4 +32,14 @@ export const screens = [
   { name: 'judge-dashboard', path: '/events/{cup}', as: 'judge1' },
   { name: 'judge-teams', path: '/events/{cup}/judge/{cupRound}', as: 'judge1' },
   { name: 'judge-workspace', path: '/events/{cup}/judge/{cupRound}/{cupTeam}', as: 'judge1' },
+  // Phase 5: results, staff operations, dashboard, audit
+  { name: 'dashboard-admin', path: '/events/{cup}', as: 'admin' },
+  { name: 'results-admin', path: '/events/{cup}/results', as: 'admin' },
+  { name: 'tasks-admin', path: '/events/{cup}/tasks', as: 'admin' },
+  { name: 'issues-admin', path: '/events/{cup}/issues', as: 'admin' },
+  { name: 'audit-admin', path: '/events/{cup}/audit', as: 'admin' },
+  { name: 'staff-dashboard', path: '/events/{cup}', as: 'staff' },
+  { name: 'staff-tasks', path: '/events/{cup}/tasks', as: 'staff' },
+  { name: 'staff-checkin', path: '/events/{cup}/checkin', as: 'staff' },
+  { name: 'staff-issues', path: '/events/{cup}/issues', as: 'staff' },
 ];
