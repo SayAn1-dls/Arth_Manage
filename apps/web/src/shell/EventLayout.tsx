@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useParams } from 'react-router';
 import { api } from '../lib/api.js';
@@ -36,20 +37,26 @@ export function EventLayout() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[14rem_1fr]">
         <nav aria-label="Event" className="flex gap-1 overflow-x-auto lg:flex-col">
-          {items.map((i) => (
-            <NavLink
-              key={i.to}
-              to={i.to}
-              end={i.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-4 px-4 text-ink no-underline hover:bg-blush lg:border-b-0 lg:border-l-4',
-                  isActive ? 'border-ember bg-blush font-bold' : 'border-transparent font-medium',
-                )
-              }
-            >
-              {i.label}
-            </NavLink>
+          {items.map((i, idx) => (
+            <Fragment key={i.to}>
+              {i.group && items[idx - 1]?.group !== i.group && (
+                <p className="hidden px-4 pt-3 text-xs font-bold uppercase tracking-eyebrow text-ink lg:block">
+                  {i.group}
+                </p>
+              )}
+              <NavLink
+                to={i.to}
+                end={i.end}
+                className={({ isActive }) =>
+                  cn(
+                    'flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-4 px-4 text-ink no-underline hover:bg-blush lg:border-b-0 lg:border-l-4',
+                    isActive ? 'border-ember bg-blush font-bold' : 'border-transparent font-medium',
+                  )
+                }
+              >
+                {i.label}
+              </NavLink>
+            </Fragment>
           ))}
         </nav>
         <main className="min-w-0">

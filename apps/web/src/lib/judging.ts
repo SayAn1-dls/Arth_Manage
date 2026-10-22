@@ -239,6 +239,10 @@ export const judgingApi = {
       `/events/${e}/assignments/${assignmentId}/evaluation/submit`,
       { version },
     ),
+  reportFile: (e: string, round: string, team: string, description: string) =>
+    request<{ id: string }>('POST', `${r(e, round)}/judge/teams/${team}/report-file`, {
+      description,
+    }),
   evaluationAction: (e: string, assignmentId: string, action: string, reason: string) =>
     request<{ ok: true }>('POST', `/events/${e}/assignments/${assignmentId}/evaluation/${action}`, {
       reason,

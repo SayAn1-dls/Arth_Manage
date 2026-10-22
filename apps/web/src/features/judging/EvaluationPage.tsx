@@ -59,6 +59,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
   const [done, setDone] = useState<{ score: string } | null>(null);
   const [conflict, setConflict] = useState(false);
   const [conflictReason, setConflictReason] = useState('');
+  const [reported, setReported] = useState(false);
   const [correction, setCorrection] = useState(false);
   const [correctionReason, setCorrectionReason] = useState('');
   const version = useRef(data.evaluation?.version ?? 0);
@@ -184,6 +185,15 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
       window.location.reload();
     } catch (e) {
       setConflict(false);
+      setNotice({ tone: 'error', text: (e as Error).message });
+    }
+  }
+  async function reportMissing(fileName: string) {
+    try {
+      await judgingApi.reportFile(eventId, roundId, data.team.id, `File: ${fileName}`);
+      setReported(true);
+      setNotice({ tone: 'success', text: 'The organisers have been told about the file.' });
+    } catch (e) {
       setNotice({ tone: 'error', text: (e as Error).message });
     }
   }
@@ -315,10 +325,16 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                     src={`/api/v1/events/${eventId}/files/${f.file!.id}?inline=1#toolbar=0`}
                     className="h-[34rem] w-full rounded-card border border-line bg-white"
                   />
-                  <p className="mt-2 text-sm">
+                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     The file did not load?{' '}
-                    <a href={`/api/v1/events/${eventId}/files/${f.file!.id}`}>Download it</a>, or
-                    tell the organisers it is missing.
+                    <a href={`/api/v1/events/${eventId}/files/${f.file!.id}`}>Download it</a>
+                    <Button
+                      variant="ghost"
+                      onClick={() => void reportMissing(f.file!.name)}
+                      disabled={reported}
+                    >
+                      {reported ? 'Reported to the organisers' : 'Report a missing file'}
+                    </Button>
                   </p>
                 </Card>
               ))}

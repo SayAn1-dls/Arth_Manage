@@ -32,6 +32,9 @@ import {
   SubmissionDetailPage,
 } from './features/admin/SubmissionsMonitorPage.js';
 import { PeoplePage } from './features/admin/PeoplePage.js';
+import { ResultsPage } from './features/results/ResultsPage.js';
+import { TasksPage, CheckInPage, IssuesPage } from './features/staff/StaffPages.js';
+import { AuditPage } from './features/ops/AuditPage.js';
 import { RubricPage } from './features/judging/RubricPage.js';
 import { JudgingPage } from './features/judging/JudgingPage.js';
 import { JudgeIndexPage, JudgeTeamsPage } from './features/judging/JudgePages.js';
@@ -74,6 +77,11 @@ const routes: RouteObject[] = [
               { path: 'structure', element: <StructurePage /> },
               { path: 'guidebook', element: <GuidebookPage /> },
               { path: 'announcements', element: <AnnouncementsPage /> },
+              { path: 'results', element: <ResultsPage /> },
+              { path: 'tasks', element: <TasksPage /> },
+              { path: 'checkin', element: <CheckInPage /> },
+              { path: 'issues', element: <IssuesPage /> },
+              { path: 'audit', element: <AuditPage /> },
               { path: 'rubric', element: <RubricPage /> },
               { path: 'judging', element: <JudgingPage /> },
               { path: 'judge', element: <JudgeIndexPage /> },
