@@ -332,8 +332,10 @@ export function createEventService({ db, logger }: Deps) {
       assertWritable(ctx);
       if (ctx.event.status !== 'PUBLISHED')
         throw AppError.conflict('not_published', 'Only a published event can be concluded');
-      // Published results exist only once Phase 5 lands; until then concluding always needs explicit confirmation.
-      const hasResults = false;
+      const hasResults =
+        (await db.resultSnapshot.count({
+          where: { eventId: ctx.event.id, publishedAt: { not: null }, unpublishedAt: null },
+        })) > 0;
       if (!hasResults && !confirmWithoutResults) {
         throw AppError.conflict(
           'no_published_results',

@@ -180,3 +180,70 @@ export async function openJudging(w: World) {
   const res = await w.admin.put(`${w.base}/rounds/${w.roundId}/judging`).send({ status: 'OPEN' });
   if (res.status !== 200) throw new Error(`open judging failed ${JSON.stringify(res.body)}`);
 }
+
+/**
+ * A closed-judging round with the worked-example rubric: each listed team submits, every judge scores every
+ * team, then judging is closed. `scores[teamName]` is one [A, B, C] triple per judge.
+ */
+export async function judgedRound(
+  kit: TestKit,
+  spec: {
+    teams: Record<string, number[][]>;
+    required?: number;
+    judges?: number;
+    closeJudging?: boolean;
+  },
+) {
+  const w = await openEvent(kit);
+  if (spec.required) {
+    const round = await kit.db.round.findUniqueOrThrow({ where: { id: w.roundId } });
+    await kit.db.round.update({
+      where: { id: round.id },
+      data: { requiredEvaluations: spec.required },
+    });
+  }
+  const teams: Record<string, Awaited<ReturnType<typeof teamOfTwo>>> = {};
+  for (const name of Object.keys(spec.teams)) {
+    teams[name] = await teamOfTwo(w, name);
+    await submitProject(w, teams[name]!, `${name} project`);
+  }
+  await closeSubmissions(kit, w);
+  const rubric = await workedExampleRubric(w);
+  const judges = [];
+  for (let i = 0; i < (spec.judges ?? 2); i++)
+    judges.push(await addJudge(kit, w, `Judge ${i + 1}`));
+  await w.admin
+    .post(`${w.base}/rounds/${w.roundId}/assignments`)
+    .send({
+      judgeMembershipIds: judges.map((j) => j.membershipId),
+      teamIds: Object.values(teams).map((t) => t.teamId),
+    });
+  await openJudging(w);
+  const [A, B, C] = rubric.criteria.map((c) => c.id) as [string, string, string];
+  const overview = async () =>
+    (await w.admin.get(`${w.base}/rounds/${w.roundId}/judging/overview`)).body;
+  const o = await overview();
+  const assignmentOf = (judgeMembershipId: string, teamId: string) =>
+    o.teams
+      .find((t: { teamId: string }) => t.teamId === teamId)
+      .assignments.find(
+        (a: { judgeMembershipId: string }) => a.judgeMembershipId === judgeMembershipId,
+      ).id as string;
+  const evaluate = async (judgeIdx: number, teamName: string, triple: number[]) => {
+    const judge = judges[judgeIdx]!;
+    const a = assignmentOf(judge.membershipId, teams[teamName]!.teamId);
+    const saved = await judge.agent
+      .put(`${w.base}/assignments/${a}/evaluation`)
+      .send({ scores: { [A]: triple[0], [B]: triple[1], [C]: triple[2] }, version: 0 });
+    const res = await judge.agent
+      .post(`${w.base}/assignments/${a}/evaluation/submit`)
+      .send({ version: saved.body.version });
+    if (res.status !== 201) throw new Error(`submit failed ${JSON.stringify(res.body)}`);
+    return a;
+  };
+  for (const [name, perJudge] of Object.entries(spec.teams))
+    for (const [i, triple] of perJudge.entries()) await evaluate(i, name, triple);
+  if (spec.closeJudging !== false)
+    await w.admin.put(`${w.base}/rounds/${w.roundId}/judging`).send({ status: 'CLOSED' });
+  return { w, teams, judges, A, B, C, evaluate, assignmentOf, overview };
+}
