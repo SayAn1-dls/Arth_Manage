@@ -209,15 +209,13 @@ export async function judgedRound(
   }
   await closeSubmissions(kit, w);
   const rubric = await workedExampleRubric(w);
-  const judges = [];
+  const judges: Awaited<ReturnType<typeof addJudge>>[] = [];
   for (let i = 0; i < (spec.judges ?? 2); i++)
     judges.push(await addJudge(kit, w, `Judge ${i + 1}`));
-  await w.admin
-    .post(`${w.base}/rounds/${w.roundId}/assignments`)
-    .send({
-      judgeMembershipIds: judges.map((j) => j.membershipId),
-      teamIds: Object.values(teams).map((t) => t.teamId),
-    });
+  await w.admin.post(`${w.base}/rounds/${w.roundId}/assignments`).send({
+    judgeMembershipIds: judges.map((j) => j.membershipId),
+    teamIds: Object.values(teams).map((t) => t.teamId),
+  });
   await openJudging(w);
   const [A, B, C] = rubric.criteria.map((c) => c.id) as [string, string, string];
   const overview = async () =>

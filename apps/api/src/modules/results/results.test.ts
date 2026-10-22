@@ -69,30 +69,26 @@ describe('result review (FR-032, FR-149..151)', () => {
     // only genuinely tied teams can be resolved together
     expect(
       (
-        await s.w.admin
-          .put(base(s, '/ties'))
-          .send({
-            group: 'Overall',
-            rank: 1,
-            teamIds: [s.teams.Zeta!.teamId, ids[0]!],
-            mode: 'SHARE',
-            reason: 'Not actually tied at all',
-          })
+        await s.w.admin.put(base(s, '/ties')).send({
+          group: 'Overall',
+          rank: 1,
+          teamIds: [s.teams.Zeta!.teamId, ids[0]!],
+          mode: 'SHARE',
+          reason: 'Not actually tied at all',
+        })
       ).status,
     ).toBe(422);
     const order = [ids[1]!, ids[0]!];
     expect(
       (
-        await s.w.admin
-          .put(base(s, '/ties'))
-          .send({
-            group: 'Overall',
-            rank: 2,
-            teamIds: ids,
-            mode: 'ORDER',
-            order,
-            reason: 'Judges preferred Yank in a live pitch',
-          })
+        await s.w.admin.put(base(s, '/ties')).send({
+          group: 'Overall',
+          rank: 2,
+          teamIds: ids,
+          mode: 'ORDER',
+          order,
+          reason: 'Judges preferred Yank in a live pitch',
+        })
       ).status,
     ).toBe(200);
     const after = await review(s);
@@ -105,15 +101,13 @@ describe('result review (FR-032, FR-149..151)', () => {
   it('lets tied teams share a position when the organiser decides so', async () => {
     const s = await judgedRound(kit, { teams: { Zeta: T100, Xray: T74, Yank: T74 } });
     const ids = ['Xray', 'Yank'].map((n) => s.teams[n]!.teamId);
-    await s.w.admin
-      .put(base(s, '/ties'))
-      .send({
-        group: 'Overall',
-        rank: 2,
-        teamIds: ids,
-        mode: 'SHARE',
-        reason: 'Genuinely level, share second place',
-      });
+    await s.w.admin.put(base(s, '/ties')).send({
+      group: 'Overall',
+      rank: 2,
+      teamIds: ids,
+      mode: 'SHARE',
+      reason: 'Genuinely level, share second place',
+    });
     const approve = await s.w.admin.post(base(s, '/approve'));
     expect(approve.status).toBe(201);
     const snap = await db.resultSnapshot.findFirstOrThrow();
