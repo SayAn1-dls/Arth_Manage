@@ -1,0 +1,42 @@
+# Arthakram brand guidelines — confidential local-only reference, must never be pushed to GitHub
+# (exact filename plus defensive patterns; extracted logo SVGs live in apps/web/src/assets/logo/)
+Arthakram-Brand-Kit*.pdf
+*Brand-Kit*
+*brand-kit*
+*Brand-Guidelines*
+/brand/
+/reference/
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+apps/api/src/generated/
+
+# Local data and logs
+.data/
+*.log
+*.sqlite
+*.db
+
+# Secrets (only .env.example may be committed)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+*service-account*.json
+
+# Test and QA artefacts
+test-results/
+playwright-report/
+.qa-screenshots/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+node_modules

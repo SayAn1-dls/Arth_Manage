@@ -1,0 +1,42 @@
+{
+  "name": "arthakram-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Arthakram hackathon and case competition management platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm run dev -w @arthakram/api",
+    "dev:web": "npm run dev -w @arthakram/web",
+    "build": "npm run build -w @arthakram/shared && npm run build -w @arthakram/api && npm run build -w @arthakram/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:brand": "node scripts/lint-brand.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "playwright test",
+    "db:migrate": "npm run db:migrate -w @arthakram/api",
+    "db:seed": "npm run db:seed -w @arthakram/api",
+    "db:reset": "npm run db:reset -w @arthakram/api",
+    "qa:visual": "node scripts/visual-qa.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "npm-run-all2": "^9.0.4",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0"
+  },
+  "type": "module"
+}

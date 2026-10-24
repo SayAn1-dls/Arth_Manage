@@ -1,0 +1,1088 @@
+// Domain schema, grown phase by phase (see docs/IMPLEMENTATION_PLAN.md).
+// Constraints that Prisma cannot express (partial/functional unique indexes, triggers) live in the SQL migrations.
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────── Identity ─────────────
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique // always stored lower-case
+  name              String
+  passwordHash      String
+  emailVerifiedAt   DateTime?
+  failedLoginCount  Int       @default(0)
+  lastFailedLoginAt DateTime?
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions    Session[]
+  tokens      AuthToken[]
+  memberships EventMembership[]
+  ownedEvents Event[]           @relation("EventOwner")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique // sha256 of the opaque cookie value; the raw token is never stored
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum AuthTokenType {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+// Development outbox for the console email provider (never used to send real mail).
+model OutboxEmail {
+  id        String   @id @default(cuid())
+  toEmail   String
+  subject   String
+  body      String
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@index([toEmail, createdAt])
+}
+
+// ───────────── Events and membership ─────────────
+
+enum EventType {
+  HACKATHON
+  CASE_COMPETITION
+  OTHER
+}
+
+enum EventMode {
+  IN_PERSON
+  ONLINE
+  HYBRID
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CONCLUDED
+  ARCHIVED
+}
+
+enum RegistrationStatus {
+  NOT_OPEN
+  OPEN
+  CLOSED
+}
+
+model Event {
+  id                         String                @id @default(cuid())
+  slug                       String                @unique
+  name                       String
+  type                       EventType
+  mode                       EventMode
+  startsAt                   DateTime
+  endsAt                     DateTime
+  timeZone                   String                @default("Asia/Kolkata")
+  institution                String
+  contactEmail               String
+  venue                      String?
+  description                String?
+  eligibility                String?
+  status                     EventStatus           @default(DRAFT)
+  registrationStatus         RegistrationStatus    @default(NOT_OPEN)
+  registrationOpensAt        DateTime?
+  registrationClosesAt       DateTime?
+  teamMin                    Int                   @default(1)
+  teamMax                    Int                   @default(4)
+  // What teams see when results publish (PRD OQ-05 defaults: winners on, own rank/score off)
+  showWinners                Boolean               @default(true)
+  showOwnRank                Boolean               @default(false)
+  showOwnScores              Boolean               @default(false)
+  // Certificate eligibility (PRD FR-231, OQ-09 default: a submitted version in Round 1)
+  certParticipationRule      CertParticipationRule @default(SUBMITTED)
+  certWinnersAlsoParticipate Boolean               @default(true)
+  // Up to five participant declarations to tick at registration (PRD FR-013)
+  declarations               String[]              @default([])
+  trackRequired              Boolean               @default(false)
+  teamCodeSeq                Int                   @default(0)
+  ownerId                    String
+  version                    Int                   @default(1)
+  publishedAt                DateTime?
+  concludedAt                DateTime?
+  archivedAt                 DateTime?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+
+  owner                 User                   @relation("EventOwner", fields: [ownerId], references: [id])
+  memberships           EventMembership[]
+  audit                 AuditLog[]
+  tracks                Track[]
+  problems              ProblemStatement[]
+  rounds                Round[]
+  guidebook             Guidebook?
+  guidebookVersions     GuidebookVersion[]
+  announcements         Announcement[]
+  registrationFieldDefs RegistrationFieldDef[]
+  teams                 Team[]
+  invitations           Invitation[]
+  staffTasks            StaffTask[]
+  issueReports          IssueReport[]
+}
+
+enum EventRole {
+  ADMIN
+  JUDGE
+  STAFF
+  PARTICIPANT
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  REMOVED
+}
+
+model EventMembership {
+  id           String           @id @default(cuid())
+  eventId      String
+  userId       String
+  role         EventRole
+  status       MembershipStatus @default(ACTIVE)
+  invitedById  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registration Registration?
+  teamMembers  TeamMember[]
+
+  // One role per user per event (PRD 8.2)
+  @@unique([eventId, userId])
+  @@unique([id, eventId]) // lets child tables carry eventId in a composite foreign key
+  @@index([userId])
+}
+
+// ───────────── Audit (append-only, enforced by a trigger in the migration) ─────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  eventId    String?
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  reason     String?
+  at         DateTime @default(now())
+  event      Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([eventId, at])
+}
+
+// ───────────── Competition structure (PRD A.2) ─────────────
+
+model Track {
+  id          String             @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  order       Int                @default(0)
+  event       Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  problems    ProblemStatement[]
+  teams       Team[]
+
+  @@unique([eventId, name])
+}
+
+model ProblemStatement {
+  id          String  @id @default(cuid())
+  eventId     String
+  trackId     String?
+  title       String
+  description String
+  order       Int     @default(0)
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  track       Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  teams       Team[]
+
+  @@unique([eventId, title])
+}
+
+enum LatePolicy {
+  REJECT
+  ACCEPT_AND_FLAG
+}
+
+enum RankingScope {
+  OVERALL
+  PER_TRACK
+}
+
+model Round {
+  id                  String                @id @default(cuid())
+  eventId             String
+  order               Int
+  name                String
+  opensAt             DateTime?
+  submissionDeadline  DateTime?
+  graceMinutes        Int                   @default(0)
+  latePolicy          LatePolicy            @default(REJECT)
+  judgingDeadline     DateTime?
+  rankingScope        RankingScope          @default(OVERALL)
+  requiredEvaluations Int                   @default(2)
+  awardPositions      Int                   @default(3)
+  version             Int                   @default(1)
+  event               Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judgingStatus       JudgingStatus         @default(NOT_OPEN)
+  commentsReleasedAt  DateTime?
+  formFields          SubmissionFormField[]
+  rubric              Rubric?
+  snapshots           ResultSnapshot[]
+  tieResolutions      TieResolution[]
+  notRanked           NotRankedMark[]
+  assignments         JudgeAssignment[]
+  submissions         Submission[]
+
+  @@unique([eventId, order])
+}
+
+// ───────────── Guidebook and announcements (PRD A.4, FR-007) ─────────────
+
+model Guidebook {
+  eventId     String   @id
+  sections    Json // draft: [{ id, title, body, hidden }] in display order
+  version     Int      @default(1) // optimistic-lock counter for the draft
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model GuidebookVersion {
+  id            String   @id @default(cuid())
+  eventId       String
+  versionNo     Int
+  sections      Json // immutable snapshot of the visible sections at publish time
+  changeNote    String?
+  publishedById String
+  publishedAt   DateTime @default(now())
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, versionNo])
+}
+
+enum AnnouncementAudience {
+  EVERYONE
+  PARTICIPANTS
+  JUDGES
+  STAFF
+}
+
+model Announcement {
+  id        String               @id @default(cuid())
+  eventId   String
+  audience  AnnouncementAudience @default(EVERYONE)
+  title     String
+  body      String
+  authorId  String
+  createdAt DateTime             @default(now())
+  editedAt  DateTime?
+  event     Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
+}
+
+// ───────────── Registration and teams (PRD B.1, FR-015/050-058) ─────────────
+
+enum RegistrationFieldType {
+  SHORT_TEXT
+  LONG_TEXT
+  NUMBER
+  SELECT
+  URL
+  CHECKBOX
+}
+
+model RegistrationFieldDef {
+  id       String                @id @default(cuid())
+  eventId  String
+  label    String
+  type     RegistrationFieldType
+  helpText String?
+  options  String[]              @default([])
+  required Boolean               @default(false)
+  hidden   Boolean               @default(false)
+  order    Int                   @default(0)
+  event    Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, label])
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+model Registration {
+  id                     String            @id @default(cuid())
+  eventId                String
+  membershipId           String            @unique // one registration per participant per event
+  fullName               String
+  phone                  String?
+  institution            String
+  course                 String?
+  yearOfStudy            String?
+  certificateName        String
+  answers                Json              @default("{}")
+  declarationsAcceptedAt DateTime
+  status                 ParticipantStatus @default(ACTIVE)
+  version                Int               @default(1)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  membership             EventMembership   @relation(fields: [membershipId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@unique([membershipId, eventId])
+  @@index([eventId])
+}
+
+enum TeamStatus {
+  ACTIVE
+  DISSOLVED
+  DISQUALIFIED
+}
+
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+model Team {
+  id                 String            @id @default(cuid())
+  eventId            String
+  teamCode           String // "T-0042", never reused
+  name               String
+  trackId            String?
+  problemId          String?
+  joinCode           String? // null once the team is dissolved
+  status             TeamStatus        @default(ACTIVE)
+  disqualifiedReason String?
+  version            Int               @default(1)
+  createdAt          DateTime          @default(now())
+  event              Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  track              Track?            @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  problem            ProblemStatement? @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  members            TeamMember[]
+  submissions        Submission[]
+
+  @@unique([eventId, teamCode])
+  @@unique([eventId, joinCode])
+  @@unique([id, eventId])
+}
+
+model TeamMember {
+  id           String          @id @default(cuid())
+  teamId       String
+  eventId      String
+  membershipId String
+  role         TeamRole        @default(MEMBER)
+  joinedAt     DateTime        @default(now())
+  leftAt       DateTime?
+  team         Team            @relation(fields: [teamId, eventId], references: [id, eventId], onDelete: Cascade)
+  membership   EventMembership @relation(fields: [membershipId, eventId], references: [id, eventId], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([eventId, membershipId])
+}
+
+model JoinAttempt {
+  id      String   @id @default(cuid())
+  userId  String
+  eventId String
+  success Boolean
+  at      DateTime @default(now())
+
+  @@index([userId, eventId, at])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  eventId     String
+  email       String
+  role        EventRole
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime?
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status])
+  @@index([email])
+}
+
+// ───────────── Submissions (PRD B.3, FR-059-073) ─────────────
+
+enum SubmissionFieldType {
+  FILE
+  REPO_URL
+  VIDEO_URL
+  LIVE_URL
+  OTHER_URL
+  SHORT_TEXT
+  LONG_TEXT
+}
+
+model SubmissionFormField {
+  id                String              @id @default(cuid())
+  roundId           String
+  type              SubmissionFieldType
+  label             String
+  helpText          String?
+  required          Boolean             @default(false)
+  order             Int                 @default(0)
+  allowedExtensions String[]            @default([]) // FILE only, lower-case without dot
+  maxMb             Int                 @default(25)
+  round             Round               @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, label])
+}
+
+model Submission {
+  id                String              @id @default(cuid())
+  eventId           String
+  roundId           String
+  teamId            String
+  draftTitle        String              @default("")
+  draftSummary      String              @default("")
+  draftValues       Json                @default("{}") // fieldId -> text / url / file id
+  draftVersion      Int                 @default(1) // optimistic lock for concurrent edits by team members
+  draftUpdatedAt    DateTime            @default(now())
+  lastVersionNo     Int                 @default(0)
+  extensionDeadline DateTime?
+  extensionReason   String?
+  minSizeOverride   Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  round             Round               @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  team              Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  versions          SubmissionVersion[]
+  files             SubmissionFile[]
+
+  @@unique([roundId, teamId])
+  @@index([eventId])
+}
+
+// Immutable once written (trigger in the migration): judges and results always use the last submitted version.
+model SubmissionVersion {
+  id                      String     @id @default(cuid())
+  submissionId            String
+  eventId                 String
+  versionNo               Int
+  title                   String
+  summary                 String
+  values                  Json
+  submittedAt             DateTime   @default(now())
+  submittedByMembershipId String
+  lateMinutes             Int        @default(0)
+  submission              Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, versionNo])
+}
+
+// Files are never overwritten: replacing a file creates a new row, so earlier versions keep theirs.
+model SubmissionFile {
+  id                     String     @id @default(cuid())
+  eventId                String
+  submissionId           String
+  fieldId                String
+  storageKey             String     @unique
+  originalName           String
+  sizeBytes              Int
+  contentType            String
+  sha256                 String
+  uploadedByMembershipId String
+  createdAt              DateTime   @default(now())
+  submission             Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}
+
+// ───────────── Rubrics, assignments and evaluations (PRD Modules A.5, C, E) ─────────────
+
+enum JudgingStatus {
+  NOT_OPEN
+  OPEN
+  CLOSED
+}
+
+enum RubricState {
+  DRAFT
+  ACTIVE
+  LOCKED
+}
+
+enum CommentMode {
+  OFF
+  OPTIONAL
+  REQUIRED
+}
+
+model Rubric {
+  id               String            @id @default(cuid())
+  roundId          String            @unique // one rubric per round
+  name             String
+  state            RubricState       @default(DRAFT)
+  teamCommentMode  CommentMode       @default(OPTIONAL)
+  sourceTemplate   String?
+  /**
+   * Increments whenever the structure changes, so evaluations record which structure they scored.
+   */
+  structureVersion Int               @default(1)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  round            Round             @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  criteria         RubricCriterion[]
+}
+
+model RubricCriterion {
+  id          String           @id @default(cuid())
+  rubricId    String
+  name        String
+  description String           @default("")
+  weight      Int
+  min         Int
+  max         Int
+  order       Int              @default(0)
+  rubric      Rubric           @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  scores      CriterionScore[]
+
+  @@unique([rubricId, name])
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  CONFLICT
+  EXCLUDED
+  UNASSIGNED
+}
+
+model JudgeAssignment {
+  id                 String           @id @default(cuid())
+  eventId            String
+  roundId            String
+  teamId             String
+  judgeMembershipId  String
+  status             AssignmentStatus @default(ACTIVE)
+  reason             String? // exclusion or conflict reason
+  conflictDeclaredBy String? // 'JUDGE' | 'ADMIN'
+  createdAt          DateTime         @default(now())
+  round              Round            @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  evaluation         Evaluation?
+
+  // One assignment per judge per team per round (PRD 9.1), so one evaluation per judge per team per round.
+  @@unique([roundId, teamId, judgeMembershipId])
+  @@index([judgeMembershipId, roundId])
+  @@index([eventId, roundId])
+}
+
+enum EvaluationStatus {
+  DRAFT
+  SUBMITTED
+  REOPENED
+}
+
+model Evaluation {
+  id                       String              @id @default(cuid())
+  assignmentId             String              @unique
+  eventId                  String
+  status                   EvaluationStatus    @default(DRAFT)
+  /**
+   * Optimistic lock for the judge's own tabs and the submit race.
+   */
+  version                  Int                 @default(1)
+  structureVersion         Int                 @default(1)
+  weightedScore            Decimal?            @db.Decimal(9, 4)
+  teamComment              String?
+  privateNote              String?
+  submittedAt              DateTime?
+  submissionCount          Int                 @default(0)
+  correctionReason         String?
+  correctionRequestedAt    DateTime?
+  correctionDeclinedReason String?
+  commentHiddenReason      String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  assignment               JudgeAssignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  scores                   CriterionScore[]
+  history                  EvaluationVersion[]
+}
+
+model CriterionScore {
+  id           String          @id @default(cuid())
+  evaluationId String
+  criterionId  String
+  score        Int
+  evaluation   Evaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  criterion    RubricCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, criterionId])
+}
+
+// Every submission of an evaluation is kept (immutable, trigger in the migration) so corrections are explainable.
+model EvaluationVersion {
+  id            String     @id @default(cuid())
+  evaluationId  String
+  versionNo     Int
+  scores        Json // { criterionId: score }
+  criteria      Json // the rubric structure that was scored: [{ id, name, weight, min, max }]
+  teamComment   String?
+  privateNote   String?
+  weightedScore Decimal    @db.Decimal(9, 4)
+  submittedAt   DateTime   @default(now())
+  evaluation    Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluationId, versionNo])
+}
+
+// ───────────── Results (PRD FR-032..035, FR-149..156) ─────────────
+
+enum SnapshotStatus {
+  APPROVED
+  INVALIDATED
+}
+
+// Content columns are immutable (trigger in the migration). Only status, invalidation and publication
+// bookkeeping may change, so an approved result is always explainable.
+model ResultSnapshot {
+  id                String         @id @default(cuid())
+  eventId           String
+  roundId           String
+  versionNo         Int
+  entries           Json // ranked teams: rank, score at 4 dp, per-judge and per-criterion breakdown
+  unranked          Json // teams not ranked and why
+  tieDecisions      Json // resolutions in force when approved
+  exclusions        Json // excluded assignments with reasons
+  fingerprint       String // hash of everything the ranking depended on
+  approvedById      String
+  approvedAt        DateTime       @default(now())
+  status            SnapshotStatus @default(APPROVED)
+  invalidatedAt     DateTime?
+  invalidatedReason String?
+  publishedAt       DateTime?
+  publishedById     String?
+  unpublishedAt     DateTime?
+  unpublishReason   String?
+  round             Round          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, versionNo])
+  @@index([eventId, roundId])
+}
+
+enum TieMode {
+  SHARE
+  ORDER
+}
+
+model TieResolution {
+  id        String   @id @default(cuid())
+  eventId   String
+  roundId   String
+  group     String
+  rank      Int
+  teamIds   String[]
+  mode      TieMode
+  order     String[] // team ids in the chosen order (ORDER only)
+  reason    String
+  createdBy String
+  createdAt DateTime @default(now())
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, group, rank])
+}
+
+model NotRankedMark {
+  id        String   @id @default(cuid())
+  eventId   String
+  roundId   String
+  teamId    String
+  reason    String
+  createdBy String
+  createdAt DateTime @default(now())
+  round     Round    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, teamId])
+}
+
+// ───────────── Staff operations (PRD Module D) ─────────────
+
+enum StaffTaskType {
+  CHECKIN
+  VERIFICATION
+  GENERAL
+}
+
+enum StaffTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+model StaffTask {
+  id                String              @id @default(cuid())
+  eventId           String
+  title             String
+  description       String?
+  type              StaffTaskType       @default(GENERAL)
+  dueAt             DateTime?
+  location          String?
+  status            StaffTaskStatus     @default(TODO)
+  note              String? // blocked reason or completion note
+  statusChangedById String?
+  statusChangedAt   DateTime            @default(now())
+  createdById       String
+  createdAt         DateTime            @default(now())
+  event             Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignees         StaffTaskAssignee[]
+  teams             StaffTaskTeam[]
+
+  @@index([eventId, status])
+}
+
+model StaffTaskAssignee {
+  taskId       String
+  membershipId String
+  task         StaffTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, membershipId])
+  @@index([membershipId])
+}
+
+model StaffTaskTeam {
+  taskId String
+  teamId String
+  task   StaffTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, teamId])
+}
+
+// Attendance and ID verification per participant. Undo keeps the row (undoneAt) so the history stays explainable.
+model CheckIn {
+  id             String    @id @default(cuid())
+  eventId        String
+  membershipId   String
+  checkedInAt    DateTime  @default(now())
+  checkedInById  String
+  idVerifiedAt   DateTime?
+  idVerifiedById String?
+  note           String?
+  undoneAt       DateTime?
+  undoneById     String?
+
+  @@index([eventId, membershipId])
+}
+
+enum IssueCategory {
+  REGISTRATION_MISMATCH
+  TECHNICAL
+  FACILITIES
+  CONDUCT
+  OTHER
+}
+
+enum IssueSeverity {
+  NORMAL
+  URGENT
+}
+
+enum IssueStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model IssueReport {
+  id                   String        @id @default(cuid())
+  eventId              String
+  reporterMembershipId String
+  category             IssueCategory
+  description          String
+  teamId               String?
+  severity             IssueSeverity @default(NORMAL)
+  status               IssueStatus   @default(OPEN)
+  resolutionNote       String?
+  resolvedById         String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  event                Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, status])
+}
+
+// ───────────── Feedback (PRD Module H) ─────────────
+
+enum FeedbackAudience {
+  PARTICIPANT
+  JUDGE
+}
+
+enum FormState {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+model FeedbackForm {
+  id           String             @id @default(cuid())
+  eventId      String
+  audience     FeedbackAudience
+  state        FormState          @default(DRAFT)
+  // Confidential: organisers never see who answered; identity is stored only to prevent duplicates.
+  confidential Boolean
+  closeAt      DateTime?
+  questions    Json // [{ id, type: RATING|CHOICE|SHORT_TEXT|LONG_TEXT, text, required, options? }]
+  version      Int                @default(1)
+  createdAt    DateTime           @default(now())
+  responses    FeedbackResponse[]
+
+  @@unique([eventId, audience])
+}
+
+model FeedbackResponse {
+  id                     String       @id @default(cuid())
+  formId                 String
+  respondentMembershipId String
+  answers                Json
+  submittedAt            DateTime     @default(now())
+  form                   FeedbackForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  // One response per user per form, enforced by the database (PRD FR-212).
+  @@unique([formId, respondentMembershipId])
+}
+
+// ───────────── Certificates (PRD Module I) ─────────────
+
+enum CertParticipationRule {
+  SUBMITTED
+  CHECKED_IN
+}
+
+enum CertificateType {
+  PARTICIPATION
+  WINNER
+}
+
+enum CertificateStatus {
+  GENERATED
+  NEEDS_REGENERATION
+  RELEASED
+  REVOKED
+  FLAGGED
+}
+
+model CertificateTemplate {
+  id             String          @id @default(cuid())
+  eventId        String
+  type           CertificateType
+  backgroundKey  String?
+  backgroundName String?
+  fields         Json            @default("[]") // placements: { field, x, y, font, size, color, align, maxWidth }
+  awardTexts     Json            @default("{}") // position -> text, e.g. { "1": "First Place" }
+  version        Int             @default(1)
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([eventId, type])
+}
+
+model Certificate {
+  id              String            @id @default(cuid())
+  certificateCode String            @unique // e.g. CERT-7F3K-9Q2M, never reused
+  eventId         String
+  membershipId    String
+  type            CertificateType
+  awardKey        String            @default("") // "" for participation; "R1:2:Overall" for a winner position
+  awardText       String?
+  nameSnapshot    String
+  teamName        String?
+  version         Int               @default(1)
+  status          CertificateStatus @default(GENERATED)
+  pdfKey          String
+  releasedAt      DateTime?
+  revokedReason   String?
+  flaggedReason   String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  corrections     NameCorrection[]
+
+  @@unique([eventId, membershipId, type, awardKey])
+  @@index([eventId, type, status])
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model NameCorrection {
+  id            String           @id @default(cuid())
+  certificateId String
+  requestedName String
+  status        CorrectionStatus @default(PENDING)
+  decisionNote  String?
+  decidedById   String?
+  createdAt     DateTime         @default(now())
+  certificate   Certificate      @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+}
+
+// Admin decisions to include or exclude one person from a certificate type, with a reason (FR-231).
+model CertificateException {
+  id           String          @id @default(cuid())
+  eventId      String
+  membershipId String
+  type         CertificateType
+  include      Boolean
+  reason       String
+  createdBy    String
+  createdAt    DateTime        @default(now())
+
+  @@unique([eventId, membershipId, type])
+}
+
+enum JobStatus {
+  RUNNING
+  DONE
+  FAILED
+}
+
+model CertificateJob {
+  id         String          @id @default(cuid())
+  eventId    String
+  type       CertificateType
+  status     JobStatus       @default(RUNNING)
+  total      Int             @default(0)
+  done       Int             @default(0)
+  failed     Int             @default(0)
+  error      String?
+  startedAt  DateTime        @default(now())
+  finishedAt DateTime?
+
+  @@index([eventId, type])
+}
+
+// ───────────── Integrations: Google Sheets one-way push and Drive mirror (PRD Modules F, G) ─────────────
+
+enum ConnectionStatus {
+  CONNECTED
+  NEEDS_REAUTH
+  DISCONNECTED
+}
+
+// One Google connection per event. Tokens are AES-256-GCM encrypted with a key held outside the database.
+model IntegrationConnection {
+  id               String           @id @default(cuid())
+  eventId          String           @unique
+  status           ConnectionStatus @default(CONNECTED)
+  googleEmail      String
+  connectedById    String
+  refreshTokenEnc  String?
+  spreadsheetId    String?
+  spreadsheetUrl   String?
+  tabIds           Json             @default("{}") // managed tab key -> sheet tab id
+  driveEnabled     Boolean          @default(false)
+  driveFolders     Json             @default("{}") // folder key -> Drive folder id
+  acknowledgedAt   DateTime
+  lastSuccessAt    DateTime?
+  lastAttemptAt    DateTime?
+  lastResult       String? // SUCCEEDED | FAILED
+  lastError        String?
+  lastErrorDetail  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  jobs             SyncJob[]
+}
+
+enum SyncKind {
+  SHEETS
+  DRIVE_MIRROR
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// Persistent, restart-safe queue. A partial unique index keeps at most one queued and one running job per kind and connection.
+model SyncJob {
+  id            String                @id @default(cuid())
+  eventId       String
+  connectionId  String
+  kind          SyncKind
+  status        SyncStatus            @default(QUEUED)
+  attempt       Int                   @default(0)
+  firstQueuedAt DateTime              @default(now())
+  runAfter      DateTime              @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  error         String?
+  errorDetail   String?
+  summary       String?
+  createdAt     DateTime              @default(now())
+  connection    IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter])
+  @@index([eventId, createdAt])
+}
+
+enum MirrorStatus {
+  PENDING
+  MIRRORED
+  FAILED
+}
+
+// One row per mirrored object, keyed so retries never create duplicate Drive files.
+model DriveMirror {
+  id          String       @id @default(cuid())
+  eventId     String
+  key         String // "file:<submissionFileId>" or "links:<submissionVersionId>"
+  status      MirrorStatus @default(PENDING)
+  driveFileId String?
+  error       String?
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([eventId, key])
+}

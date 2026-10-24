@@ -1,0 +1,55 @@
+// Screens added per phase for scripts/visual-qa.mjs. `{event}` is the demo event id; `as` is a seeded account key.
+export const screens = [
+  // Phase 2: events, rounds, guidebook
+  { name: 'public-event', path: '/e/hacksonipat-2026' },
+  { name: 'create-event', path: '/events/new', as: 'admin' },
+  { name: 'setup-admin', path: '/events/{event}/setup', as: 'admin' },
+  { name: 'rounds-admin', path: '/events/{event}/rounds', as: 'admin' },
+  { name: 'structure-admin', path: '/events/{event}/structure', as: 'admin' },
+  { name: 'guidebook-admin', path: '/events/{event}/guidebook', as: 'admin' },
+  { name: 'guidebook-participant', path: '/events/{event}/guidebook', as: 'asha' },
+  { name: 'announcements-admin', path: '/events/{event}/announcements', as: 'admin' },
+  { name: 'announcements-judge', path: '/events/{event}/announcements', as: 'judge1' },
+  // Phase 3: participants, teams, submissions
+  { name: 'team-asha', path: '/events/{event}/team', as: 'asha' },
+  { name: 'team-ravi-no-team', path: '/events/{event}/team', as: 'ravi' },
+  { name: 'dashboard-asha', path: '/events/{event}', as: 'asha' },
+  { name: 'submission-asha', path: '/events/{event}/submission/{round}', as: 'asha' },
+  { name: 'profile-asha', path: '/events/{event}/profile', as: 'asha' },
+  { name: 'participants-admin', path: '/events/{event}/participants', as: 'admin' },
+  {
+    name: 'participant-detail-admin',
+    path: '/events/{event}/participants/{participant}',
+    as: 'admin',
+  },
+  { name: 'teams-admin', path: '/events/{event}/teams', as: 'admin' },
+  { name: 'team-detail-admin', path: '/events/{event}/teams/{team}', as: 'admin' },
+  { name: 'submissions-admin', path: '/events/{event}/submissions', as: 'admin' },
+  { name: 'people-admin', path: '/events/{event}/people', as: 'admin' },
+  // Phase 4: rubric, judging, judge workspace (Case Cup demo event: submissions closed, judging open)
+  { name: 'rubric-admin', path: '/events/{cup}/rubric', as: 'admin' },
+  { name: 'judging-admin', path: '/events/{cup}/judging', as: 'admin' },
+  { name: 'judge-dashboard', path: '/events/{cup}', as: 'judge1' },
+  { name: 'judge-teams', path: '/events/{cup}/judge/{cupRound}', as: 'judge1' },
+  { name: 'judge-workspace', path: '/events/{cup}/judge/{cupRound}/{cupTeam}', as: 'judge1' },
+  // Phase 5: results, staff operations, dashboard, audit
+  { name: 'dashboard-admin', path: '/events/{cup}', as: 'admin' },
+  { name: 'results-admin', path: '/events/{cup}/results', as: 'admin' },
+  { name: 'tasks-admin', path: '/events/{cup}/tasks', as: 'admin' },
+  { name: 'issues-admin', path: '/events/{cup}/issues', as: 'admin' },
+  { name: 'audit-admin', path: '/events/{cup}/audit', as: 'admin' },
+  { name: 'staff-dashboard', path: '/events/{cup}', as: 'staff' },
+  { name: 'staff-tasks', path: '/events/{cup}/tasks', as: 'staff' },
+  { name: 'staff-checkin', path: '/events/{cup}/checkin', as: 'staff' },
+  { name: 'staff-issues', path: '/events/{cup}/issues', as: 'staff' },
+  // Phase 6: feedback and certificates
+  { name: 'setup-certificates-admin', path: '/events/{event}/setup', as: 'admin' },
+  { name: 'feedback-admin', path: '/events/{event}/feedback', as: 'admin' },
+  { name: 'feedback-participant', path: '/events/{event}/feedback', as: 'asha' },
+  { name: 'feedback-judge', path: '/events/{cup}/feedback', as: 'judge1' },
+  { name: 'certificates-admin', path: '/events/{cup}/certificates', as: 'admin' },
+  { name: 'certificates-participant', path: '/events/{cup}/certificates', as: 'cup1' },
+  { name: 'certificates-participant-empty', path: '/events/{event}/certificates', as: 'asha' },
+  // Phase 7: integrations
+  { name: 'integrations-admin', path: '/events/{cup}/integrations', as: 'admin' },
+];

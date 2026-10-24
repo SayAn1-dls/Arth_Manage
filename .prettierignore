@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+docs/*.pdf
+package-lock.json
+apps/api/src/generated
+.data
+test-results
+.qa-screenshots
+docs
