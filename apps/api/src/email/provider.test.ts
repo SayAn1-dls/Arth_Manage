@@ -3,12 +3,12 @@ import { createLogger } from '../config/logger.js';
 import { loadEnv } from '../config/env.js';
 import { SmtpEmailProvider } from './provider.js';
 
-const logger = createLogger(loadEnv());
+const logger = createLogger(loadEnv({ DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) }));
 const base = { DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) };
 
 describe('SmtpEmailProvider', () => {
-  it('sends plain text from the configured sender and surfaces transport failures', async () => {
-    const sent: unknown[] = [];
+  it('sends HTML email with embedded link (plus plain text fallback) and surfaces transport failures', async () => {
+    const sent: Array<{ from: string; to: string; subject: string; text: string; html?: string }> = [];
     const ok = new SmtpEmailProvider(
       'Arthakram <hello@example.org>',
       { sendMail: async (m) => void sent.push(m) },
@@ -20,14 +20,17 @@ describe('SmtpEmailProvider', () => {
       body: 'Confirm your email address.',
       link: 'https://x/verify?token=1',
     });
-    expect(sent).toEqual([
-      {
-        from: 'Arthakram <hello@example.org>',
-        to: 'a@example.test',
-        subject: 'Verify',
-        text: 'Confirm your email address.\n\nhttps://x/verify?token=1\n', // the link is part of the delivered message
-      },
-    ]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      from: 'Arthakram <hello@example.org>',
+      to: 'a@example.test',
+      subject: 'Verify',
+      text: 'Confirm your email address.\n\nhttps://x/verify?token=1\n',
+    });
+    expect(sent[0].html).toContain('<!DOCTYPE html>');
+    expect(sent[0].html).toContain('Confirm your email address.');
+    expect(sent[0].html).toContain('<a href="https://x/verify?token=1"');
+
     const down = new SmtpEmailProvider(
       'x',
       { sendMail: async () => Promise.reject(new Error('ECONNREFUSED')) },
