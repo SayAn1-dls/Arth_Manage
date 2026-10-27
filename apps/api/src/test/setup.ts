@@ -11,4 +11,4 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 }
 process.env.SESSION_SECRET ??= 'test-session-secret-0123456789abcdef';
-process.env.TOKEN_ENCRYPTION_KEY ??= 'ab'.repeat(32);
+if (!process.env.TOKEN_ENCRYPTION_KEY) process.env.TOKEN_ENCRYPTION_KEY = 'ab'.repeat(32);

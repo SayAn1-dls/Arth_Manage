@@ -1,3 +1,4 @@
+import { judgeToolsRouter } from './tools.js';
 import { Router } from 'express';
 import type { Deps } from '../../http/deps.js';
 import { assignmentsRouter } from './assignments.js';
@@ -6,6 +7,7 @@ import { rubricRouter } from './rubric.js';
 
 export function judgingRouter(deps: Deps) {
   const router = Router({ mergeParams: true });
+  router.use(judgeToolsRouter(deps));
   router.use(rubricRouter(deps));
   router.use(assignmentsRouter(deps));
   router.use(judgeRouter(deps));

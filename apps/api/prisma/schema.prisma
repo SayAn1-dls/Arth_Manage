@@ -130,6 +130,7 @@ model Event {
   // Up to five participant declarations to tick at registration (PRD FR-013)
   declarations               String[]              @default([])
   trackRequired              Boolean               @default(false)
+  applicationReview          Boolean @default(false)
   teamCodeSeq                Int                   @default(0)
   ownerId                    String
   version                    Int                   @default(1)
@@ -175,6 +176,9 @@ model EventMembership {
   role         EventRole
   status       MembershipStatus @default(ACTIVE)
   invitedById  String?
+  accessLevel  String @default("STANDARD")
+  institution  String @default("")
+  trackIds     String[] @default([])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -256,6 +260,8 @@ model Round {
   latePolicy          LatePolicy            @default(REJECT)
   judgingDeadline     DateTime?
   rankingScope        RankingScope          @default(OVERALL)
+  normalisation       Boolean               @default(false)
+  shortlistEnabled    Boolean               @default(false)
   requiredEvaluations Int                   @default(2)
   awardPositions      Int                   @default(3)
   version             Int                   @default(1)
@@ -385,6 +391,8 @@ enum TeamRole {
 model Team {
   id                 String            @id @default(cuid())
   eventId            String
+  applicationStatus  String @default("PENDING")
+  applicationNote    String?
   teamCode           String // "T-0042", never reused
   name               String
   trackId            String?
@@ -610,6 +618,7 @@ model JudgeAssignment {
   createdAt          DateTime         @default(now())
   round              Round            @relation(fields: [roundId], references: [id], onDelete: Cascade)
   evaluation         Evaluation?
+  memo               JudgeMemo?
 
   // One assignment per judge per team per round (PRD 9.1), so one evaluation per judge per team per round.
   @@unique([roundId, teamId, judgeMembershipId])
@@ -1085,4 +1094,134 @@ model DriveMirror {
   updatedAt   DateTime     @updatedAt
 
   @@unique([eventId, key])
+}
+
+
+model SupportTicket {
+  id String @id @default(cuid())
+  eventId String
+  authorId String
+  teamId String?
+  subject String
+  kind String @default("QUESTION")
+  status String @default("OPEN")
+  assignedToId String?
+  roundId String?
+  minutes Int @default(10)
+  replacementEmail String?
+  departingEmail String?
+  decisionNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages TicketMessage[]
+  @@index([eventId, status, updatedAt])
+  @@index([eventId, authorId])
+}
+
+model TicketMessage {
+  id String @id @default(cuid())
+  ticketId String
+  authorId String
+  body String
+  createdAt DateTime @default(now())
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  @@index([ticketId, createdAt])
+}
+
+model RoundEntry {
+  id String @id @default(cuid())
+  eventId String
+  roundId String
+  teamId String
+  createdAt DateTime @default(now())
+  @@unique([roundId, teamId])
+  @@index([eventId, roundId])
+}
+
+model DiscoveryProfile {
+  id String @id @default(cuid())
+  eventId String
+  membershipId String
+  headline String
+  skills String
+  about String
+  contact String
+  visible Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  @@unique([eventId, membershipId])
+}
+
+model ActivityPulse {
+  id String @id @default(cuid())
+  eventId String
+  membershipId String
+  lastSeenAt DateTime @default(now())
+  guidebookAt DateTime?
+  @@unique([eventId, membershipId])
+}
+
+model MessageDelivery {
+  id String @id @default(cuid())
+  eventId String
+  membershipId String
+  key String
+  subject String
+  body String
+  status String @default("QUEUED")
+  attempts Int @default(0)
+  error String?
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([eventId, membershipId, key])
+  @@index([status, createdAt])
+}
+
+model ProjectReview {
+  id String @id @default(cuid())
+  eventId String
+  teamId String
+  roundId String
+  repoUrl String?
+  integrityNote String @default("")
+  marketNote String @default("")
+  sources Json @default("[]")
+  status String @default("PENDING")
+  releaseToTeam Boolean @default(false)
+  reviewedById String?
+  updatedAt DateTime @updatedAt
+  @@unique([roundId, teamId])
+  @@index([eventId])
+}
+
+
+// Judge-owned scratch material; intentionally excluded from evaluation/admin DTOs and exports.
+model JudgeMemo {
+  assignmentId String @id
+  scratchpad String @default("")
+  starred Boolean @default(false)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  assignment JudgeAssignment @relation(fields:[assignmentId], references:[id], onDelete:Cascade)
+}
+model JudgeBriefing {
+  eventId String @id
+  body String @default("")
+  examples String @default("")
+  contact String @default("")
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+}
+model TrackGlossary {
+  id String @id @default(cuid())
+  eventId String
+  trackId String?
+  term String
+  definition String
+  @@unique([eventId, term])
+  @@index([eventId,trackId])
+}
+model SubmissionInsight {
+  versionId String @id
+  payload Json
+  updatedAt DateTime @updatedAt
 }

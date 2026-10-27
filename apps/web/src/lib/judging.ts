@@ -92,6 +92,7 @@ export interface JudgeRound {
   rubricState: string | null;
 }
 export interface JudgeTeamRow {
+  starred?: boolean;
   assignmentId: string;
   teamId: string;
   teamCode: string;

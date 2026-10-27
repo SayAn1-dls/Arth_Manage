@@ -41,6 +41,7 @@ export interface MeResponse {
 }
 
 export interface MyEvent {
+  accessLevel?: string;
   eventId: string;
   slug: string;
   name: string;

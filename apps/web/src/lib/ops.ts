@@ -12,6 +12,7 @@ export interface ReviewResult {
   required: number;
   complete: boolean;
   pending: number;
+  rawScore?: string | null;
   score: string | null;
   rank: number | null;
   tied: boolean;

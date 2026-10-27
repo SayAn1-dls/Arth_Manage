@@ -595,7 +595,18 @@ function ResultRow({
           {t.teamCode} {t.name}
         </Td>
         {r.round.rankingScope === 'PER_TRACK' && <Td>{t.group}</Td>}
-        <Td>{t.score ? <strong>{Number(t.score).toFixed(2)}</strong> : '—'}</Td>
+        <Td>
+          {t.score ? (
+            <>
+              <strong>{Number(t.score).toFixed(2)}</strong>
+              {t.rawScore && t.rawScore !== t.score && (
+                <small className="block">Raw: {Number(t.rawScore).toFixed(2)}</small>
+              )}
+            </>
+          ) : (
+            '—'
+          )}
+        </Td>
         <Td>
           {t.counted} of {t.required}
         </Td>
@@ -680,8 +691,8 @@ function ResultRow({
               </p>
             ))}
             <p className="mt-2 text-sm">
-              Team score = plain mean of the counted judge scores, rounded half-up to 4 decimals (
-              {t.score}).
+              Team score uses the round’s selected scoring method, rounded to 4 decimals ({t.score}
+              ).
             </p>
           </Td>
         </Tr>

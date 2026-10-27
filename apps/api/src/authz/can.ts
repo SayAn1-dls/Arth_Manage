@@ -35,6 +35,11 @@ export function eventContext(deps: Deps): RequestHandler {
       return next(AppError.notFound());
     }
     const { event, ...m } = membership;
+    if (
+      m.accessLevel === 'SPONSOR_VIEWER' &&
+      !(req.method === 'GET' && /\/workspace\/report\.pdf$/.test(req.originalUrl.split('?')[0]!))
+    )
+      return next(AppError.notFound());
     req.ctx = { event, membership: m };
     next();
   };

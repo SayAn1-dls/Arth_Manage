@@ -89,7 +89,7 @@ export function judgeRouter(deps: Deps) {
     const [assignments, judged] = await Promise.all([
       db.judgeAssignment.findMany({
         where: { roundId, judgeMembershipId: ctx.membership.id, status: { not: 'UNASSIGNED' } },
-        include: { evaluation: true },
+        include: { evaluation: true, memo: true },
       }),
       judgedVersions(db, roundId),
     ]);
@@ -111,6 +111,7 @@ export function judgeRouter(deps: Deps) {
       else if (a.status === 'EXCLUDED' || (!didSubmit && closed)) status = 'NOT_REQUIRED';
       else status = a.evaluation?.status ?? 'NOT_STARTED';
       return {
+        starred: a.memo?.starred ?? false,
         assignmentId: a.id,
         teamId: team.id,
         teamCode: team.teamCode,
@@ -149,6 +150,7 @@ export function judgeRouter(deps: Deps) {
       (r) =>
         (!q || r.name.toLowerCase().includes(q) || r.teamCode.toLowerCase().includes(q)) &&
         (!status || r.evaluationStatus === status) &&
+        (req.query.starred !== '1' || r.starred) &&
         (!trackId || r.trackId === trackId),
     );
     res.json({

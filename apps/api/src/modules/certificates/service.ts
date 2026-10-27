@@ -158,6 +158,7 @@ export function createCertificateService(deps: Deps) {
         date: createdAt,
         timeZone: event.timeZone,
         code: cert.certificateCode,
+        verificationUrl: `${deps.env.APP_BASE_URL}/verify-certificate/${encodeURIComponent(cert.certificateCode)}`,
         placements: (t?.fields ?? []) as unknown as Placement[],
         backgroundKey: t?.backgroundKey ?? null,
         watermark: over?.watermark,

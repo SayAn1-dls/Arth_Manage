@@ -12,6 +12,12 @@ const envSchema = z
     STORAGE_DIR: z.string().default('./.data/uploads'),
     EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
     SMTP_URL: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    JUDGE_SUMMARY_MODEL: z.string().optional(),
+    JUDGE_AI_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     EMAIL_FROM: z.string().default('Arthakram <no-reply@localhost>'),
     // Local development and automated browser runs sign in far more often than real users; never set in production.
     RATE_LIMIT_DISABLED: z

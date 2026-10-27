@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router';
+import { Link, useOutletContext, useParams, useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, ExternalLink, FileText, ShieldAlert } from 'lucide-react';
 import { judgeScoreExact, validateScores, type MyEvent } from '@arthakram/shared';
+import {
+  JudgeNotebook,
+  ReadingAid,
+  GlossaryText,
+  JudgeLinks,
+  VideoHealth,
+  type JudgeToolsHandle,
+  type Insight,
+} from './JudgeTools.js';
 import { ApiError } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import { judgingApi, type Workspace } from '../../lib/judging.js';
@@ -42,6 +51,11 @@ type Save = 'saved' | 'dirty' | 'saving' | 'failed';
 
 function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; roundId: string }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const notebook = useRef<JudgeToolsHandle>(null);
+  const [health, setHealth] = useState<Insight | null>(null);
+  const activeCriterion = useRef(0);
+  const [videoLengths, setVideoLengths] = useState<Record<string, number>>({});
   const eventId = mine.eventId;
   const criteria = data.rubric?.criteria ?? [];
   const [scores, setScores] = useState<Record<string, string>>(() =>
@@ -62,6 +76,8 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
   const [reported, setReported] = useState(false);
   const [correction, setCorrection] = useState(false);
   const [correctionReason, setCorrectionReason] = useState('');
+  const saveFailed = useRef(false);
+  const [previewLoaded, setPreviewLoaded] = useState<Record<string, boolean>>({});
   const version = useRef(data.evaluation?.version ?? 0);
   const latest = useRef({ scores, teamComment, privateNote });
   latest.current = { scores, teamComment, privateNote };
@@ -88,10 +104,12 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
       setState('saving');
       try {
         const r = await judgingApi.saveEvaluation(eventId, data.assignmentId, toPayload());
+        saveFailed.current = false;
         version.current = r.version;
         setFieldErrors({});
         setState((s) => (s === 'dirty' ? 'dirty' : 'saved'));
       } catch (e) {
+        saveFailed.current = true;
         if (e instanceof ApiError && e.status === 422) {
           setFieldErrors(e.fields);
           setState('failed');
@@ -138,6 +156,45 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
     return () => clearTimeout(t);
   }, [state, fieldErrors, save]);
 
+  async function leave(path: string) {
+    try {
+      if (timer.current) clearTimeout(timer.current);
+      if (editable && ['dirty', 'saving', 'failed'].includes(state)) await save();
+      await notebook.current?.flush();
+      if (editable && saveFailed.current) {
+        setNotice({ tone: 'error', text: 'Save your evaluation before leaving.' });
+        return;
+      }
+      navigate(path);
+    } catch {
+      setNotice({
+        tone: 'error',
+        text: 'Private notes could not be saved. Save or copy them before leaving.',
+      });
+    }
+  }
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (confirm || conflict || correction || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('input,textarea,select,[contenteditable="true"]')) return;
+      if (e.key.toLowerCase() === 'n' && data.nextTeamId) {
+        e.preventDefault();
+        void leave(`${base}/${data.nextTeamId}`);
+      }
+      if (/^[0-9]$/.test(e.key) && editable && criteria.length) {
+        const c = criteria[activeCriterion.current] ?? criteria[0]!;
+        const value = Number(e.key);
+        if (value < c.min || value > c.max) return;
+        e.preventDefault();
+        setScores((s) => ({ ...s, [c.id]: e.key }));
+        touch();
+        document.getElementById(`score-${c.id}`)?.focus();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
   const numeric = Object.fromEntries(
     criteria
       .filter((c) => scores[c.id] !== undefined && scores[c.id] !== '')
@@ -153,6 +210,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
     try {
       if (timer.current) clearTimeout(timer.current);
       await save();
+      if (saveFailed.current) throw new Error('Evaluation was not saved');
       const r = await judgingApi.submitEvaluation(eventId, data.assignmentId, version.current);
       setConfirm(false);
       setDone({ score: Number(r.weightedScore).toFixed(2) });
@@ -221,9 +279,21 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
 
   return (
     <div className="flex flex-col gap-4">
+      <JudgeLinks eventId={eventId} />
+      <p className="text-sm">
+        Shortcuts: 0–9 enters a score when not typing; Tab moves through fields; N opens the next
+        team when not typing. Use the numeric field to enter 10 or other multi-digit values.
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to={base} className="text-sm">
+          <Link
+            to={base}
+            className="text-sm"
+            onClick={(e) => {
+              e.preventDefault();
+              void leave(base);
+            }}
+          >
             All teams
           </Link>
           <h2 className="mt-1">
@@ -234,6 +304,10 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
           {data.prevTeamId && (
             <Link
               to={`${base}/${data.prevTeamId}`}
+              onClick={(e) => {
+                e.preventDefault();
+                void leave(`${base}/${data.prevTeamId}`);
+              }}
               className="inline-flex min-h-11 items-center gap-1 rounded-pill border border-line-strong bg-white px-4 font-bold text-ink no-underline"
             >
               <ArrowLeft aria-hidden className="size-4" /> Previous
@@ -242,6 +316,10 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
           {data.nextTeamId && (
             <Link
               to={`${base}/${data.nextTeamId}`}
+              onClick={(e) => {
+                e.preventDefault();
+                void leave(`${base}/${data.nextTeamId}`);
+              }}
               className="inline-flex min-h-11 items-center gap-1 rounded-pill border border-line-strong bg-white px-4 font-bold text-ink no-underline"
             >
               Next <ArrowRight aria-hidden className="size-4" />
@@ -271,6 +349,18 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
       {!data.locked && (
         <div className="grid gap-4 xl:grid-cols-[1fr_26rem] xl:items-start">
           <div className="flex min-w-0 flex-col gap-4">
+            <ReadingAid
+              data={data}
+              eventId={eventId}
+              roundId={roundId}
+              onHealth={setHealth}
+              videoLengths={videoLengths}
+            />
+            {Object.entries(videoLengths).map(([id, n]) => (
+              <p className="text-sm" key={id}>
+                Video length: {Math.floor(n / 60)}:{String(Math.floor(n % 60)).padStart(2, '0')}
+              </p>
+            ))}
             <Card
               footerLabel={`Version ${sub?.versionNo ?? '—'}${sub ? ` · ${formatDateTime(sub.submittedAt, mine.timeZone)}` : ''}`}
             >
@@ -287,7 +377,9 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                       <Badge tone="warning">Late by {sub.lateMinutes} min</Badge>
                     )}
                   </div>
-                  <p className="mt-2 whitespace-pre-line">{sub.summary}</p>
+                  <p className="mt-2 whitespace-pre-line">
+                    <GlossaryText text={sub.summary} eventId={eventId} track={data.track} />
+                  </p>
                   <dl className="mt-4 grid gap-3">
                     {sub.fields
                       .filter((f) => f.value || f.file)
@@ -309,6 +401,42 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                             ) : (
                               f.value
                             )}
+                            {f.file && (
+                              <Badge
+                                tone={
+                                  health?.files.find((x) => x.fieldId === f.id)?.available
+                                    ? 'success'
+                                    : 'info'
+                                }
+                              >
+                                {health?.files.some((x) => x.fieldId === f.id)
+                                  ? health.files.find((x) => x.fieldId === f.id)?.available
+                                    ? previewLoaded[f.id]
+                                      ? 'File loaded'
+                                      : 'File available'
+                                    : 'File unavailable'
+                                  : 'File not checked'}
+                              </Badge>
+                            )}
+                            {f.type === 'REPO_URL' && (
+                              <Badge tone={health?.repo?.reachable ? 'success' : 'info'}>
+                                {health?.repo
+                                  ? health.repo.reachable
+                                    ? 'Repo public / reachable'
+                                    : (health.repo.error ?? 'Repo check unavailable')
+                                  : 'Repo not checked'}
+                              </Badge>
+                            )}
+                            {f.type === 'VIDEO_URL' && (
+                              <VideoHealth
+                                url={f.value}
+                                onDuration={(n) =>
+                                  setVideoLengths((old) =>
+                                    old[f.id] === n ? old : { ...old, [f.id]: n },
+                                  )
+                                }
+                              />
+                            )}
                           </dd>
                         </div>
                       ))}
@@ -322,6 +450,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                 <Card key={f.id} footerLabel={`${f.label}: ${f.file!.name}`}>
                   <iframe
                     title={`${f.label}: ${f.file!.name}`}
+                    onLoad={() => setPreviewLoaded((old) => ({ ...old, [f.id]: true }))}
                     src={`/api/v1/events/${eventId}/files/${f.file!.id}?inline=1#toolbar=0`}
                     className="h-[34rem] w-full rounded-card border border-line bg-white"
                   />
@@ -360,6 +489,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
           </div>
 
           <div className="flex flex-col gap-4 xl:sticky xl:top-4">
+            <JudgeNotebook ref={notebook} eventId={eventId} assignmentId={data.assignmentId} />
             <Card
               footerLabel={
                 editable
@@ -400,12 +530,20 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                 </Alert>
               )}
               <ul className="mt-3 flex flex-col gap-4">
-                {criteria.map((c) => {
+                {criteria.map((c, criterionIndex) => {
                   const err = fieldErrors[c.id];
                   return (
                     <li key={c.id}>
+                      {c.description && (
+                        <p className="mb-2 text-sm">
+                          <GlossaryText text={c.description} eventId={eventId} track={data.track} />
+                        </p>
+                      )}
                       <Input
                         id={`score-${c.id}`}
+                        onFocus={() => {
+                          activeCriterion.current = criterionIndex;
+                        }}
                         type="number"
                         inputMode="numeric"
                         step={1}
@@ -413,7 +551,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                         max={c.max}
                         disabled={!editable}
                         label={`${c.name} (${c.weight}%)`}
-                        hint={`${c.description ? `${c.description} ` : ''}Whole number ${c.min} to ${c.max}.`}
+                        hint={`Whole number ${c.min} to ${c.max}.`}
                         value={scores[c.id] ?? ''}
                         error={err}
                         onChange={(e) => {

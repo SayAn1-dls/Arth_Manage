@@ -298,6 +298,12 @@ export function assignmentsRouter({ db }: Deps) {
         const [teams, current] = await Promise.all([
           tx.team.findMany({
             where: { eventId: ctx.event.id, status: 'ACTIVE' },
+            include: {
+              members: {
+                where: { leftAt: null },
+                include: { membership: { include: { registration: true } } },
+              },
+            },
             orderBy: { teamCode: 'asc' },
           }),
           tx.judgeAssignment.findMany({ where: { roundId: round.id } }),
@@ -309,14 +315,28 @@ export function assignmentsRouter({ db }: Deps) {
           ]),
         );
         let made = 0;
+        const entries = round.shortlistEnabled
+          ? await tx.roundEntry.findMany({ where: { roundId: round.id } })
+          : [];
         for (const team of teams) {
+          if (round.shortlistEnabled && !entries.some((e) => e.teamId === team.id)) continue;
           const have = current.filter((a) => a.teamId === team.id && a.status === 'ACTIVE');
           const taken = new Set(
             current.filter((a) => a.teamId === team.id).map((a) => a.judgeMembershipId),
           );
           for (let n = have.length; n < round.requiredEvaluations; n++) {
             const pick = [...judges]
-              .filter((j) => !taken.has(j.id))
+              .filter(
+                (j) =>
+                  !taken.has(j.id) &&
+                  (!j.trackIds.length || (team.trackId && j.trackIds.includes(team.trackId))) &&
+                  (!j.institution.trim() ||
+                    !team.members.some(
+                      (m) =>
+                        m.membership.registration?.institution.trim().toLowerCase() ===
+                        j.institution.trim().toLowerCase(),
+                    )),
+              )
               .sort((a, b) => load.get(a.id)! - load.get(b.id)! || a.id.localeCompare(b.id))[0];
             if (!pick) break;
             await tx.judgeAssignment.create({
