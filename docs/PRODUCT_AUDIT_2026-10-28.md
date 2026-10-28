@@ -33,7 +33,7 @@ IDs are stable; `CHANGELOG.md` and `RELEASE_READINESS.md` section 11 refer to th
 | A6 | Medium | e2e needs `EMAIL_PROVIDER=console` and `RATE_LIMIT_DISABLED=true`; with the repo `.env` (`EMAIL_PROVIDER=smtp`) every signup test fails "No email for ...", and the 10/hour registration limit blocks the rest. Not documented | **Fixed** in README |
 | A7 | Medium | Nine of the ten PR #3 tables checked have no foreign keys (only `JudgeMemo` has one), so orphan rows are possible | **Open**: needs a data check before constraints are added |
 | A8 | Low | The reminder and email worker retries every 30 s with no backoff and runs in every API instance | **Open** |
-| A9 | Low | `/public/certificates/:code` is unauthenticated, unlimited and returns the holder's name. Codes are 8 characters from 32 symbols (about 1.1e12) | **Open**: add a rate limit |
+| A9 | Low | `/public/certificates/:code` is unauthenticated, unlimited and returns the holder's name. Codes are 8 characters from 32 symbols (about 1.1e12) | **Fixed**: 60 requests per minute per address, with a test |
 | A10 | Process | PR #3 is one 5.9k-line commit touching scoring, assignment, the submission gate and certificates under a "judge workspace" title | **Process**: PRs split by concern from now on |
 | A11 | Low | GitHub checks are unauthenticated: 60 requests per hour per server IP, shared by judge reading cards and admin scans | **Open**: add optional `GITHUB_TOKEN` |
 | A12 | Medium | Documentation drift (see section 4) | **Fixed** in this follow-up (README, DECISIONS D-54 to D-58, RELEASE_READINESS section 11, DEPLOYMENT, FEATURES_V2, JUDGE_WORKSPACE, TECHNICAL_ARCHITECTURE) |

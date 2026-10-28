@@ -211,11 +211,11 @@ Full report: `PRODUCT_AUDIT_2026-10-28.md`. Findings keep their IDs (A1 to A12).
 
 **Fixed in the follow-up:** A1 two certificate integrity constraints were missing (migration and a must-exist test
 added); A3 shortlist notices repeated and reached inactive teams; A4 API typecheck failed; A5 `body-parser`
-advisory; A6 e2e environment undocumented; A12 stale documents.
+advisory; A6 e2e environment undocumented; A9 the public certificate endpoint is now rate limited (60 per minute per address); A12 stale documents.
 
 **Still open** (each needs a decision or a real environment): A2 score normalisation can change winners (D-54);
-A7 no foreign keys on nine of the ten new tables; A8 worker retries without backoff; A9 public certificate
-endpoint has no rate limit; A11 GitHub checks are unauthenticated (60 requests per hour per IP).
+A7 no foreign keys on nine of the ten new tables; A8 worker retries without backoff; A11 GitHub checks are
+unauthenticated (60 requests per hour per IP).
 
 **Changed risk picture**
 
