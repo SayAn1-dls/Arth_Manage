@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · docs(v2) · `FEATURES_V2.md` and `JUDGE_WORKSPACE.md`: replaced the "changes remain local / nothing pushed" statements, added the normalisation caveat and rate-limit notes, linked D-55, and recorded the 28 Oct re-run (386 API, 69 web, 16 e2e) (A12). · n/a
 - 2026-10-28 · docs(deployment) · `DEPLOYMENT.md`: corrected the known-limits list (reminders and public verification exist), documented the optional AI and normalisation settings, the worker's behaviour, the unlimited public certificate endpoint, unauthenticated GitHub calls, and the migration rule from D-58 (A8, A9, A11, A12). · n/a
 - 2026-10-28 · docs(readiness) · `RELEASE_READINESS.md`: new section 11 (28 Oct re-audit: verified figures, fixed, open, changed risks); corrected the "not built" list; noted that sections 1 to 10 describe the 22 Oct tree (A12). · n/a
 - 2026-10-28 · docs(decisions) · Added D-54 to D-58 (normalisation, AI reading aid, public certificate verification, extended workflow, migration integrity policy) and marked D-03 and D-45 as partly superseded (A2, A9, A12). · n/a
