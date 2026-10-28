@@ -28,7 +28,7 @@ The implementation keeps React/Vite, Express, Prisma and PostgreSQL. QR code gen
 3. **AI and broad prior-art discovery:** not implemented pending the user's provider choice, API access and budget. Current market context is entered by admins. Current code comparison requires an admin-selected public reference repository and a shared file path; it is not a global plagiarism scanner, semantic authorship detector, or automated startup/product search.
 4. **Private repositories:** public GitHub history/file checks work without a token subject to GitHub rate limits. Private-repository review needs a scoped credential integration; no private token is currently accepted or stored by this feature.
 5. **GitHub publishing:** merged to `main` as PR #3 (2026-10-28). No deployment has been performed.
-6. **Rate limits:** GitHub checks are unauthenticated (60 requests per hour per server IP) and the public certificate page has no request limit (`PRODUCT_AUDIT_2026-10-28.md` A9, A11).
+6. **Rate limits:** GitHub checks are unauthenticated (60 requests per hour per server IP, audit A11). The public certificate endpoint is limited to 60 requests per minute per address (audit A9, fixed).
 
 ## Run and inspect
 

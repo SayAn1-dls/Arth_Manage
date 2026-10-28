@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · docs(plan) · `IMPLEMENTATION_PLAN.md`: post-audit checklist (7 done, 5 open); `FEATURES_V2.md`: rate-limit note now reflects A9. · n/a
 - 2026-10-28 · docs(deployment) · `DEPLOYMENT.md` and `DECISIONS.md` D-56 now describe the rate limit on the public certificate endpoint. · n/a
 - 2026-10-28 · docs(audit) · Marked A9 fixed in the audit and the readiness report. · n/a
 - 2026-10-28 · fix(certificates) · `GET /public/certificates/:code` is now limited to 60 requests per minute per address (A9). New test: 60 x 404 then 429; certificates, workspace and security suites 45/45. · red then green
