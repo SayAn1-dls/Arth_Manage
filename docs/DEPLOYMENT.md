@@ -21,6 +21,10 @@ Copy `.env.example` to `.env` and fill it in. `TRUST_PROXY_HOPS` is the number o
 `EMAIL_PROVIDER=smtp` (with `SMTP_URL`) and `APP_BASE_URL` is `https://`. `SESSION_SECRET` must be at
 least 32 characters. Never commit `.env`.
 
+Optional features stay off unless configured: `JUDGE_AI_ENABLED=true` with `OPENAI_API_KEY` and `JUDGE_SUMMARY_MODEL`
+sends project titles, summaries and public README excerpts to OpenAI (DECISIONS D-55; decide privacy first), and
+the Google variables in section 5. Score normalisation is a per-round setting, off by default (D-54).
+
 Generate secrets with `openssl rand -base64 48` (session) and `openssl rand -hex 32` (token key).
 Losing `TOKEN_ENCRYPTION_KEY` only means the organiser must reconnect Google; it does not affect any
 other data. Changing `SESSION_SECRET` signs out OAuth flows in progress and nothing else.
@@ -65,7 +69,9 @@ may also require OAuth app verification before non-test users can consent.
 ## 6. Upgrades
 
 Take a backup (see the runbook), `git pull`, `npm ci`, `npm run build`, `npm run db:deploy -w
-@arthakram/api`, restart. Migrations are forward-only; to roll back, restore the backup.
+@arthakram/api`, restart. Migrations are forward-only; to roll back, restore the backup. Never generate a migration
+with `prisma migrate dev` and commit it unread: Prisma proposes to drop the composite same-event keys it does not
+model (DECISIONS D-58).
 
 ## 7. Known limits
 
@@ -74,7 +80,10 @@ Take a backup (see the runbook), `git pull`, `npm ci`, `npm run build`, `npm run
 * One API process. The sync worker runs inside it; running two is safe (job claims are conditional) but
   untested under load.
 * Rate limiting is in memory per process.
-* No email reminders, withdraw flow, public certificate verification or appreciation certificates (P1/P2).
+* No withdraw flow or appreciation certificates (P1/P2). Deadline reminders and the public certificate verification page exist (PR #3, D-56) but have only been exercised on a development machine.
+* The email and reminder worker (`modules/workspace/worker.ts`) runs inside every API process, retries failed mail every 30 seconds up to three times with no backoff, and can duplicate a message after a crash because SMTP has no idempotency key. Run one instance.
+* `GET /api/v1/public/certificates/:code` is unauthenticated and not rate limited (audit A9); it returns the holder's name, so consider limiting it at the reverse proxy.
+* GitHub checks for project review and judge reading cards call the GitHub API without a token (60 requests per hour per server IP).
 
 ## 8. Staging rehearsal (what was actually run)
 
