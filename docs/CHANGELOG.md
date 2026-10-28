@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · fix(helpdesk) `977aa04` · Reported by the user from the running app: every helpdesk author showed as "Participant" in both the judge and admin portals. Cause: the screen looked authors up in an admin-only list and fell back to the word "Participant". `GET /workspace/tickets` now returns `authorName` and `authorRole` for tickets and messages and the screen renders them (A13). · new API test red then green; checked in the browser as judge and admin
 - 2026-10-28 · docs(plan) · `IMPLEMENTATION_PLAN.md`: post-audit checklist (7 done, 5 open); `FEATURES_V2.md`: rate-limit note now reflects A9. · n/a
 - 2026-10-28 · docs(deployment) · `DEPLOYMENT.md` and `DECISIONS.md` D-56 now describe the rate limit on the public certificate endpoint. · n/a
 - 2026-10-28 · docs(audit) · Marked A9 fixed in the audit and the readiness report. · n/a

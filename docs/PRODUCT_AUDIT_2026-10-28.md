@@ -37,6 +37,7 @@ IDs are stable; `CHANGELOG.md` and `RELEASE_READINESS.md` section 11 refer to th
 | A10 | Process | PR #3 is one 5.9k-line commit touching scoring, assignment, the submission gate and certificates under a "judge workspace" title | **Process**: PRs split by concern from now on |
 | A11 | Low | GitHub checks are unauthenticated: 60 requests per hour per server IP, shared by judge reading cards and admin scans | **Open**: add optional `GITHUB_TOKEN` |
 | A12 | Medium | Documentation drift (see section 4) | **Fixed** in this follow-up (README, DECISIONS D-54 to D-58, RELEASE_READINESS section 11, DEPLOYMENT, FEATURES_V2, JUDGE_WORKSPACE, TECHNICAL_ARCHITECTURE) |
+| A13 | Medium | Found after the audit, reported from the running app: the helpdesk labelled every author and request "Participant", in the judge and the admin portal, because names were resolved from an admin-only list with a hard-coded fallback | **Fixed** (`977aa04`): the API returns author name and role; regression test |
 
 ## 3. Functional status
 
