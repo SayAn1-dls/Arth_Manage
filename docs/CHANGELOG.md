@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · docs(decisions) · Added D-54 to D-58 (normalisation, AI reading aid, public certificate verification, extended workflow, migration integrity policy) and marked D-03 and D-45 as partly superseded (A2, A9, A12). · n/a
 - 2026-10-28 · docs(readme) · README: status now covers PR #3 and the sidebar, links to the audit, change log and V2 docs, and explains how to run the e2e specs (`EMAIL_PROVIDER=console RATE_LIMIT_DISABLED=true`) (A6, A12). · n/a
 - 2026-10-28 · docs(audit) · Added `PRODUCT_AUDIT_2026-10-28.md`: evidence, 12 numbered findings with status, functional status, documentation drift, integration points. · n/a
 - 2026-10-28 · fix(workspace) · Shortlist notices now use a key derived from the chosen teams (it embedded `Date.now()`, so the unique index never de-duplicated) and go only to members of ACTIVE teams (A3). · new test red (8 notices) then green (2); workspace suite 15/15
