@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · docs(readiness) · `RELEASE_READINESS.md`: new section 11 (28 Oct re-audit: verified figures, fixed, open, changed risks); corrected the "not built" list; noted that sections 1 to 10 describe the 22 Oct tree (A12). · n/a
 - 2026-10-28 · docs(decisions) · Added D-54 to D-58 (normalisation, AI reading aid, public certificate verification, extended workflow, migration integrity policy) and marked D-03 and D-45 as partly superseded (A2, A9, A12). · n/a
 - 2026-10-28 · docs(readme) · README: status now covers PR #3 and the sidebar, links to the audit, change log and V2 docs, and explains how to run the e2e specs (`EMAIL_PROVIDER=console RATE_LIMIT_DISABLED=true`) (A6, A12). · n/a
 - 2026-10-28 · docs(audit) · Added `PRODUCT_AUDIT_2026-10-28.md`: evidence, 12 numbered findings with status, functional status, documentation drift, integration points. · n/a
