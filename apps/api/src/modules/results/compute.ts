@@ -28,6 +28,7 @@ export interface TeamResult {
   complete: boolean;
   /** Active or conflicted assignments that have no submitted evaluation yet. */
   pending: number;
+  rawScore?: string | null;
   score: string | null;
   rank: number | null;
   /** Equal score within the ranking group and not (yet) resolved. */
@@ -90,67 +91,109 @@ export async function computeReview(db: Db, round: Round): Promise<ResultsReview
   const judgeName = (id: string) => judges.find((j) => j.id === id)?.user.name ?? 'Former judge';
   const criteria: ScoringCriterion[] = rubric ? toCriteria(rubric.criteria) : [];
 
-  const results: TeamResult[] = teams.map((t) => {
-    const mine = assignments.filter((a) => a.teamId === t.id);
-    const counted = mine.filter(
-      (a) => a.status === 'ACTIVE' && a.evaluation?.status === 'SUBMITTED',
-    );
-    const mark = notRanked.find((n) => n.teamId === t.id);
-    const submitted = judged.has(t.id);
-    const group = round.rankingScope === 'PER_TRACK' ? (t.track?.name ?? NO_TRACK) : 'Overall';
-    let state: TeamState = 'RANKED';
-    let reason: string | null = null;
-    if (t.status === 'DISQUALIFIED') {
-      state = 'DISQUALIFIED';
-      reason = t.disqualifiedReason;
-    } else if (!submitted) state = 'DID_NOT_SUBMIT';
-    else if (mark) {
-      state = 'NOT_RANKED';
-      reason = mark.reason;
-    } else if (counted.length === 0) state = 'NO_EVALUATIONS';
+  const valid = assignments.filter(
+    (a) =>
+      a.status === 'ACTIVE' &&
+      a.evaluation?.status === 'SUBMITTED' &&
+      a.evaluation.weightedScore !== null &&
+      judged.has(a.teamId) &&
+      teams.some((t) => t.id === a.teamId && t.status === 'ACTIVE'),
+  );
+  const panel = valid.length
+    ? valid.reduce((s, a) => s + Number(a.evaluation!.weightedScore), 0) / valid.length
+    : 0;
+  const judgeMeans = new Map<string, number>();
+  for (const id of new Set(valid.map((a) => a.judgeMembershipId))) {
+    const scores = valid.filter((a) => a.judgeMembershipId === id);
+    if (scores.length >= 3)
+      judgeMeans.set(
+        id,
+        scores.reduce((s, a) => s + Number(a.evaluation!.weightedScore), 0) / scores.length,
+      );
+  }
+  const entries = round.shortlistEnabled
+    ? await db.roundEntry.findMany({ where: { roundId: round.id } })
+    : [];
+  const results: TeamResult[] = teams
+    .filter((t) => !round.shortlistEnabled || entries.some((e) => e.teamId === t.id))
+    .map((t) => {
+      const mine = assignments.filter((a) => a.teamId === t.id);
+      const counted = mine.filter(
+        (a) => a.status === 'ACTIVE' && a.evaluation?.status === 'SUBMITTED',
+      );
+      const mark = notRanked.find((n) => n.teamId === t.id);
+      const submitted = judged.has(t.id);
+      const group = round.rankingScope === 'PER_TRACK' ? (t.track?.name ?? NO_TRACK) : 'Overall';
+      let state: TeamState = 'RANKED';
+      let reason: string | null = null;
+      if (t.status === 'DISQUALIFIED') {
+        state = 'DISQUALIFIED';
+        reason = t.disqualifiedReason;
+      } else if (!submitted) state = 'DID_NOT_SUBMIT';
+      else if (mark) {
+        state = 'NOT_RANKED';
+        reason = mark.reason;
+      } else if (counted.length === 0) state = 'NO_EVALUATIONS';
 
-    const evals = counted.map((a) => ({
-      criteria,
-      scores: Object.fromEntries(a.evaluation!.scores.map((s) => [s.criterionId, s.score])),
-    }));
-    const score: Decimal | null = state === 'RANKED' && criteria.length ? teamScore(evals) : null;
-    return {
-      teamId: t.id,
-      teamCode: t.teamCode,
-      name: t.name,
-      trackName: t.track?.name ?? '',
-      group,
-      state,
-      reason,
-      counted: counted.length,
-      required: round.requiredEvaluations,
-      complete: counted.length >= round.requiredEvaluations,
-      pending: mine.filter(
-        (a) =>
-          (a.status === 'ACTIVE' && a.evaluation?.status !== 'SUBMITTED') ||
-          a.status === 'CONFLICT',
-      ).length,
-      score: score ? score.toFixed(4) : null,
-      rank: null,
-      tied: false,
-      tieResolved: false,
-      needsResolution: false,
-      breakdown: counted.map((a) => ({
-        assignmentId: a.id,
-        judgeName: judgeName(a.judgeMembershipId),
-        weightedScore: Number(a.evaluation!.weightedScore!.toString()).toFixed(4),
+      const evals = counted.map((a) => ({
+        criteria,
         scores: Object.fromEntries(a.evaluation!.scores.map((s) => [s.criterionId, s.score])),
-      })),
-      excluded: mine
-        .filter((a) => a.status === 'EXCLUDED' || a.status === 'UNASSIGNED')
-        .map((a) => ({
+      }));
+      const raw: Decimal | null = state === 'RANKED' && criteria.length ? teamScore(evals) : null;
+      const adjusted = counted.map((a) =>
+        Math.min(
+          100,
+          Math.max(
+            0,
+            Number(a.evaluation!.weightedScore) +
+              (judgeMeans.has(a.judgeMembershipId)
+                ? panel - judgeMeans.get(a.judgeMembershipId)!
+                : 0),
+          ),
+        ),
+      );
+      const score =
+        round.normalisation && raw && adjusted.length
+          ? new Decimal(adjusted.reduce((s, n) => s + n, 0) / adjusted.length)
+          : raw;
+      return {
+        teamId: t.id,
+        teamCode: t.teamCode,
+        name: t.name,
+        trackName: t.track?.name ?? '',
+        group,
+        state,
+        reason,
+        counted: counted.length,
+        required: round.requiredEvaluations,
+        complete: counted.length >= round.requiredEvaluations,
+        pending: mine.filter(
+          (a) =>
+            (a.status === 'ACTIVE' && a.evaluation?.status !== 'SUBMITTED') ||
+            a.status === 'CONFLICT',
+        ).length,
+        rawScore: raw ? raw.toFixed(4) : null,
+        score: score ? score.toFixed(4) : null,
+        rank: null,
+        tied: false,
+        tieResolved: false,
+        needsResolution: false,
+        breakdown: counted.map((a) => ({
           assignmentId: a.id,
           judgeName: judgeName(a.judgeMembershipId),
-          status: a.status,
-          reason: a.reason,
+          weightedScore: Number(a.evaluation!.weightedScore!.toString()).toFixed(4),
+          scores: Object.fromEntries(a.evaluation!.scores.map((s) => [s.criterionId, s.score])),
         })),
-    };
-  });
+        excluded: mine
+          .filter((a) => a.status === 'EXCLUDED' || a.status === 'UNASSIGNED')
+          .map((a) => ({
+            assignmentId: a.id,
+            judgeName: judgeName(a.judgeMembershipId),
+            status: a.status,
+            reason: a.reason,
+          })),
+      };
+    });
 
   // Rank, then apply stored tie decisions that still describe the same set of teams.
   const rankable = results.filter((r) => r.state === 'RANKED' && r.score);
@@ -214,7 +257,13 @@ export async function computeReview(db: Db, round: Round): Promise<ResultsReview
   const fingerprint = createHash('sha256')
     .update(
       JSON.stringify({
-        round: [round.rankingScope, round.awardPositions, round.requiredEvaluations],
+        round: [
+          round.normalisation,
+          round.shortlistEnabled,
+          round.rankingScope,
+          round.awardPositions,
+          round.requiredEvaluations,
+        ],
         rubric: rubric ? [rubric.id, rubric.structureVersion] : null,
         teams: results.map((r) => [
           r.teamId,

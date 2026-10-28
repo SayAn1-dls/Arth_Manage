@@ -219,6 +219,15 @@ export function submissionsRouter(deps: Deps) {
     assertWritable(ctx);
     const round = await loadRound(ctx, roundId);
     const team = await ownTeam(ctx);
+    if (ctx.event.applicationReview && team.applicationStatus !== 'ACCEPTED')
+      throw AppError.forbidden('Your team application must be accepted before submitting');
+    if (
+      round.shortlistEnabled &&
+      !(await db.roundEntry.findUnique({
+        where: { roundId_teamId: { roundId: round.id, teamId: team.id } },
+      }))
+    )
+      throw AppError.forbidden('Your team has not been shortlisted for this round');
     const submission = await db.submission.findUnique({
       where: { roundId_teamId: { roundId, teamId: team.id } },
     });

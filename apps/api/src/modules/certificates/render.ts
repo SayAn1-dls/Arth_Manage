@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { DEFAULT_PLACEMENTS, type CertField } from '@arthakram/shared';
 import type { PDFFont, PDFPage } from 'pdf-lib';
 import type { Storage } from './types.js';
@@ -33,6 +34,7 @@ export interface CertificateData {
   placements?: Placement[];
   backgroundKey?: string | null;
   watermark?: string;
+  verificationUrl?: string;
 }
 
 const PAGE: [number, number] = [841.89, 595.28]; // A4 landscape
@@ -161,6 +163,18 @@ export async function renderCertificate(
   for (const p of placements) {
     const text = value[p.field];
     if (text) drawFitted(page, text, fontOf[p.font], p, w, h);
+  }
+  if (data.verificationUrl) {
+    const png = await QRCode.toBuffer(data.verificationUrl, { type: 'png', width: 200, margin: 2 });
+    const qr = await doc.embedPng(png);
+    page.drawImage(qr, { x: w - 125, y: 48, width: 72, height: 72 });
+    page.drawText('Verify certificate', {
+      x: w - 125,
+      y: 38,
+      size: 8,
+      font: fonts.text,
+      color: PDF_COLORS.ink,
+    });
   }
   if (data.watermark) {
     page.drawText(data.watermark, {

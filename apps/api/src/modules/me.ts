@@ -20,6 +20,7 @@ export function meRouter({ db }: Deps) {
       slug: m.event.slug,
       name: m.event.name,
       role: m.role,
+      accessLevel: m.accessLevel,
       status: m.event.status,
       registrationStatus: m.event.registrationStatus,
       startsAt: m.event.startsAt.toISOString(),

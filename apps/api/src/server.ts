@@ -1,3 +1,4 @@
+import { startWorkspaceWorker } from './modules/workspace/worker.js';
 import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createDb } from './db/client.js';
@@ -39,12 +40,14 @@ await deps.storage.check().catch((err: unknown) => {
 const app = createApp(deps);
 const stopWorker = startSyncWorker(deps);
 const stopMaintenance = startMaintenance(deps);
+const stopWorkspace = startWorkspaceWorker(deps);
 
 const server = app.listen(env.API_PORT, () => {
   logger.info(`API listening on http://localhost:${env.API_PORT}`);
 });
 
 async function shutdown() {
+  stopWorkspace();
   stopWorker();
   stopMaintenance();
   server.close();

@@ -1,5 +1,22 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import type { RouteObject } from 'react-router';
+const ProjectReviewPage = lazy(() =>
+  import('./features/workspace/ProjectReviewPage.js').then((m) => ({
+    default: m.ProjectReviewPage,
+  })),
+);
+const SandboxPage = lazy(() =>
+  import('./features/workspace/SandboxPage.js').then((m) => ({ default: m.SandboxPage })),
+);
+const VerifyCertificatePage = lazy(() =>
+  import('./features/workspace/VerifyCertificatePage.js').then((m) => ({
+    default: m.VerifyCertificatePage,
+  })),
+);
+const WorkspacePage = lazy(() =>
+  import('./features/workspace/WorkspacePage.js').then((m) => ({ default: m.WorkspacePage })),
+);
 import { HomePage } from './pages/HomePage.js';
 import { DesignGalleryPage } from './pages/DesignGalleryPage.js';
 import { AppShell } from './shell/AppShell.js';
@@ -38,6 +55,11 @@ import { AuditPage } from './features/ops/AuditPage.js';
 import { RubricPage } from './features/judging/RubricPage.js';
 import { JudgingPage } from './features/judging/JudgingPage.js';
 import { JudgeIndexPage, JudgeTeamsPage } from './features/judging/JudgePages.js';
+import {
+  JudgeBriefingPage,
+  JudgeComparePage,
+  JudgePracticePage,
+} from './features/judging/JudgeExtraPages.js';
 import { EvaluationPage } from './features/judging/EvaluationPage.js';
 import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage.js';
 import { ProfilePage } from './features/participant/ProfilePage.js';
@@ -59,6 +81,14 @@ const FeedbackRoute = () =>
 
 const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
+  {
+    path: '/verify-certificate/:code',
+    element: (
+      <Suspense fallback={<p>Checking certificate…</p>}>
+        <VerifyCertificatePage />
+      </Suspense>
+    ),
+  },
   { path: '/e/:slug', element: <PublicEventPage /> },
   { path: '/e/:slug/register', element: <RegisterForEventPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
@@ -85,6 +115,42 @@ const routes: RouteObject[] = [
             element: <EventLayout />,
             children: [
               { index: true, element: <EventOverviewPage /> },
+              {
+                path: 'integrity',
+                element: (
+                  <Suspense fallback={<p>Loading reviews…</p>}>
+                    <ProjectReviewPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'sandbox',
+                element: (
+                  <Suspense fallback={<p>Loading practice…</p>}>
+                    <SandboxPage />
+                  </Suspense>
+                ),
+              },
+              ...[
+                'messages',
+                'helpdesk',
+                'exceptions',
+                'applications',
+                'advancement',
+                'calibration',
+                'engagement',
+                'communications',
+                'discovery',
+                'access',
+                'report',
+              ].map((section) => ({
+                path: section,
+                element: (
+                  <Suspense fallback={<p>Loading workspace…</p>}>
+                    <WorkspacePage section={section} />
+                  </Suspense>
+                ),
+              })),
               { path: 'setup', element: <SetupPage /> },
               { path: 'rounds', element: <RoundsPage /> },
               { path: 'structure', element: <StructurePage /> },
@@ -100,6 +166,9 @@ const routes: RouteObject[] = [
               { path: 'certificates', element: <CertificatesRoute /> },
               { path: 'rubric', element: <RubricPage /> },
               { path: 'judging', element: <JudgingPage /> },
+              { path: 'briefing', element: <JudgeBriefingPage /> },
+              { path: 'practice', element: <JudgePracticePage /> },
+              { path: 'judge/:roundId/compare', element: <JudgeComparePage /> },
               { path: 'judge', element: <JudgeIndexPage /> },
               { path: 'judge/:roundId', element: <JudgeTeamsPage /> },
               { path: 'judge/:roundId/:teamId', element: <EvaluationPage /> },

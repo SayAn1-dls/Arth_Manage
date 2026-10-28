@@ -29,6 +29,7 @@ export function createApp(deps: Deps) {
           styleSrc: ["'self'", "'unsafe-inline'"], // React sets inline style attributes (progress bars, widths)
           imgSrc: ["'self'", 'data:'],
           fontSrc: ["'self'"],
+          mediaSrc: ["'self'", 'https:'],
           connectSrc: ["'self'"],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],

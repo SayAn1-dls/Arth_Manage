@@ -23,6 +23,8 @@ import { opsRouter } from '../ops/routes.js';
 import { resultsRouter } from '../results/routes.js';
 import { judgingRouter } from '../judging/routes.js';
 import { invitationsRouter } from '../invitations/routes.js';
+import { projectReviewRouter } from '../workspace/reviews.js';
+import { workspaceRouter } from '../workspace/routes.js';
 import { registrationRouter } from '../registration/routes.js';
 
 export function eventsRouter(deps: Deps) {
@@ -115,6 +117,8 @@ export function eventsRouter(deps: Deps) {
     res.json(eventDto(await svc.archive(requireCtx(req))));
   });
 
+  scoped.use(workspaceRouter(deps));
+  scoped.use(projectReviewRouter(deps));
   scoped.use(structureRouter(deps));
   scoped.use(guidebookRouter(deps));
   scoped.use(announcementsRouter(deps));

@@ -1,3 +1,4 @@
+import { JudgeLinks } from './JudgeTools.js';
 import { useState } from 'react';
 import { Link, Navigate, useOutletContext, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -122,6 +123,7 @@ export function JudgeTeamsPage() {
     q: list.get('q'),
     status: list.get('status'),
     trackId: list.get('trackId'),
+    starred: list.get('starred'),
   });
   const res = useQuery({
     queryKey: ['judge-teams', mine.eventId, roundId, qs.toString()],
@@ -133,6 +135,18 @@ export function JudgeTeamsPage() {
   const { round, rows, total } = res.data;
   return (
     <div className="flex flex-col gap-4">
+      <JudgeLinks eventId={mine.eventId} />
+      <Link to={`/events/${mine.eventId}/judge/${roundId}/compare`}>
+        Compare two assigned teams
+      </Link>
+      <label className="flex gap-2">
+        <input
+          type="checkbox"
+          checked={list.get('starred') === '1'}
+          onChange={(e) => list.set({ starred: e.target.checked ? '1' : '' })}
+        />
+        Only starred teams
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <h2>{round.name}</h2>
         <Badge tone={roundTone[round.judgingStatus as keyof typeof roundTone]}>
@@ -212,7 +226,10 @@ export function JudgeTeamsPage() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <h3>
-                  <Link to={r.teamId}>{r.name}</Link>
+                  <Link to={r.teamId}>
+                    {r.starred ? '★ ' : ''}
+                    {r.name}
+                  </Link>
                 </h3>
                 <Badge tone="info">{r.teamCode}</Badge>
               </div>
