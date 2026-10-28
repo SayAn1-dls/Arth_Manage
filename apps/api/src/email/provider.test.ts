@@ -3,12 +3,15 @@ import { createLogger } from '../config/logger.js';
 import { loadEnv } from '../config/env.js';
 import { SmtpEmailProvider } from './provider.js';
 
-const logger = createLogger(loadEnv({ DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) }));
+const logger = createLogger(
+  loadEnv({ DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) }),
+);
 const base = { DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) };
 
 describe('SmtpEmailProvider', () => {
   it('sends HTML email with embedded link (plus plain text fallback) and surfaces transport failures', async () => {
-    const sent: Array<{ from: string; to: string; subject: string; text: string; html?: string }> = [];
+    const sent: Array<{ from: string; to: string; subject: string; text: string; html?: string }> =
+      [];
     const ok = new SmtpEmailProvider(
       'Arthakram <hello@example.org>',
       { sendMail: async (m) => void sent.push(m) },

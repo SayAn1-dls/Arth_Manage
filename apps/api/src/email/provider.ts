@@ -38,7 +38,13 @@ export class ConsoleEmailProvider implements EmailProvider {
 }
 
 export interface MailTransport {
-  sendMail(m: { from: string; to: string; subject: string; text: string; html?: string }): Promise<unknown>;
+  sendMail(m: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+    html?: string;
+  }): Promise<unknown>;
 }
 
 function escapeHtml(str: string): string {

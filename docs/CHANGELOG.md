@@ -9,7 +9,8 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar. Findings are numbered
 A1 to A10 in `RELEASE_READINESS.md` section 11.
 
-- 2026-10-28 · fix(email) · Fixed 3 TS2532 errors in `email/provider.test.ts` that made `npm run typecheck` fail for the API (A4). · typecheck clean, 4 provider tests pass
+- 2026-10-28 · style(email) · Ran Prettier on `email/provider.ts` and its test so `npm run format:check` passes repo-wide (it failed on PR #2). · format:check clean
+- 2026-10-28 · fix(email) · Fixed 3 TS2532 errors in `email/provider.test.ts` that made `npm run typecheck` fail for the API (A4). · typecheck clean, 2 provider tests pass
 - 2026-10-28 · docs(changelog) · Added this log. · n/a
 
 ## Already on the branch before the audit
