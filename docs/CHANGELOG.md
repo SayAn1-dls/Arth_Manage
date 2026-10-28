@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar. Findings are numbered
 A1 to A10 in `RELEASE_READINESS.md` section 11.
 
+- 2026-10-28 · fix(workspace) · Shortlist notices now use a key derived from the chosen teams (it embedded `Date.now()`, so the unique index never de-duplicated) and go only to members of ACTIVE teams (A3). · new test red (8 notices) then green (2); workspace suite 15/15
 - 2026-10-28 · fix(db) · New migration `20261028100000_restore_certificate_event_constraints` re-adds `certificate_member_same_event` and `cert_exception_member_same_event`, dropped by accident in `20261023150259_first_migration` (A1). The migration test gained a fixed must-exist list (6 triggers, 4 constraints) because its generic check excused every dropped rule. · red before, green after; verified on an empty database
 - 2026-10-28 · fix(deps) · `npm audit fix` raised `body-parser` out of the vulnerable 2.0.0-2.3.0 range (DoS via trailing bytes after a compressed body, GHSA-27r3-jxmh-p828). Lockfile only (A5). · `npm audit --omit=dev`: 0 vulnerabilities
 - 2026-10-28 · style(email) · Ran Prettier on `email/provider.ts` and its test so `npm run format:check` passes repo-wide (it failed on PR #2). · format:check clean

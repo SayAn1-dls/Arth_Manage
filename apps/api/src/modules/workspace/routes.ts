@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Deps } from '../../http/deps.js';
@@ -441,14 +442,20 @@ export function workspaceRouter({ db }: Deps) {
         data: teams.map((t) => ({ eventId: c.event.id, roundId: to.id, teamId: t.id })),
       });
       await tx.round.update({ where: { id: to.id }, data: { shortlistEnabled: true } });
+      // Notify members of active teams only, once per distinct decision: the key is derived from the
+      // chosen teams, so repeating the same shortlist cannot email everyone again.
       const members = await tx.teamMember.findMany({
-        where: { eventId: c.event.id, leftAt: null },
+        where: { eventId: c.event.id, leftAt: null, team: { status: 'ACTIVE' } },
       });
+      const decision = createHash('sha256')
+        .update([...new Set(input.teamIds)].sort().join(','))
+        .digest('hex')
+        .slice(0, 16);
       await tx.messageDelivery.createMany({
         data: members.map((m) => ({
           eventId: c.event.id,
           membershipId: m.membershipId,
-          key: `shortlist:${to.id}:${Date.now()}`,
+          key: `shortlist:${to.id}:${decision}`,
           subject: `${c.event.name}: ${to.name}`,
           body: input.teamIds.includes(m.teamId)
             ? `Your team has advanced to ${to.name}.`
