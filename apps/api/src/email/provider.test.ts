@@ -27,9 +27,10 @@ describe('SmtpEmailProvider', () => {
       subject: 'Verify',
       text: 'Confirm your email address.\n\nhttps://x/verify?token=1\n',
     });
-    expect(sent[0].html).toContain('<!DOCTYPE html>');
-    expect(sent[0].html).toContain('Confirm your email address.');
-    expect(sent[0].html).toContain('<a href="https://x/verify?token=1"');
+    const html = sent[0]?.html;
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('Confirm your email address.');
+    expect(html).toContain('<a href="https://x/verify?token=1"');
 
     const down = new SmtpEmailProvider(
       'x',
