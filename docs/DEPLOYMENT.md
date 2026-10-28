@@ -82,7 +82,7 @@ model (DECISIONS D-58).
 * Rate limiting is in memory per process.
 * No withdraw flow or appreciation certificates (P1/P2). Deadline reminders and the public certificate verification page exist (PR #3, D-56) but have only been exercised on a development machine.
 * The email and reminder worker (`modules/workspace/worker.ts`) runs inside every API process, retries failed mail every 30 seconds up to three times with no backoff, and can duplicate a message after a crash because SMTP has no idempotency key. Run one instance.
-* `GET /api/v1/public/certificates/:code` is unauthenticated and not rate limited (audit A9); it returns the holder's name, so consider limiting it at the reverse proxy.
+* `GET /api/v1/public/certificates/:code` is unauthenticated and returns the holder's name. It is limited to 60 requests per minute per address (audit A9); the limit is in process memory, so with a reverse proxy set `TRUST_PROXY_HOPS` correctly.
 * GitHub checks for project review and judge reading cards call the GitHub API without a token (60 requests per hour per server IP).
 
 ## 8. Staging rehearsal (what was actually run)
