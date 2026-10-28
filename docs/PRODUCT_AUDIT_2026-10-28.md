@@ -5,6 +5,9 @@ files in `docs/`, the PRD (sections 0-2, 13, the section 16 test list and 18.8 r
 through `TECHNICAL_ARCHITECTURE.md`), the code, and these runs. Statements are tagged **Verified** (run and
 observed), **Docs claim** (a document says so, not re-checked) or **Unverified** (nobody has tested it).
 
+> **Correction, same day:** the first draft listed `FEATURES_V2.md` as understating its migrations. It lists its
+> own two correctly (the third migration belongs to the judge portal), so that row was wrong and is fixed below.
+
 ## 1. Evidence gathered (Verified)
 
 | Check | Result |
@@ -33,7 +36,7 @@ IDs are stable; `CHANGELOG.md` and `RELEASE_READINESS.md` section 11 refer to th
 | A9 | Low | `/public/certificates/:code` is unauthenticated, unlimited and returns the holder's name. Codes are 8 characters from 32 symbols (about 1.1e12) | **Open**: add a rate limit |
 | A10 | Process | PR #3 is one 5.9k-line commit touching scoring, assignment, the submission gate and certificates under a "judge workspace" title | **Process**: PRs split by concern from now on |
 | A11 | Low | GitHub checks are unauthenticated: 60 requests per hour per server IP, shared by judge reading cards and admin scans | **Open**: add optional `GITHUB_TOKEN` |
-| A12 | Medium | Documentation drift (see section 4) | **Fixed** in this follow-up |
+| A12 | Medium | Documentation drift (see section 4) | **Fixed** in this follow-up (README, DECISIONS D-54 to D-58, RELEASE_READINESS section 11, DEPLOYMENT, FEATURES_V2, JUDGE_WORKSPACE, TECHNICAL_ARCHITECTURE) |
 
 ## 3. Functional status
 
@@ -68,7 +71,7 @@ Not functional or not proven:
 | `RELEASE_READINESS.md`, `DEPLOYMENT.md` section 7, D-45 | Public certificate verification and email reminders not built | Both exist |
 | `RELEASE_READINESS.md` section 2 | API 363, web 32 tests; audit clean | 386 and 69; audit was 1 high (now fixed) |
 | `README.md` | Status stops at Phase 7 | PR #3 scope not mentioned |
-| `FEATURES_V2.md` | Changes remain local; two migrations | Merged; three migrations |
+| `FEATURES_V2.md` | Changes remain local | Merged as PR #3 |
 | `JUDGE_WORKSPACE.md` | Nothing pushed | Merged |
 | `TECHNICAL_ARCHITECTURE.md` | React Hook Form; signed 10-minute URLs | Replaced by D-21 and D-31 |
 | `DECISIONS.md` | Rule: add a row for every departure from the PRD | No rows for the PR #3 departures |
