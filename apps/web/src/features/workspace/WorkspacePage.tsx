@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useParams } from 'react-router';
-import type { MyEvent } from '@arthakram/shared';
+import type { MyEvent, Role } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
+import { ROLE_LABEL } from '../../lib/format.js';
 import { Alert, Button, Spinner } from '../../ui/index.js';
 
 type Options = {
@@ -31,11 +32,21 @@ type Ticket = {
   kind: string;
   status: string;
   authorId: string;
+  authorName: string;
+  authorRole: Role | null;
   assignedToId: string | null;
   teamId: string | null;
   decisionNote: string | null;
-  messages: { id: string; authorId: string; body: string; createdAt: string }[];
+  messages: {
+    id: string;
+    authorId: string;
+    authorName: string;
+    authorRole: Role | null;
+    body: string;
+    createdAt: string;
+  }[];
 };
+const roleName = (role: Role | null) => (role ? ROLE_LABEL[role] : 'Former member');
 const control = 'block w-full rounded-lg border border-line-strong bg-white px-3 py-2 text-ink';
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -340,14 +351,14 @@ export function WorkspacePage({ section }: { section: string }) {
                   <p className="text-sm text-graphite">
                     {t.kind} ·{' '}
                     {options.data?.teams.find((x) => x.id === t.teamId)?.teamCode ??
-                      'Participant request'}
+                      `${roleName(t.authorRole)} request`}{' '}
+                    · {t.authorName}
                   </p>
                   {t.messages.map((m) => (
                     <div className="rounded-lg bg-blush p-3" key={m.id}>
                       <p className="text-xs font-bold">
-                        {options.data?.staff.find((s) => s.id === m.authorId)?.user.name ??
-                          'Participant'}{' '}
-                        · {new Date(m.createdAt).toLocaleString()}
+                        {m.authorName} · {roleName(m.authorRole)} ·{' '}
+                        {new Date(m.createdAt).toLocaleString()}
                       </p>
                       <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
                     </div>

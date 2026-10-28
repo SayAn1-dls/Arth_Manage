@@ -146,7 +146,25 @@ export function workspaceRouter({ db }: Deps) {
       take: 100,
       include: { messages: { orderBy: { createdAt: 'asc' } } },
     });
-    res.json({ tickets });
+    // Name each author and their role in this event, so the screen never has to guess (it used to print
+    // "Participant" for judges and admins). Participants only receive their own tickets, so this exposes
+    // nothing beyond their own name and the names of the organisers who answered them.
+    const ids = new Set(tickets.flatMap((t) => [t.authorId, ...t.messages.map((m) => m.authorId)]));
+    const people = await db.eventMembership.findMany({
+      where: { eventId: c.event.id, id: { in: [...ids] } },
+      select: { id: true, role: true, user: { select: { name: true } } },
+    });
+    const who = (id: string) => {
+      const p = people.find((x) => x.id === id);
+      return { authorName: p?.user.name ?? 'Former member', authorRole: p?.role ?? null };
+    };
+    res.json({
+      tickets: tickets.map((t) => ({
+        ...t,
+        ...who(t.authorId),
+        messages: t.messages.map((m) => ({ ...m, ...who(m.authorId) })),
+      })),
+    });
   });
   router.post('/workspace/tickets', async (req, res) => {
     const c = requireCtx(req);
