@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ACCOUNTS, createVerifiedUser, signInUi } from './helpers.js';
+import { ACCOUNTS, createVerifiedUser, goToNav, signInUi } from './helpers.js';
 
 test.describe('event setup and guidebook', () => {
   test('admin creates, configures and publishes an event with a guidebook and announcement (AT-01)', async ({
@@ -35,7 +35,7 @@ test.describe('event setup and guidebook', () => {
     await page.getByRole('button', { name: 'Open registration' }).click();
     await expect(page.getByText('Registration open').first()).toBeVisible();
 
-    await page.getByRole('link', { name: 'Guidebook' }).click();
+    await goToNav(page, 'Guidebook');
     await page.getByLabel('Content').fill('## Rules\n\nBe **kind**. Submit before the deadline.');
     await expect(page.getByRole('heading', { name: 'Rules' })).toBeVisible(); // live preview
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
@@ -70,7 +70,7 @@ test.describe('event setup and guidebook', () => {
     await signInUi(page, ACCOUNTS.asha);
     await page.getByRole('link', { name: 'HackSonipat 2026' }).click();
     await expect(page.getByRole('link', { name: 'Setup' })).toHaveCount(0);
-    await page.getByRole('link', { name: 'Guidebook' }).click();
+    await goToNav(page, 'Guidebook');
     await expect(page.getByRole('heading', { name: 'Welcome to HackSonipat' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible();
     await page.getByRole('link', { name: 'Announcements' }).click();

@@ -3,6 +3,7 @@ export * from './Arc.js';
 export * from './Badge.js';
 export * from './Button.js';
 export * from './Card.js';
+export * from './CollapsibleNav.js';
 export * from './Countdown.js';
 export * from './DateTimeField.js';
 export * from './Dialog.js';

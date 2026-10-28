@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Api, newUser } from './api.js';
 import { BASE, buildJudgingScenario } from './scenario.js';
-import { latestEmailLink, signInUi } from './helpers.js';
+import { goToNav, latestEmailLink, signInUi } from './helpers.js';
 
 test('event day: tasks, check-in on a phone, issue reporting and the organiser dashboard (AT-20, AT-21)', async ({
   playwright,
@@ -35,7 +35,7 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   await signInUi(page, staff.email, staff.password);
   await page.getByRole('link', { name: /Scenario Cup/ }).click();
   await expect(page.getByText('1 task to do')).toBeVisible();
-  await page.getByRole('link', { name: 'My tasks' }).click();
+  await goToNav(page, 'My tasks');
   await expect(page.getByRole('heading', { name: 'Run the check-in desk' })).toBeVisible();
   await page.getByRole('button', { name: 'Blocked' }).click();
   await expect(page.getByRole('button', { name: 'Mark blocked' })).toBeDisabled(); // a note is required
@@ -44,7 +44,7 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   await expect(page.getByText('No tables set up yet')).toBeVisible();
 
   // Check-in: search, mark both members present, verify one ID
-  await page.getByRole('link', { name: 'Check-in' }).click();
+  await goToNav(page, 'Check-in');
   await page.getByLabel('Find a team').fill('alpha');
   await expect(page.getByRole('heading', { name: 'Alpha Squad' })).toBeVisible();
   expect(await page.content()).not.toMatch(/@example\.test/); // no emails on the staff card
@@ -58,10 +58,7 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   await expect(page.getByText(/ID verified by Sahil Staff: College ID matched/)).toBeVisible();
 
   // An urgent issue
-  await page
-    .getByRole('navigation', { name: 'Event' })
-    .getByRole('link', { name: 'Report an issue' })
-    .click();
+  await goToNav(page, 'Report an issue');
   await page.getByLabel('What happened?').fill('Projector is dead in hall B');
   await page.getByLabel('This is urgent').check();
   await page.getByRole('button', { name: 'Send report' }).click();

@@ -1,10 +1,10 @@
-import { Fragment, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, Navigate, Outlet, useLocation, useParams } from 'react-router';
+import { Navigate, Outlet, useLocation, useParams } from 'react-router';
 import { api, request } from '../lib/api.js';
 import { ROLE_LABEL } from '../lib/format.js';
-import { Alert, Badge, cn, Spinner } from '../ui/index.js';
-import { navFor } from './nav.js';
+import { Alert, Badge, CollapsibleNav, Spinner } from '../ui/index.js';
+import { activeGroupId, navFor, navItems, type NavGroup } from './nav.js';
 
 /** Event workspace: header with role badge plus the navigation for the caller's role in this event. */
 export function EventLayout() {
@@ -37,10 +37,18 @@ export function EventLayout() {
       </main>
     );
   }
-  const items =
-    mine.accessLevel === 'SPONSOR_VIEWER'
-      ? [{ to: 'report', label: 'Impact report' }]
-      : navFor(mine.role);
+  const sponsor = mine.accessLevel === 'SPONSOR_VIEWER';
+  const groups: NavGroup[] = sponsor
+    ? [
+        {
+          id: 'report',
+          label: 'Impact report',
+          flat: true,
+          items: [{ to: 'report', label: 'Impact report' }],
+        },
+      ]
+    : navFor(mine.role);
+  const items = navItems(groups);
   if (mine.accessLevel === 'SPONSOR_VIEWER' && !pathname.endsWith('/report'))
     return <Navigate to={`/events/${eventId}/report`} replace />;
   // A screen outside the caller's role is not rendered at all; the API enforces this independently (PRD §8.1).
@@ -56,29 +64,14 @@ export function EventLayout() {
         </Badge>
       </div>
       <div className="grid gap-6 lg:grid-cols-[14rem_1fr]">
-        <nav aria-label="Event" className="flex gap-1 overflow-x-auto lg:flex-col">
-          {items.map((i, idx) => (
-            <Fragment key={i.to}>
-              {i.group && items[idx - 1]?.group !== i.group && (
-                <p className="hidden px-4 pt-3 text-xs font-bold uppercase tracking-eyebrow text-ink lg:block">
-                  {i.group}
-                </p>
-              )}
-              <NavLink
-                to={i.to}
-                end={i.end}
-                className={({ isActive }) =>
-                  cn(
-                    'flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-4 px-4 text-ink no-underline hover:bg-blush lg:border-b-0 lg:border-l-4',
-                    isActive ? 'border-ember bg-blush font-bold' : 'border-transparent font-medium',
-                  )
-                }
-              >
-                {i.label}
-              </NavLink>
-            </Fragment>
-          ))}
-        </nav>
+        <CollapsibleNav
+          label="Event"
+          groups={groups}
+          activeGroupId={activeGroupId(groups, section)}
+          pageKey={pathname}
+          currentLabel={items.find((i) => i.to.split('/')[0] === section)?.label}
+          scope={`${sponsor ? 'SPONSOR' : mine.role}:${eventId}`}
+        />
         <main className="min-w-0">
           {allowed ? (
             <Outlet context={mine} />
