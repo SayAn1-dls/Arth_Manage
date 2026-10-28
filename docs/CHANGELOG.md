@@ -9,6 +9,7 @@ commit. Newest first. Format: **date · type(scope) · what changed and why · e
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as
 `PRODUCT_AUDIT_2026-10-28.md`. Findings are numbered A1 to A12 there; statuses are kept current in that file.
 
+- 2026-10-28 · fix(certificates) · `GET /public/certificates/:code` is now limited to 60 requests per minute per address (A9). New test: 60 x 404 then 429; certificates, workspace and security suites 45/45. · red then green
 - 2026-10-28 · docs(architecture) · `TECHNICAL_ARCHITECTURE.md`: corrected the stack (React 19, Vite 8, React Router 8, no React Hook Form), file delivery (per-request checks, D-31), scoring (optional normalisation, D-54), prerequisites, and the non-goals list (A12). · n/a
 - 2026-10-28 · docs(audit) · Corrected a wrong drift row in the audit (FEATURES_V2 does list its own two migrations) and recorded where each A12 fix landed. · n/a
 - 2026-10-28 · docs(v2) · `FEATURES_V2.md` and `JUDGE_WORKSPACE.md`: replaced the "changes remain local / nothing pushed" statements, added the normalisation caveat and rate-limit notes, linked D-55, and recorded the 28 Oct re-run (386 API, 69 web, 16 e2e) (A12). · n/a
