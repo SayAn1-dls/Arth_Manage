@@ -21,9 +21,9 @@ guaranteed fallback. V1 is sized for the PRD load profile: ≤ 1,000 participant
 |---|---|---|
 | Language | TypeScript (strict) everywhere | One language, shared types and validation between client and server |
 | Monorepo | npm workspaces | Simplest option that lets `web`, `api` and `shared` share code; no extra tooling |
-| Frontend | React 18, Vite, React Router, Tailwind CSS, `lucide-react` | Requested stack; Tailwind is mapped onto CSS-variable brand tokens |
+| Frontend | React 19, Vite 8, React Router 8, Tailwind CSS, `lucide-react` | Requested stack; Tailwind is mapped onto CSS-variable brand tokens |
 | Server state | TanStack Query | Caching, optimistic-lock error handling, retry for idempotent writes |
-| Forms | React Hook Form + Zod resolver | Same Zod schemas as the API, field-level errors (PRD 6.0-4) |
+| Forms | Plain forms; server-side Zod validation mapped to field errors by `useFormErrors` | React Hook Form was not adopted (DECISIONS D-21); the server is the validator of record (PRD 6.0-4) |
 | Backend | Node.js, Express, TypeScript | Requested stack; thin routes over services |
 | Validation | Zod (in `packages/shared`) | Single schema source for request bodies, responses and forms |
 | Database | PostgreSQL 16 | Required constraints (partial unique indexes, row locks, triggers) |
@@ -37,8 +37,8 @@ guaranteed fallback. V1 is sized for the PRD load profile: ≤ 1,000 participant
 | Tests | Vitest (unit + API integration with Supertest), Playwright (E2E + visual QA screenshots) | Chromium for Playwright is already installed locally |
 | Quality | ESLint, Prettier, `tsc --noEmit`, Husky-free (run via npm scripts) | |
 
-Local prerequisites (verified on this machine): Node 26.9, npm 11.19, PostgreSQL 16.15,
-Playwright Chromium 1243. Node 26 is very new: Phase 0 includes a spike confirming Prisma and every
+Local prerequisites (verified on this machine on 28 Oct 2026): Node 26.9, npm 11, PostgreSQL 16 or 18 (the
+Postgres.app 18 server was used for the 28 Oct audit run), Playwright Chromium. Node 26 is very new: Phase 0 includes a spike confirming Prisma and every
 dependency installs and runs on it, with a documented fallback to Node 22 LTS (DECISIONS D-14).
 
 ## 3. Repository layout
@@ -110,8 +110,8 @@ are testable without a database and reusable by the UI for previews.
    NONE | OWN | ASSIGNED | READ | FULL`). `OWN` and `ASSIGNED` are evaluated against the resource
    (team membership; `JudgeAssignment`).
 4. Out-of-scope records return **404 "not found"**, not 403, and the denied attempt is logged (PRD 8.3).
-5. Signed file URLs are issued only after step 3, expire within 10 minutes, and are served with
-   `Content-Disposition: attachment` (PDF inline preview excepted) and `nosniff`.
+5. Files are served by `GET /events/:id/files/:fileId`, which re-checks permission on every request instead of
+   issuing signed URLs (DECISIONS D-31), with `Content-Disposition: attachment` and `nosniff`.
 6. Frontend route guards and hidden menu items are *presentation only*.
 
 ### 4.3 Permission test harness (NFR-S4)
@@ -199,7 +199,10 @@ T   = mean of counted J over m ≥ 1     team score for the round
 
 * Exact decimal arithmetic (`decimal.js`), **no intermediate rounding**; stored/compared values rounded
   **half-up to 4 dp**, displayed to 2 dp. All criteria required; integer scores only; `min ∈ {0,1}`.
-* No normalisation across judges and no silent fill-in of missing scores.
+* No normalisation across judges by default and no silent fill-in of missing scores. An **optional per-round
+  normalisation** was added later (DECISIONS D-54, off by default): it shifts each judge with at least three scores
+  by (panel mean minus judge mean), clamps to 0-100 and averages. It has a known weakness (assignment is not
+  random; the panel mean mixes tracks), and raw and adjusted scores are both shown.
 * A team is *complete* when every required (non-excluded) assignment has a submitted evaluation; teams
   may have different counts only after an explicit admin exclusion with a reason, recorded in the snapshot.
 * **Ranking and ties (documented assumption, resolves the brief's "document tie handling"):** teams are
@@ -322,7 +325,8 @@ inspected via Playwright screenshots at desktop (1440) and mobile (390) widths a
 
 ## 14. Explicit non-goals (inherited from PRD §3.2)
 
-Payments, QR check-in, public leaderboards, AI features, bidirectional Sheets sync, multi-tenant org
-administration/SSO, offline mode, native apps, judge-bias normalisation, anonymous judging, public
-discovery. Where the brief's prompt mentioned QR check-in or AI "where in scope / later", the PRD
+Payments, QR check-in, public leaderboards, bidirectional Sheets sync, multi-tenant org
+administration/SSO, offline mode, native apps, anonymous judging, public discovery. (AI features and judge-bias
+normalisation were also non-goals; both now exist as optional, off-by-default features, DECISIONS D-54 and D-55.
+Public certificate verification, formerly P2, exists too, D-56.) Where the brief's prompt mentioned QR check-in or AI "where in scope / later", the PRD
 non-goal wins (DECISIONS D-02, D-03).
