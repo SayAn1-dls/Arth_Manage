@@ -29,7 +29,7 @@ JUDGE_AI_ENABLED=true
 
 No model is silently selected. Choose a model supported by your OpenAI account. Keys are never sent to the browser or stored in the database. Enabling this explicitly allows project titles, submitted summary text, repository language and public README excerpts to be sent to OpenAI on request. Scores, scratchpads, organiser notes and participant records are not part of that input. Requests set `store: false`, use a strict three-field schema, have a timeout and output-token limit, and handle refused/incomplete/unavailable outputs with a source-only fallback.
 
-AI remains **off by default**. Without credentials, the source-based reading card works and states that AI is not configured. Real OpenAI calls have not been exercised; provider behavior was tested with a mocked response.
+AI remains **off by default** and is recorded as DECISIONS D-55, which supersedes the earlier "no AI in V1" decision (D-03). Without credentials, the source-based reading card works and states that AI is not configured. Real OpenAI calls have not been exercised; provider behavior was tested with a mocked response.
 
 ## Video and link limits
 
@@ -45,4 +45,4 @@ AI remains **off by default**. Without credentials, the source-based reading car
 - Production build, TypeScript checks, ESLint, brand lint, formatting and whitespace checks.
 - Browser inspection as seeded judge `judge1@arthakram.test`: navigation, team list, evaluation workspace, reading card, file status and comparison controls.
 
-The additive migration `20261027160000_judge_workspace` has been applied to the local development and test databases. Earlier local changes have been preserved. Nothing has been pushed or deployed.
+The additive migration `20261027160000_judge_workspace` has been applied to the local development and test databases. Earlier local changes have been preserved. Merged to `main` as PR #3 (2026-10-28); nothing has been deployed. On a database that predates the merge run `npm run db:deploy -w @arthakram/api` first.

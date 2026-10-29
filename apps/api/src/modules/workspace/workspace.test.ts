@@ -114,6 +114,57 @@ describe('expanded workspace', () => {
       ).status,
     ).toBe(422);
   });
+  it('names the author and role of every helpdesk request and reply', async () => {
+    const w = await openEvent(kit),
+      judge = await addJudge(kit, w, 'Jaya Judge');
+    const created = await judge.agent
+      .post(`${w.base}/workspace/tickets`)
+      .send({ subject: 'Scoring help', body: 'How should I score?', kind: 'QUESTION' });
+    expect(created.status).toBe(201);
+    await w.admin
+      .post(`${w.base}/workspace/tickets/${created.body.id}/reply`)
+      .send({ body: 'Use the rubric ranges.' });
+    await judge.agent
+      .post(`${w.base}/workspace/tickets/${created.body.id}/reply`)
+      .send({ body: 'Thanks.' });
+    for (const viewer of [judge.agent, w.admin]) {
+      const t = (await viewer.get(`${w.base}/workspace/tickets`)).body.tickets[0];
+      expect(t.authorRole).toBe('JUDGE');
+      expect(t.authorName).toBe('Jaya Judge');
+      expect(t.messages.map((m: { authorRole: string }) => m.authorRole)).toEqual([
+        'JUDGE',
+        'ADMIN',
+        'JUDGE',
+      ]);
+      expect(t.messages[0].authorName).toBe('Jaya Judge');
+    }
+  });
+  it('sends shortlist notices once per decision and only to members of active teams', async () => {
+    const w = await openEvent(kit),
+      advanced = await teamOfTwo(w, 'Advanced'),
+      dropped = await teamOfTwo(w, 'Dropped');
+    await submitProject(w, advanced);
+    const next = await db.round.create({
+      data: {
+        eventId: w.eventId,
+        order: 2,
+        name: 'Final',
+        submissionDeadline: new Date(Date.now() + 86400000),
+      },
+    });
+    await db.team.update({ where: { id: dropped.teamId }, data: { status: 'DISQUALIFIED' } });
+    const decide = () =>
+      w.admin
+        .post(`${w.base}/workspace/shortlist`)
+        .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [advanced.teamId] });
+    expect((await decide()).status).toBe(200);
+    expect((await decide()).status).toBe(200); // same decision again, e.g. a double click
+    const notices = await db.messageDelivery.findMany({
+      where: { eventId: w.eventId, key: { startsWith: 'shortlist:' } },
+    });
+    expect(notices).toHaveLength(2); // the two members of the shortlisted team, once each
+    expect(notices.every((n) => n.body.includes('advanced'))).toBe(true);
+  });
   it('publishes only opted-in discovery profiles and hides withdrawn profiles', async () => {
     const w = await openEvent(kit),
       a = await w.participant('A');

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createOpenEvent, createVerifiedUser, signInUi } from './helpers.js';
+import { createOpenEvent, createVerifiedUser, goToNav, signInUi } from './helpers.js';
 
 const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.from('slide '.repeat(200))]);
 
@@ -51,7 +51,7 @@ test('registration, team formation, submission and admin monitoring (AT-02, AT-0
   await expect(b.getByText('2 of 3')).toBeVisible();
 
   // Team A submits: a fake PDF is refused, a real one accepted
-  await a.getByRole('link', { name: 'Submission' }).click();
+  await goToNav(a, 'Submission');
   await a.getByLabel('Project title').fill('Fraud Radar');
   await a.getByLabel('Summary').fill('Flags suspicious UPI transactions in real time.');
   const picker = a.locator('input[type=file]');
@@ -73,7 +73,7 @@ test('registration, team formation, submission and admin monitoring (AT-02, AT-0
   await expect(a.getByText('Version 1').first()).toBeVisible();
 
   // Teammate B sees the same submission
-  await b.getByRole('link', { name: 'Submission' }).click();
+  await goToNav(b, 'Submission');
   await expect(b.getByText('Submitted', { exact: true }).first()).toBeVisible();
 
   // Organiser monitors it and can open the submitted version

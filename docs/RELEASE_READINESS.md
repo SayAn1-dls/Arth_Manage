@@ -1,7 +1,9 @@
 # Release readiness: controlled pilot
 
 Written after a hands-on audit of the running system, not from earlier completion reports. Everything is
-labelled **Verified** (I ran it and saw the result), **Partly verified**, or **Not verified**. Dates are 22 Oct 2026.
+labelled **Verified** (I ran it and saw the result), **Partly verified**, or **Not verified**. Dates are 22 Oct 2026
+unless stated. Sections 1 to 10 describe the tree as of 22 Oct; **section 11 is the 28 Oct re-audit after PR #3**
+and supersedes any figure or "not built" statement above it.
 
 ## 1. Verdict
 
@@ -189,4 +191,40 @@ Screenshots are written to `.qa-screenshots/` (git-ignored). The brand kit PDF w
 * **Medium:** load figures are from one laptop; no soak test, no concurrent-upload test at the deadline with large files.
 * **Low:** accessibility has had keyboard/contrast attention but no assistive-technology test.
 * **Low:** locked-account message reveals account existence; audit log holds some personal data.
-* **Not built:** judge/staff appreciation certificates, public certificate verification, participant withdraw, email reminders, staff phone visibility.
+* **Not built:** judge/staff appreciation certificates, participant withdraw, staff phone visibility. (Public certificate verification and deadline reminders were built later in PR #3; see section 11.)
+
+## 11. Re-audit of 28 October 2026 (after PR #3 and the sidebar)
+
+Full report: `PRODUCT_AUDIT_2026-10-28.md`. Findings keep their IDs (A1 to A12).
+
+**Verified on this tree**
+
+| Area | Result |
+|---|---|
+| API tests | 386 pass (was 363) |
+| Web tests | 69 pass (was 32) |
+| Playwright | 16 pass, with `EMAIL_PROVIDER=console` and `RATE_LIMIT_DISABLED=true` (see README) |
+| Build, ESLint, brand lint, Prettier, typecheck (web and API) | pass after the fixes below |
+| `npm audit --omit=dev` | 0 vulnerabilities after A5 (it reported 1 high before) |
+| 65 sidebar screens, four roles | load with no failed API call or console error on a seeded event |
+| Migrations on an empty database | apply, and both certificate same-event constraints exist |
+
+**Fixed in the follow-up:** A1 two certificate integrity constraints were missing (migration and a must-exist test
+added); A3 shortlist notices repeated and reached inactive teams; A4 API typecheck failed; A5 `body-parser`
+advisory; A6 e2e environment undocumented; A9 the public certificate endpoint is now rate limited (60 per minute per address); A12 stale documents.
+
+**Still open** (each needs a decision or a real environment): A2 score normalisation can change winners (D-54);
+A7 no foreign keys on nine of the ten new tables; A8 worker retries without backoff; A11 GitHub checks are
+unauthenticated (60 requests per hour per IP).
+
+**Changed risk picture**
+
+* The release verdict in section 1 is unchanged: a controlled pilot on one instance with persistent disk. It now
+  also assumes normalisation stays off and `JUDGE_AI_ENABLED` stays false unless the organiser has decided otherwise.
+* Section 3 defect 1 described the same two constraints as protected by `migrations.test.ts`. That protection was
+  not real: the test excused every dropped rule. It now has a fixed list.
+* The PRD treats normalisation, public certificate verification and AI as out of scope for V1; they exist now
+  (D-54 to D-56). They widen what must be rehearsed before an event.
+
+**Still not verified:** Google Sheets and Drive against real Google; real SMTP deliverability; a real host; OpenAI;
+load, restore and accessibility re-runs on this tree; PRD sections 6 to 8 and 15 read line by line.

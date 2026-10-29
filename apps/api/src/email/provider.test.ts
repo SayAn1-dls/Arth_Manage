@@ -3,12 +3,15 @@ import { createLogger } from '../config/logger.js';
 import { loadEnv } from '../config/env.js';
 import { SmtpEmailProvider } from './provider.js';
 
-const logger = createLogger(loadEnv({ DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) }));
+const logger = createLogger(
+  loadEnv({ DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) }),
+);
 const base = { DATABASE_URL: 'postgresql://x/y', SESSION_SECRET: 'a'.repeat(32) };
 
 describe('SmtpEmailProvider', () => {
   it('sends HTML email with embedded link (plus plain text fallback) and surfaces transport failures', async () => {
-    const sent: Array<{ from: string; to: string; subject: string; text: string; html?: string }> = [];
+    const sent: Array<{ from: string; to: string; subject: string; text: string; html?: string }> =
+      [];
     const ok = new SmtpEmailProvider(
       'Arthakram <hello@example.org>',
       { sendMail: async (m) => void sent.push(m) },
@@ -27,9 +30,10 @@ describe('SmtpEmailProvider', () => {
       subject: 'Verify',
       text: 'Confirm your email address.\n\nhttps://x/verify?token=1\n',
     });
-    expect(sent[0].html).toContain('<!DOCTYPE html>');
-    expect(sent[0].html).toContain('Confirm your email address.');
-    expect(sent[0].html).toContain('<a href="https://x/verify?token=1"');
+    const html = sent[0]?.html;
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('Confirm your email address.');
+    expect(html).toContain('<a href="https://x/verify?token=1"');
 
     const down = new SmtpEmailProvider(
       'x',
