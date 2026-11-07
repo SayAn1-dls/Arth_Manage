@@ -1,0 +1,41 @@
+# Render Blueprint for a public demo of the platform (seeded fake accounts, see README).
+databases:
+  - name: arthmanage-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
+    databaseName: arthmanage_db
+    user: arthmanage_db_user
+
+services:
+  - type: web
+    name: arthmanage
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: cd apps/api && npx prisma migrate deploy && NODE_ENV=development npx tsx --conditions=source prisma/seed.ts && NODE_ENV=production node dist/server.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: arthmanage-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_BASE_URL
+        value: https://arthmanage.onrender.com
+      - key: API_PORT
+        value: "10000"
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_URL
+        value: smtp://localhost:2525
+      - key: EMAIL_FROM
+        value: Arthakram <no-reply@arthmanage.onrender.com>
+      - key: STORAGE_DIR
+        value: /opt/render/project/src/.data/uploads
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: NODE_VERSION
+        value: "26"
