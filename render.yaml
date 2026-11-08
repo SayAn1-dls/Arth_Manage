@@ -14,7 +14,9 @@ services:
     plan: free
     region: singapore
     buildCommand: npm ci && npm run build
-    startCommand: cd apps/api && npx prisma migrate deploy && NODE_ENV=development npx tsx --conditions=source prisma/seed.ts && NODE_ENV=production node dist/server.js
+    # Migrations must finish before the server takes traffic; the seed is idempotent, so it runs alongside the
+    # server to keep wake-ups from the free plan's sleep fast.
+    startCommand: cd apps/api && npx prisma migrate deploy && (NODE_ENV=development npx tsx --conditions=source prisma/seed.ts &) && NODE_ENV=production exec node dist/server.js
     healthCheckPath: /api/v1/health
     envVars:
       - key: DATABASE_URL
