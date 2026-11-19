@@ -2,7 +2,11 @@ import { startWorkspaceWorker } from './modules/workspace/worker.js';
 import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createDb } from './db/client.js';
-import { ConsoleEmailProvider, SmtpEmailProvider } from './email/provider.js';
+import {
+  BrevoApiEmailProvider,
+  ConsoleEmailProvider,
+  SmtpEmailProvider,
+} from './email/provider.js';
 import { LocalDiskStorage } from './storage/provider.js';
 import { createApp } from './http/app.js';
 import { createRateLimiter } from './http/rateLimit.js';
@@ -20,9 +24,11 @@ const deps: Deps = {
   logger,
   env,
   email:
-    env.EMAIL_PROVIDER === 'smtp'
-      ? SmtpEmailProvider.fromUrl(env.SMTP_URL!, env.EMAIL_FROM, logger)
-      : new ConsoleEmailProvider(db, logger),
+    env.EMAIL_PROVIDER !== 'smtp'
+      ? new ConsoleEmailProvider(db, logger)
+      : env.BREVO_API_KEY
+        ? new BrevoApiEmailProvider(env.BREVO_API_KEY.trim(), env.EMAIL_FROM, logger)
+        : SmtpEmailProvider.fromUrl(env.SMTP_URL!, env.EMAIL_FROM, logger),
   storage: new LocalDiskStorage(env.STORAGE_DIR),
   limit: createRateLimiter(env.NODE_ENV !== 'test' && !env.RATE_LIMIT_DISABLED),
   google: createGoogleProvider({

@@ -157,3 +157,74 @@ export class SmtpEmailProvider implements EmailProvider {
     this.logger.info({ subject: message.subject }, 'email sent');
   }
 }
+
+/** Splits `Name <address>` (or a bare address) into Brevo's sender object. */
+export function parseSender(from: string): { name?: string; email: string } {
+  const m = /^\s*(.*?)\s*<\s*([^>]+?)\s*>\s*$/.exec(from);
+  if (!m) return { email: from.trim() };
+  const name = m[1]?.replace(/^"|"$/g, '').trim();
+  return name ? { name, email: m[2]! } : { email: m[2]! };
+}
+
+type FetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string },
+) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+
+/**
+ * Sends through Brevo's transactional email API over HTTPS. Hosts that block SMTP ports cannot block it, it needs one
+ * secret instead of a URL with encoded credentials, and Brevo answers failures in plain words.
+ */
+export class BrevoApiEmailProvider implements EmailProvider {
+  private failure: EmailFailure | undefined;
+
+  constructor(
+    private readonly apiKey: string,
+    private readonly from: string,
+    private readonly logger: Logger,
+    private readonly fetchImpl: FetchLike = (url, init) => fetch(url, init),
+  ) {}
+
+  lastFailure(): EmailFailure | undefined {
+    return this.failure;
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    try {
+      const res = await this.fetchImpl('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': this.apiKey,
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: parseSender(this.from),
+          to: [{ email: message.to }],
+          subject: message.subject,
+          textContent: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
+          htmlContent: buildHtmlEmail(message),
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let reply = text;
+        try {
+          const parsed = JSON.parse(text) as { code?: string; message?: string };
+          reply = [parsed.code, parsed.message].filter(Boolean).join(': ') || text;
+        } catch {
+          // not JSON; keep the raw text
+        }
+        throw Object.assign(new Error(`Brevo API answered ${res.status}`), {
+          code: `HTTP_${res.status}`,
+          response: reply,
+        });
+      }
+    } catch (err) {
+      this.failure = describeEmailFailure(err);
+      throw err;
+    }
+    this.failure = undefined;
+    this.logger.info({ subject: message.subject }, 'email sent');
+  }
+}
