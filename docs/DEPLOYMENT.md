@@ -112,7 +112,11 @@ second after each backup rehearsal. Backups contain personal data: restrict acce
 `https://arthmanage.onrender.com` runs from the `render-deploy` branch on Render's free plan with the blueprint in
 `render.yaml`. It seeds the fake demo accounts from the README on every start, so treat it as a demo, not an event host.
 
-* **Email.** Set `SMTP_URL` and `EMAIL_FROM` in the Render dashboard. Without a reachable mail server, sign-up,
+* **Email (simplest).** Set `BREVO_API_KEY` (Brevo > SMTP & API > API keys, starts with `xkeysib-`) and `EMAIL_FROM`
+  (a sender verified in Brevo, e.g. `Arthakram <you@example.com>`). It uses Brevo's HTTPS API, which Render does not
+  block, and takes precedence over `SMTP_URL`. `GET /api/v1/health` shows the last delivery failure (`emailLastFailure`:
+  a code and the provider's reply, never the key) and stays 200.
+* **Email (any SMTP provider).** Alternatively set `SMTP_URL` and `EMAIL_FROM` in the Render dashboard. Without a reachable mail server, sign-up,
   password reset and invitations answer 503 ("email unavailable"). Render's free plan blocks outbound ports 25, 465
   and 587, so use a provider with another port, for example Resend: `smtps://resend:<RESEND_API_KEY>@smtp.resend.com:2465`.
   With Resend's shared `onboarding@resend.dev` sender, mail reaches only the Resend account owner; verify a domain

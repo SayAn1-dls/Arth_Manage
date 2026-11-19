@@ -12,6 +12,8 @@ const envSchema = z
     STORAGE_DIR: z.string().default('./.data/uploads'),
     EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
     SMTP_URL: z.string().optional(),
+    // Brevo's HTTPS email API (port 443, never blocked by hosts). When set it replaces SMTP_URL; one value, no URL encoding.
+    BREVO_API_KEY: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
     JUDGE_SUMMARY_MODEL: z.string().optional(),
     JUDGE_AI_ENABLED: z
@@ -31,8 +33,8 @@ const envSchema = z
     TOKEN_ENCRYPTION_KEY: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   })
-  .refine((e) => e.EMAIL_PROVIDER !== 'smtp' || Boolean(e.SMTP_URL), {
-    message: 'SMTP_URL is required when EMAIL_PROVIDER=smtp',
+  .refine((e) => e.EMAIL_PROVIDER !== 'smtp' || Boolean(e.SMTP_URL || e.BREVO_API_KEY), {
+    message: 'SMTP_URL (or BREVO_API_KEY) is required when EMAIL_PROVIDER=smtp',
     path: ['SMTP_URL'],
   })
   .refine((e) => e.NODE_ENV !== 'production' || e.EMAIL_PROVIDER === 'smtp', {
