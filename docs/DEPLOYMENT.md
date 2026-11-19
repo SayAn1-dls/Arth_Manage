@@ -119,6 +119,10 @@ second after each backup rehearsal. Backups contain personal data: restrict acce
   in Resend to email anyone else.
 * **Proxy hops.** Requests pass Cloudflare, Render's load balancer and a local proxy, so `TRUST_PROXY_HOPS=3`.
   With 1, every visitor appears as Render's internal address and the whole site shares one rate-limit bucket.
+* **Your own Render account.** In the Render dashboard choose New > Blueprint, pick this repository and the
+  `render-deploy` branch, and enter `SMTP_URL` and `EMAIL_FROM` when asked. The links in emails use the new
+  service's own address (`RENDER_EXTERNAL_URL`) unless `APP_BASE_URL` is set. A Render account can have one free
+  PostgreSQL database at a time.
 * **Port and `.env`.** The API binds `PORT` when `API_PORT` is unset, and `npm run start` no longer fails when there is
   no `.env` file on the host.
 * **Free-plan limits.** The disk is ephemeral (uploads and certificate PDFs vanish on restart or redeploy; see section 9),
