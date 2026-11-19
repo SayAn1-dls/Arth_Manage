@@ -49,7 +49,13 @@ export type Env = z.infer<typeof envSchema>;
 
 /** Parse and validate the environment once; fail fast with a readable message. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = envSchema.safeParse(source);
+  // Hosts such as Render, Railway and Fly tell the app which port to bind through PORT.
+  // Render publishes the service's own https address as RENDER_EXTERNAL_URL.
+  const parsed = envSchema.safeParse({
+    ...source,
+    API_PORT: source.API_PORT ?? source.PORT,
+    APP_BASE_URL: source.APP_BASE_URL || source.RENDER_EXTERNAL_URL || undefined,
+  });
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
