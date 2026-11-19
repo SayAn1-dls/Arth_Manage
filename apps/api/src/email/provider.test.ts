@@ -44,6 +44,34 @@ describe('SmtpEmailProvider', () => {
       'ECONNREFUSED',
     );
   });
+
+  it('remembers the last failure as a code and server reply, never the message text, and clears it on success', async () => {
+    let fail = true;
+    const provider = new SmtpEmailProvider(
+      'x',
+      {
+        sendMail: async () => {
+          if (!fail) return;
+          throw Object.assign(new Error('Invalid login for smtp://user:SECRET@host'), {
+            code: 'EAUTH',
+            responseCode: 535,
+            response: '535 5.7.8 Authentication failed',
+          });
+        },
+      },
+      logger,
+    );
+    expect(provider.lastFailure()).toBeUndefined();
+    await expect(
+      provider.send({ to: 'a@example.test', subject: 's', body: 'b' }),
+    ).rejects.toThrow();
+    const failure = provider.lastFailure();
+    expect(failure).toMatchObject({ code: 'EAUTH', detail: '535 5.7.8 Authentication failed' });
+    expect(JSON.stringify(failure)).not.toContain('SECRET');
+    fail = false;
+    await provider.send({ to: 'a@example.test', subject: 's', body: 'b' });
+    expect(provider.lastFailure()).toBeUndefined();
+  });
 });
 
 describe('production configuration guards', () => {
