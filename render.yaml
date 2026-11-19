@@ -25,8 +25,7 @@ services:
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
-      - key: APP_BASE_URL
-        value: https://arthmanage.onrender.com
+      # APP_BASE_URL is optional: without it the API uses Render's RENDER_EXTERNAL_URL (this service's own address).
       - key: API_PORT
         value: '10000'
       - key: EMAIL_PROVIDER
