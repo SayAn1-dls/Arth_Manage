@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { buildJudgingScenario, scoreEverything } from './scenario.js';
-import { signInUi } from './helpers.js';
+import { goToNav, signInUi } from './helpers.js';
 
 // Hackathon template (20/20/25/20/15 over 1-10): [10,10,10,10,10] = 100; [8,7,9,6,8] = 76.5
 const FULL = [10, 10, 10, 10, 10];
@@ -56,7 +56,7 @@ test('results: review, tie decision, approval, publication and what participants
   const p = await pCtx.newPage();
   await signInUi(p, lead.email, lead.password);
   await p.getByRole('link', { name: /Scenario Cup/ }).click();
-  await p.getByRole('link', { name: 'Results', exact: true }).click();
+  await goToNav(p, 'Results', true);
   await expect(p.getByText('Results will appear here once published')).toBeVisible();
 
   await admin.getByRole('button', { name: /Publish version 1/ }).click();

@@ -3,7 +3,7 @@ databases:
   - name: arthmanage-db
     plan: free
     region: singapore
-    postgresMajorVersion: "16"
+    postgresMajorVersion: '16'
     databaseName: arthmanage_db
     user: arthmanage_db_user
 
@@ -28,16 +28,21 @@ services:
       - key: APP_BASE_URL
         value: https://arthmanage.onrender.com
       - key: API_PORT
-        value: "10000"
+        value: '10000'
       - key: EMAIL_PROVIDER
         value: smtp
+      # Set these two in the Render dashboard; there is no mail server inside the service. Render's free plan blocks
+      # outbound ports 25/465/587, so use a provider with an alternative port, e.g. Resend:
+      # smtps://resend:<RESEND_API_KEY>@smtp.resend.com:2465 (see docs/DEPLOYMENT.md, section 11).
       - key: SMTP_URL
-        value: smtp://localhost:2525
+        sync: false
       - key: EMAIL_FROM
-        value: Arthakram <no-reply@arthmanage.onrender.com>
+        sync: false
       - key: STORAGE_DIR
         value: /opt/render/project/src/.data/uploads
+      # Requests pass Cloudflare, Render's load balancer and a local proxy. With fewer hops every visitor shares
+      # Render's internal address and one rate-limit bucket (10 sign-ups an hour for the whole site).
       - key: TRUST_PROXY_HOPS
-        value: "1"
+        value: '3'
       - key: NODE_VERSION
-        value: "26"
+        value: '26'

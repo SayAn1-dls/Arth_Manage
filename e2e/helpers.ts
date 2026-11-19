@@ -1,6 +1,21 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { APIRequestContext, Page } from '@playwright/test';
 
+/** Opens a sidebar destination, expanding collapsed groups first when the link is not currently shown. */
+export async function goToNav(page: Page, name: string, exact = false) {
+  const nav = page.getByRole('navigation', { name: 'Event' });
+  const link = nav.getByRole('link', { name, exact });
+  await nav.waitFor(); // the layout renders a spinner first
+  const menu = nav.getByRole('button', { name: /^Menu/ }); // folded menu on small screens
+  if ((await menu.isVisible()) && (await menu.getAttribute('aria-expanded')) === 'false')
+    await menu.click();
+  // Role queries skip hidden elements; the Menu button itself is handled above.
+  const collapsed = nav.getByRole('button', { expanded: false }).filter({ hasNotText: /^Menu/ });
+  while (!(await link.isVisible()) && (await collapsed.count()) > 0)
+    await collapsed.first().click();
+  await link.click();
+}
+
 export const DEV_PASSWORD = 'Password!2345';
 export const ACCOUNTS = {
   admin: 'admin@arthakram.test',

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --conditions=source --env-file=../../.env src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "start": "node --env-file=../../.env dist/server.js",
+    "start": "node --env-file-if-exists=../../.env dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "db:generate": "prisma generate",
