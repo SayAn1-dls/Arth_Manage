@@ -10,8 +10,29 @@ export interface EmailMessage {
   link?: string;
 }
 
+export interface EmailFailure {
+  at: string;
+  /** Transport error code, e.g. EAUTH (login rejected), ECONNECTION, ETIMEDOUT, EENVELOPE (address refused). */
+  code: string;
+  /** The mail server's own reply line, which never contains the credentials. */
+  detail?: string;
+}
+
 export interface EmailProvider {
   send(message: EmailMessage): Promise<void>;
+  /** The most recent delivery failure, so an operator can diagnose mail from the health check without log access. */
+  lastFailure?(): EmailFailure | undefined;
+}
+
+/** Reduce a transport error to its code and the server's reply; drops the message text, which can echo the URL. */
+export function describeEmailFailure(err: unknown, at = new Date()): EmailFailure {
+  const e = (err ?? {}) as { code?: unknown; responseCode?: unknown; response?: unknown };
+  const code = typeof e.code === 'string' && e.code ? e.code : 'UNKNOWN';
+  const reply = typeof e.response === 'string' ? e.response : undefined;
+  const detail =
+    reply?.slice(0, 200) ??
+    (typeof e.responseCode === 'number' ? String(e.responseCode) : undefined);
+  return { at: at.toISOString(), code, ...(detail ? { detail } : {}) };
 }
 
 /**
@@ -102,6 +123,8 @@ function buildHtmlEmail(message: EmailMessage): string {
  * Failures are thrown so callers see them; the message is sent as HTML with an embedded link (and plain text fallback).
  */
 export class SmtpEmailProvider implements EmailProvider {
+  private failure: EmailFailure | undefined;
+
   constructor(
     private readonly from: string,
     private readonly transport: MailTransport,
@@ -112,15 +135,25 @@ export class SmtpEmailProvider implements EmailProvider {
     return new SmtpEmailProvider(from, nodemailer.createTransport(url), logger);
   }
 
+  lastFailure(): EmailFailure | undefined {
+    return this.failure;
+  }
+
   async send(message: EmailMessage): Promise<void> {
-    await this.transport.sendMail({
-      from: this.from,
-      to: message.to,
-      subject: message.subject,
-      // Plain text fallback + HTML body with embedded link
-      text: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
-      html: buildHtmlEmail(message),
-    });
+    try {
+      await this.transport.sendMail({
+        from: this.from,
+        to: message.to,
+        subject: message.subject,
+        // Plain text fallback + HTML body with embedded link
+        text: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
+        html: buildHtmlEmail(message),
+      });
+    } catch (err) {
+      this.failure = describeEmailFailure(err);
+      throw err;
+    }
+    this.failure = undefined;
     this.logger.info({ subject: message.subject }, 'email sent');
   }
 }

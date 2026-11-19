@@ -39,3 +39,18 @@ describe('health reflects file storage too', () => {
     expect(res.body).toMatchObject({ database: 'up', storage: 'down' });
   });
 });
+
+describe('health reports the last email failure without failing', () => {
+  it('stays 200 and includes the failure category', async () => {
+    const kit = createTestKit();
+    const failure = {
+      at: '2026-11-19T00:00:00.000Z',
+      code: 'EENVELOPE',
+      detail: '550 sender not verified',
+    };
+    kit.deps.email.lastFailure = () => failure;
+    const res = await request(createApp(kit.deps)).get('/api/v1/health');
+    expect(res.status).toBe(200);
+    expect(res.body.emailLastFailure).toEqual(failure);
+  });
+});
