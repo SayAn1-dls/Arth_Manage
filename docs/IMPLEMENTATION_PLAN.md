@@ -244,6 +244,20 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 - [ ] Google Sheets/Drive verified against real Google (needs credentials; manual steps documented)
 - [ ] Real host, certificate, mail provider rehearsal (needs hosting decision)
 
+**Post-audit follow-up (28 Oct 2026)** — see `docs/PRODUCT_AUDIT_2026-10-28.md` and `docs/CHANGELOG.md`
+- [x] A1 certificate same-event constraints restored; migration test has a fixed must-exist list
+- [x] A3 shortlist notices sent once, to active teams only
+- [x] A4 API typecheck clean; repo-wide Prettier clean
+- [x] A5 `body-parser` advisory cleared (`npm audit` 0)
+- [x] A6 e2e environment documented in the README
+- [x] A9 public certificate endpoint rate limited
+- [x] A12 documentation aligned (README, DECISIONS D-54 to D-58, RELEASE_READINESS section 11, DEPLOYMENT, FEATURES_V2, JUDGE_WORKSPACE, TECHNICAL_ARCHITECTURE)
+- [ ] A2 decide on score normalisation (per-track panel mean, larger minimum sample, or removal) before it is used for prizes
+- [ ] A7 foreign keys on the PR #3 tables, after a data check
+- [ ] A8 backoff for the email and reminder worker
+- [ ] A11 optional `GITHUB_TOKEN` for project review and reading cards
+- [ ] Working agreement: one concern per PR from now on (A10); at most 3 files per commit on this branch
+
 ## 7. Reporting at the end of each session
 
 Features implemented · features tested · test results (actual output) · visual QA performed (which

@@ -28,27 +28,32 @@ const typeSchema = z.enum(CERT_TYPES);
 
 /** Certificate templates, generation, review, release, downloads, corrections (PRD Module I). */
 export function certificatesRouter(deps: Deps) {
-  const { db, storage } = deps;
+  const { db, storage, limit } = deps;
   const svc = createCertificateService(deps);
   const router = Router({ mergeParams: true });
   const me = Router();
-  me.get('/public/certificates/:code', async (req, res) => {
-    const cert = await db.certificate.findUnique({
-      where: { certificateCode: String(req.params.code) },
-    });
-    if (!cert || !['RELEASED', 'REVOKED'].includes(cert.status))
-      throw AppError.notFound('Certificate not found or not released');
-    const event = await db.event.findUnique({ where: { id: cert.eventId } });
-    res.json({
-      code: cert.certificateCode,
-      name: cert.nameSnapshot,
-      event: event?.name,
-      type: cert.type,
-      award: cert.awardText,
-      status: cert.status,
-      releasedAt: cert.releasedAt,
-    });
-  });
+  // Unauthenticated and returns the holder's name, so guessing codes is rate limited per address (audit A9).
+  me.get(
+    '/public/certificates/:code',
+    limit('public-certificate', 60, 60_000),
+    async (req, res) => {
+      const cert = await db.certificate.findUnique({
+        where: { certificateCode: String(req.params.code) },
+      });
+      if (!cert || !['RELEASED', 'REVOKED'].includes(cert.status))
+        throw AppError.notFound('Certificate not found or not released');
+      const event = await db.event.findUnique({ where: { id: cert.eventId } });
+      res.json({
+        code: cert.certificateCode,
+        name: cert.nameSnapshot,
+        event: event?.name,
+        type: cert.type,
+        award: cert.awardText,
+        status: cert.status,
+        releasedAt: cert.releasedAt,
+      });
+    },
+  );
 
   const dto = (c: Awaited<ReturnType<typeof db.certificate.findMany>>[number]) => ({
     id: c.id,

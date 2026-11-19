@@ -23,6 +23,31 @@ describe('migrations', () => {
     }
   });
 
+  /**
+   * Rules that must exist in every database, whatever the migration history says. The generic check below
+   * excuses anything a migration drops, which is how two certificate constraints went missing unnoticed
+   * (commit 0c89712). A rule may leave this list only through a deliberate edit in review.
+   */
+  it('has the integrity rules the product depends on', async () => {
+    const rows = await db.$queryRaw<{ n: string }[]>`
+      SELECT 'trigger:' || tgname AS n FROM pg_trigger WHERE NOT tgisinternal
+      UNION ALL SELECT 'constraint:' || conname FROM pg_constraint`;
+    const present = new Set(rows.map((r) => r.n));
+    const required = [
+      'trigger:audit_log_no_update_delete',
+      'trigger:evaluation_version_immutable',
+      'trigger:judge_assignment_role_check',
+      'trigger:result_snapshot_immutable',
+      'trigger:submission_file_immutable',
+      'trigger:submission_version_immutable',
+      'constraint:certificate_member_same_event',
+      'constraint:cert_exception_member_same_event',
+      'constraint:cert_exception_reason',
+      'constraint:feedback_form_question_limit',
+    ];
+    expect(required.filter((r) => !present.has(r))).toEqual([]);
+  });
+
   it('keeps every hand-written integrity rule (triggers, checks, partial and composite constraints) in the database', async () => {
     const all = migrations.map((m) => m.sql).join('\n');
     const dropped = new Set(
