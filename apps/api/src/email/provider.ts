@@ -10,8 +10,29 @@ export interface EmailMessage {
   link?: string;
 }
 
+export interface EmailFailure {
+  at: string;
+  /** Transport error code, e.g. EAUTH (login rejected), ECONNECTION, ETIMEDOUT, EENVELOPE (address refused). */
+  code: string;
+  /** The mail server's own reply line, which never contains the credentials. */
+  detail?: string;
+}
+
 export interface EmailProvider {
   send(message: EmailMessage): Promise<void>;
+  /** The most recent delivery failure, so an operator can diagnose mail from the health check without log access. */
+  lastFailure?(): EmailFailure | undefined;
+}
+
+/** Reduce a transport error to its code and the server's reply; drops the message text, which can echo the URL. */
+export function describeEmailFailure(err: unknown, at = new Date()): EmailFailure {
+  const e = (err ?? {}) as { code?: unknown; responseCode?: unknown; response?: unknown };
+  const code = typeof e.code === 'string' && e.code ? e.code : 'UNKNOWN';
+  const reply = typeof e.response === 'string' ? e.response : undefined;
+  const detail =
+    reply?.slice(0, 200) ??
+    (typeof e.responseCode === 'number' ? String(e.responseCode) : undefined);
+  return { at: at.toISOString(), code, ...(detail ? { detail } : {}) };
 }
 
 /**
@@ -102,6 +123,8 @@ function buildHtmlEmail(message: EmailMessage): string {
  * Failures are thrown so callers see them; the message is sent as HTML with an embedded link (and plain text fallback).
  */
 export class SmtpEmailProvider implements EmailProvider {
+  private failure: EmailFailure | undefined;
+
   constructor(
     private readonly from: string,
     private readonly transport: MailTransport,
@@ -112,15 +135,96 @@ export class SmtpEmailProvider implements EmailProvider {
     return new SmtpEmailProvider(from, nodemailer.createTransport(url), logger);
   }
 
+  lastFailure(): EmailFailure | undefined {
+    return this.failure;
+  }
+
   async send(message: EmailMessage): Promise<void> {
-    await this.transport.sendMail({
-      from: this.from,
-      to: message.to,
-      subject: message.subject,
-      // Plain text fallback + HTML body with embedded link
-      text: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
-      html: buildHtmlEmail(message),
-    });
+    try {
+      await this.transport.sendMail({
+        from: this.from,
+        to: message.to,
+        subject: message.subject,
+        // Plain text fallback + HTML body with embedded link
+        text: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
+        html: buildHtmlEmail(message),
+      });
+    } catch (err) {
+      this.failure = describeEmailFailure(err);
+      throw err;
+    }
+    this.failure = undefined;
+    this.logger.info({ subject: message.subject }, 'email sent');
+  }
+}
+
+/** Splits `Name <address>` (or a bare address) into Brevo's sender object. */
+export function parseSender(from: string): { name?: string; email: string } {
+  const m = /^\s*(.*?)\s*<\s*([^>]+?)\s*>\s*$/.exec(from);
+  if (!m) return { email: from.trim() };
+  const name = m[1]?.replace(/^"|"$/g, '').trim();
+  return name ? { name, email: m[2]! } : { email: m[2]! };
+}
+
+type FetchLike = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body: string },
+) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
+
+/**
+ * Sends through Brevo's transactional email API over HTTPS. Hosts that block SMTP ports cannot block it, it needs one
+ * secret instead of a URL with encoded credentials, and Brevo answers failures in plain words.
+ */
+export class BrevoApiEmailProvider implements EmailProvider {
+  private failure: EmailFailure | undefined;
+
+  constructor(
+    private readonly apiKey: string,
+    private readonly from: string,
+    private readonly logger: Logger,
+    private readonly fetchImpl: FetchLike = (url, init) => fetch(url, init),
+  ) {}
+
+  lastFailure(): EmailFailure | undefined {
+    return this.failure;
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    try {
+      const res = await this.fetchImpl('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': this.apiKey,
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: parseSender(this.from),
+          to: [{ email: message.to }],
+          subject: message.subject,
+          textContent: message.link ? `${message.body}\n\n${message.link}\n` : message.body,
+          htmlContent: buildHtmlEmail(message),
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let reply = text;
+        try {
+          const parsed = JSON.parse(text) as { code?: string; message?: string };
+          reply = [parsed.code, parsed.message].filter(Boolean).join(': ') || text;
+        } catch {
+          // not JSON; keep the raw text
+        }
+        throw Object.assign(new Error(`Brevo API answered ${res.status}`), {
+          code: `HTTP_${res.status}`,
+          response: reply,
+        });
+      }
+    } catch (err) {
+      this.failure = describeEmailFailure(err);
+      throw err;
+    }
+    this.failure = undefined;
     this.logger.info({ subject: message.subject }, 'email sent');
   }
 }

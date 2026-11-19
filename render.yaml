@@ -30,9 +30,11 @@ services:
         value: '10000'
       - key: EMAIL_PROVIDER
         value: smtp
-      # Set these two in the Render dashboard; there is no mail server inside the service. Render's free plan blocks
-      # outbound ports 25/465/587, so use a provider with an alternative port, e.g. Resend:
-      # smtps://resend:<RESEND_API_KEY>@smtp.resend.com:2465 (see docs/DEPLOYMENT.md, section 11).
+      # Set in the Render dashboard. Easiest: BREVO_API_KEY (Brevo > SMTP & API > API keys, starts with xkeysib-) plus
+      # EMAIL_FROM using a sender verified in Brevo. It uses HTTPS, so Render's SMTP port block does not apply, and it
+      # replaces SMTP_URL. SMTP_URL stays supported for other providers (see docs/DEPLOYMENT.md, section 11).
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_URL
         sync: false
       - key: EMAIL_FROM
