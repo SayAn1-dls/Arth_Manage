@@ -106,3 +106,22 @@ and tested before the event. It has not been built.
 `scripts/backup.sh` (database dump verified readable, uploads archive, checksums) and `scripts/restore-check.sh`
 (restore into a scratch database, compare row counts and triggers, drop it). Schedule the first daily and run the
 second after each backup rehearsal. Backups contain personal data: restrict access and delete on the same schedule as the data.
+
+## 11. The Render demo (`render.yaml`)
+
+`https://arthmanage.onrender.com` runs from the `render-deploy` branch on Render's free plan with the blueprint in
+`render.yaml`. It seeds the fake demo accounts from the README on every start, so treat it as a demo, not an event host.
+
+* **Email.** Set `SMTP_URL` and `EMAIL_FROM` in the Render dashboard. Without a reachable mail server, sign-up,
+  password reset and invitations answer 503 ("email unavailable"). Render's free plan blocks outbound ports 25, 465
+  and 587, so use a provider with another port, for example Resend: `smtps://resend:<RESEND_API_KEY>@smtp.resend.com:2465`.
+  With Resend's shared `onboarding@resend.dev` sender, mail reaches only the Resend account owner; verify a domain
+  in Resend to email anyone else.
+* **Proxy hops.** Requests pass Cloudflare, Render's load balancer and a local proxy, so `TRUST_PROXY_HOPS=3`.
+  With 1, every visitor appears as Render's internal address and the whole site shares one rate-limit bucket.
+* **Port and `.env`.** The API binds `PORT` when `API_PORT` is unset, and `npm run start` no longer fails when there is
+  no `.env` file on the host.
+* **Free-plan limits.** The disk is ephemeral (uploads and certificate PDFs vanish on restart or redeploy; see section 9),
+  the service sleeps when idle, and a free Render PostgreSQL database expires 30 days after creation.
+* **Vercel.** Vercel cannot run this app as it is (one long-running Express process with background workers and a
+  local disk), so its deployments of this repository fail. Disconnect those Vercel projects or ignore them.
