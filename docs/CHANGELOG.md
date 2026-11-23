@@ -4,6 +4,23 @@ Every commit on `v1_runthrough` after the product audit of 28 Oct 2026 adds a li
 commit. Newest first. Format: **date · type(scope) · what changed and why · evidence**. Earlier history is in
 `git log`; deviations from the PRD are in `DECISIONS.md`; verification status is in `RELEASE_READINESS.md`.
 
+## feature/arthakram-ux-overhaul (23 Nov 2026)
+
+Source: `UX_RESTRUCTURING_PLAN.md` (navigation audit PDF and the product and UI/UX audit, P0/P1 IDs).
+
+- 2026-11-23 · fix(ux) `f4bb40d` · Safe round shortlists (context endpoint, pre-ticked current shortlist, no empty or same-round save, consequence dialog), explicit normalisation with the D-54 caveat, publish dialog showing what participants will see (P0-04, P0-05, P0-06). · API and web tests
+- 2026-11-23 · fix(ux) `972e453` · Unsaved-work guard on guidebook, submission and evaluation; one official deadline with grace and extension lines; blocked submissions explained and read-only (P0-07, P0-02, P0-03). · guard unit tests
+- 2026-11-23 · fix(ux) `0e2f64f` · Stacked mobile tables, sectioned setup page with sticky save bar, clearer judge team list (P1-31, P1-27, P1-19). · checked at 375 px
+- 2026-11-23 · fix(access) `b44d6ec` · Invitations carry the access level; sponsor viewers never hold admin access (P0-10); additive migration `20261123180000_invitation_access_level`. · API tests
+- 2026-11-23 · fix(ux) `1d75e1e` · Return path through sign-up, verification and invitations (P0-01); declaration typing (P0-08). · API test
+- 2026-11-23 · feat(workspaces) `4cfc7bf` · Participant, judge, staff and sponsor dashboards; eligibility block on the submission view (P0-03 API); judge progress excludes non-submitting teams (P1-18); check-in issue link fixed (P1-28). · API tests
+- 2026-11-23 · feat(admin) `c1a6886` · Feedback & reviews with participant, judge and team-comment tabs; comment release asks first. · privacy assertion
+- 2026-11-23 · feat(admin) `2d52c28`, `2775eb8` · Communication: one composer, audience preview and confirmation, idempotent targeted sends, grouped history; participant Updates. · API tests
+- 2026-11-23 · feat(admin) `86efc9d` · Support & requests inbox with tabs, filters, full context and explicit Approve/Deny (P0-09). · API test
+- 2026-11-23 · feat(admin) `9043626` · Teams & participants with one search across both views. · API tests
+- 2026-11-23 · feat(admin) `4138dcc` · Seven-division navigation and the lifecycle-aware admin dashboard. · API tests
+- 2026-11-23 · docs(ux) `b84ed76` · Restructuring plan. · n/a
+
 ## Unreleased (audit follow-up, 28 Oct 2026)
 
 Source: the product audit of the merged PR #1 to #3 tree plus the collapsible sidebar, saved as

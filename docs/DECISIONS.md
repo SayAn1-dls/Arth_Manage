@@ -79,6 +79,17 @@ still governs V1; each of these goes beyond it, so each states what it costs and
 | D-57 | Extended organiser workflow: helpdesk, exception desk, application screening, round shortlists, targeted messages with a persistent email queue, engagement, teammate discovery, access labels (co-admin, staff lead, sponsor viewer), impact PDF, GitHub project review | Not in the PRD. Roles stay the four in D-07; access labels only narrow or reuse them and are enforced server-side. Shortlisting and application screening change who may submit and who is judged, so they are covered by tests. Notices use a key derived from the decision so repeating it does not re-send (audit A3). | *Adopted* |
 | D-58 | Migration integrity policy | Prisma does not model the composite same-event keys, so `prisma migrate dev` proposes to drop them (this happened in `20261023150259_first_migration`, audit A1). They were restored by `20261028100000_restore_certificate_event_constraints`. Rules: read every generated migration for `DROP CONSTRAINT`, `DROP TRIGGER` and `DROP INDEX` before committing; `migrations.test.ts` now holds a fixed must-exist list that a drop cannot excuse; removing a rule means editing that list in review. | *Adopted* |
 
+## Decisions added with the UX restructuring (23 Nov 2026)
+
+See `UX_RESTRUCTURING_PLAN.md` for the full plan and open decisions OD-1 to OD-7.
+
+| ID | Decision | Why and consequences | Status |
+|---|---|---|---|
+| D-59 | Core Admin navigation uses the seven divisions of the navigation audit; four pages are consolidated (Teams & participants, Support & requests, Communication, Feedback & reviews) and old paths redirect | Departs from the PRD §5.4 sitemap's labels, not its permissions; every endpoint keeps its own checks | *Adopted* |
+| D-60 | Event stage on the admin dashboard is derived from stored state (status, registration, judging, results), not the calendar alone | The calendar is only used to tell registration from the event itself | *Adopted* |
+| D-61 | `Invitation.accessLevel` (additive migration): access labels are granted at invitation time, by the event owner only | Closes the window in which a sponsor viewer held full admin access (audit P0-10); same owner-only rule as Access & matching | *Adopted* |
+| D-62 | Targeted sends accept a per-message request id for idempotency; a dry-run endpoint counts recipients | No change to who receives messages or how they are delivered | *Adopted* |
+
 ## PRD open questions — defaults in force
 
 OQ-02 any verified user may create events; creator becomes Core Admin (no allowlist, see D-06) ·

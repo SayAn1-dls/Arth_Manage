@@ -269,3 +269,68 @@ No other schema changes are needed.
 | OD-5 | Normalisation (D-54) | Kept, behind a consequence dialog with the D-54 caveat and a visible "Scoring method" line on Results | Removing it is a product decision |
 | OD-6 | "Other special request" exception category | Not offered | Not in the data model; adding it would change the exception workflow |
 | OD-7 | Recent activity on the dashboard | Not shown | The audit log is the record; a feed would mostly repeat "Needs attention" |
+
+---
+
+## 12. Implementation status (end of this branch)
+
+### P0 findings: all addressed
+
+| ID | Status | Where |
+|---|---|---|
+| P0-01 Return path through sign-up and invitations | Fixed | `1d75e1e` |
+| P0-02 One official deadline | Fixed (dashboard, submission page, submission list, public page) | `4cfc7bf`, `972e453` |
+| P0-03 Eligibility explained before typing | Fixed (API reports `blockedReason`; page read-only) | `4cfc7bf`, `972e453` |
+| P0-04 Safe round shortlists | Fixed | `f4bb40d` |
+| P0-05 Explicit normalisation with the D-54 caveat | Fixed (restriction kept, not removed) | `f4bb40d` |
+| P0-06 Publish preview and confirmation | Fixed | `f4bb40d` |
+| P0-07 No lost work on navigation | Fixed (guidebook, submission, evaluation) | `972e453` |
+| P0-08 Declaration typing | Fixed | `1d75e1e` |
+| P0-09 Exception decisions with full context | Fixed | `86efc9d` |
+| P0-10 Sponsor and access-label invitations | Fixed (additive migration) | `b44d6ec` |
+
+### P1 findings
+
+**Addressed:**
+- P1-08 comment release dialog
+- P1-11 application status in words
+- P1-12 composer confirmation and no duplicate sends
+- P1-13 lifecycle dashboard
+- P1-14 seven divisions in work order
+- P1-15 one Communication page and one Updates inbox
+- P1-16 one support inbox
+- P1-18 judge progress
+- P1-19 judge list badges
+- P1-20 judging deadline warning
+- P1-23 late submissions
+- P1-27 sectioned setup page
+- P1-28 check-in issue link
+- P1-29 invitation recovery
+- P1-30 public page way in
+- P1-31 stacked mobile tables and bottom bar
+
+**Partly addressed:**
+- P1-02: only Rank again and Clear tie are confirmed.
+- P1-03: Discard changes and announcement delete ask first; other deletes do not yet.
+- P1-24: "team number" wording on the dashboard.
+
+**Scheduled, not done here, with the reason:**
+
+| ID | Reason |
+|---|---|
+| P1-01 | Confirmations for publish, unpublish, conclude and archive: the Setup page was restructured first; the dialogs are a contained follow-up |
+| P1-04 | Confirmations for people and team member changes |
+| P1-05 | Needs a new "withdraw approval" API, which changes result lifecycle semantics. Product decision first |
+| P1-06 | Flagging certificates when results change. Touches certificate validity rules; needs a product decision |
+| P1-07 | Rubric activation with unsaved edits |
+| P1-09 | Certificate release counts |
+| P1-10 | Application review table |
+| P1-17 | Practice workspace naming. The audit's label is kept for now |
+| P1-21 | Evaluation layout below 1280 px |
+| P1-22 | Market context headings. Needs the team name in the reviews API |
+| P1-25 | Judges' comments under Results. Comments stay on the participant survey page; the nav label says so |
+| P1-26 | Problem-statement release time. A new feature with a schema change |
+
+### Verification
+
+API, web unit, e2e, lint, brand lint, typecheck and production build are run before the final commit. Visual QA was done in the browser at 1024 and 375 px for every admin division, the participant, judge and staff dashboards, Support & requests, Communication, Feedback & reviews and the stacked tables. The final report gives the exact figures.
