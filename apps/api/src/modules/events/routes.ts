@@ -67,7 +67,11 @@ export function eventsRouter(deps: Deps) {
         teamMax: event.teamMax,
         contactEmail: event.contactEmail,
       },
-      rounds: rounds.map((r) => ({ name: r.name, submissionDeadline: r.submissionDeadline })),
+      rounds: rounds.map((r) => ({
+        name: r.name,
+        submissionDeadline: r.submissionDeadline,
+        graceMinutes: r.graceMinutes,
+      })),
       tracks: tracks.map((t) => ({ name: t.name, description: t.description })),
     });
   });
