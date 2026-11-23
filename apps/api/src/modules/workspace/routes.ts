@@ -143,7 +143,7 @@ export function workspaceRouter({ db }: Deps) {
     const tickets = await db.supportTicket.findMany({
       where: { eventId: c.event.id, ...(manager ? {} : { authorId: c.membership.id }) },
       orderBy: { updatedAt: 'desc' },
-      take: 100,
+      take: 500,
       include: { messages: { orderBy: { createdAt: 'asc' } } },
     });
     // Name each author and their role in this event, so the screen never has to guess (it used to print
@@ -158,12 +158,91 @@ export function workspaceRouter({ db }: Deps) {
       const p = people.find((x) => x.id === id);
       return { authorName: p?.user.name ?? 'Former member', authorRole: p?.role ?? null };
     };
+    // Context for the Support & requests inbox: team, round, assignee, what an approval would change,
+    // who decided and the activity trail. Participants only see their own tickets, so this adds nothing
+    // they could not already see about themselves; the decision maker is named only to managers.
+    const teamIds = [...new Set(tickets.flatMap((t) => (t.teamId ? [t.teamId] : [])))];
+    const roundIds = [...new Set(tickets.flatMap((t) => (t.roundId ? [t.roundId] : [])))];
+    const [teams, rounds, subs, staffList, trail] = await Promise.all([
+      db.team.findMany({
+        where: { eventId: c.event.id, id: { in: teamIds } },
+        select: { id: true, teamCode: true, name: true },
+      }),
+      db.round.findMany({
+        where: { eventId: c.event.id, id: { in: roundIds } },
+        select: { id: true, name: true, submissionDeadline: true, graceMinutes: true },
+      }),
+      db.submission.findMany({
+        where: { eventId: c.event.id, roundId: { in: roundIds }, teamId: { in: teamIds } },
+        select: { roundId: true, teamId: true, extensionDeadline: true },
+      }),
+      manager
+        ? db.eventMembership.findMany({
+            where: { eventId: c.event.id, status: 'ACTIVE', role: { in: ['ADMIN', 'STAFF'] } },
+            select: { id: true, role: true, user: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+      manager
+        ? db.auditLog.findMany({
+            where: {
+              eventId: c.event.id,
+              entityId: { in: tickets.map((t) => t.id) },
+              entityType: { in: ['Workspace', 'SupportTicket'] },
+            },
+            orderBy: { at: 'asc' },
+            select: { entityId: true, action: true, at: true, actorId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const actors = manager
+      ? await db.user.findMany({
+          where: { id: { in: [...new Set(trail.flatMap((a) => (a.actorId ? [a.actorId] : [])))] } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const actorName = (id: string | null) => actors.find((a) => a.id === id)?.name ?? 'System';
+    const now = Date.now();
     res.json({
-      tickets: tickets.map((t) => ({
-        ...t,
-        ...who(t.authorId),
-        messages: t.messages.map((m) => ({ ...m, ...who(m.authorId) })),
-      })),
+      assignees: staffList.map((m) => ({ id: m.id, name: m.user.name, role: m.role })),
+      tickets: tickets.map((t) => {
+        const team = teams.find((x) => x.id === t.teamId);
+        const round = rounds.find((x) => x.id === t.roundId);
+        const sub = subs.find((x) => x.roundId === t.roundId && x.teamId === t.teamId);
+        // Same arithmetic as the decision endpoint, so the organiser sees the real outcome before deciding.
+        const currentCutoff =
+          sub?.extensionDeadline ??
+          (round?.submissionDeadline
+            ? new Date(+round.submissionDeadline + round.graceMinutes * 60000)
+            : null);
+        const proposedCutoff =
+          ['EXTENSION', 'UNLOCK'].includes(t.kind) && round
+            ? new Date(Math.max(now, +(currentCutoff ?? new Date(now))) + t.minutes * 60000)
+            : null;
+        const activity = trail.filter((a) => a.entityId === t.id);
+        const decided = activity.findLast((a) => a.action === 'exception.decided');
+        return {
+          ...t,
+          ...who(t.authorId),
+          teamCode: team?.teamCode ?? null,
+          teamName: team?.name ?? null,
+          roundName: round?.name ?? null,
+          currentCutoff,
+          proposedCutoff,
+          assigneeName: staffList.find((m) => m.id === t.assignedToId)?.user.name ?? null,
+          ...(manager
+            ? {
+                decidedBy: decided ? actorName(decided.actorId) : null,
+                decidedAt: decided?.at ?? null,
+                activity: activity.map((a) => ({
+                  action: a.action,
+                  at: a.at,
+                  actor: actorName(a.actorId),
+                })),
+              }
+            : {}),
+          messages: t.messages.map((m) => ({ ...m, ...who(m.authorId) })),
+        };
+      }),
     });
   });
   router.post('/workspace/tickets', async (req, res) => {

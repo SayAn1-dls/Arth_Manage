@@ -9,6 +9,9 @@ const ProjectReviewPage = lazy(() =>
 const SandboxPage = lazy(() =>
   import('./features/workspace/SandboxPage.js').then((m) => ({ default: m.SandboxPage })),
 );
+const SupportPage = lazy(() =>
+  import('./features/workspace/SupportPage.js').then((m) => ({ default: m.SupportPage })),
+);
 const VerifyCertificatePage = lazy(() =>
   import('./features/workspace/VerifyCertificatePage.js').then((m) => ({
     default: m.VerifyCertificatePage,
@@ -18,6 +21,7 @@ const WorkspacePage = lazy(() =>
   import('./features/workspace/WorkspacePage.js').then((m) => ({ default: m.WorkspacePage })),
 );
 import { HomePage } from './pages/HomePage.js';
+import { Spinner } from './ui/index.js';
 import { DesignGalleryPage } from './pages/DesignGalleryPage.js';
 import { AppShell } from './shell/AppShell.js';
 import { EventLayout } from './shell/EventLayout.js';
@@ -132,8 +136,6 @@ const routes: RouteObject[] = [
               },
               ...[
                 'messages',
-                'helpdesk',
-                'exceptions',
                 'applications',
                 'advancement',
                 'calibration',
@@ -150,6 +152,14 @@ const routes: RouteObject[] = [
                   </Suspense>
                 ),
               })),
+              {
+                path: 'support',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading requests" />}>
+                    <SupportPage />
+                  </Suspense>
+                ),
+              },
               { path: 'setup', element: <SetupPage /> },
               { path: 'rounds', element: <RoundsPage /> },
               { path: 'structure', element: <StructurePage /> },

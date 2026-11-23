@@ -357,7 +357,7 @@ export function JudgeLinks({ eventId }: { eventId: string }) {
   return (
     <div className="flex flex-wrap gap-4 text-sm">
       <Link to={`/events/${eventId}/briefing`}>Pinned judge briefing</Link>
-      <Link to={`/events/${eventId}/helpdesk`}>Ask Admin</Link>
+      <Link to={`/events/${eventId}/support`}>Ask the organisers</Link>
       <Link to={`/events/${eventId}/practice`}>Practice team</Link>
       <a href={`/api/v1/events/${eventId}/judge/export.pdf`}>Export my evaluations (PDF)</a>
     </div>

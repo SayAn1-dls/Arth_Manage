@@ -335,3 +335,51 @@ describe('expanded workspace', () => {
     expect(() => githubRepo('https://localhost/private')).toThrow();
   });
 });
+
+describe('Support & requests inbox', () => {
+  it('shows organisers the real outcome of an extension before deciding, then who decided', async () => {
+    const w = await openEvent(kit);
+    const t = await teamOfTwo(w, 'Alpha');
+    const created = await t.lead.agent.post(`${w.base}/workspace/tickets`).send({
+      subject: 'Laptop died',
+      body: 'We need a little more time',
+      kind: 'EXTENSION',
+      roundId: w.roundId,
+      minutes: 30,
+    });
+    expect(created.status).toBe(201);
+    const before = (await w.admin.get(`${w.base}/workspace/tickets`)).body;
+    const ticket = before.tickets[0];
+    expect(ticket).toMatchObject({
+      teamName: 'Alpha',
+      roundId: w.roundId,
+      assigneeName: null,
+      decidedBy: null,
+    });
+    expect(before.assignees.map((a: { role: string }) => a.role)).toContain('ADMIN');
+    const proposed = new Date(ticket.proposedCutoff).getTime();
+    const decided = await w.admin
+      .post(`${w.base}/workspace/tickets/${ticket.id}/decision`)
+      .send({ approve: true, note: 'Approved for 30 minutes' });
+    expect(decided.status).toBe(200);
+    const sub = await kit.db.submission.findFirstOrThrow({
+      where: { roundId: w.roundId, teamId: t.teamId },
+    });
+    // the preview and the decision use the same arithmetic (allowing for the seconds between the two calls)
+    expect(Math.abs(sub.extensionDeadline!.getTime() - proposed)).toBeLessThan(60_000);
+    const after = (await w.admin.get(`${w.base}/workspace/tickets`)).body.tickets[0];
+    expect(after.status).toBe('APPROVED');
+    expect(after.decidedBy).toBe('Owner');
+    expect(after.activity.map((a: { action: string }) => a.action)).toEqual([
+      'helpdesk.created',
+      'exception.decided',
+    ]);
+    // the participant sees their own request and decision, but not the organisers' audit trail
+    const own = (await t.lead.agent.get(`${w.base}/workspace/tickets`)).body;
+    expect(own.tickets).toHaveLength(1);
+    expect(own.tickets[0].activity).toBeUndefined();
+    expect(own.tickets[0].decidedBy).toBeUndefined();
+    expect(own.assignees).toEqual([]);
+    expect((await t.mate.agent.get(`${w.base}/workspace/tickets`)).body.tickets).toHaveLength(0);
+  });
+});

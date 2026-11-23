@@ -99,8 +99,7 @@ function adminNav(): NavGroup[] {
       'operations',
       'Event operations',
       [
-        item('helpdesk', 'Helpdesk', 'Participant support'),
-        item('exceptions', 'Exception requests', 'Participant support'),
+        item('support', 'Support & requests', 'Participant support'),
         item('announcements', 'Announcements', 'Communication'),
         item('communications', 'Targeted messages', 'Communication'),
         item('checkin', 'Check-in', 'Event-day management'),
@@ -174,11 +173,7 @@ export function navFor(role: Role): NavGroup[] {
         group(
           'help',
           'Help',
-          [
-            item('helpdesk', 'Ask the organisers'),
-            item('exceptions', 'Request an exception'),
-            item('guidebook', 'Guidebook'),
-          ],
+          [item('support', 'Help & requests'), item('guidebook', 'Guidebook')],
           'Ask the organisers, request an exception or read the rules.',
         ),
         group(
@@ -214,7 +209,7 @@ export function navFor(role: Role): NavGroup[] {
           'Help & updates',
           [
             item('announcements', 'Announcements'),
-            item('helpdesk', 'Ask the organisers'),
+            item('support', 'Ask the organisers'),
             item('guidebook', 'Guidebook'),
             item('feedback', 'Judge survey'),
           ],
@@ -239,7 +234,7 @@ export function navFor(role: Role): NavGroup[] {
           'Help & updates',
           [
             item('announcements', 'Announcements'),
-            item('helpdesk', 'Helpdesk'),
+            item('support', 'Helpdesk'),
             item('guidebook', 'Guidebook'),
           ],
           'Announcements, the helpdesk and the guidebook.',
@@ -253,7 +248,7 @@ export function navFor(role: Role): NavGroup[] {
  * the two can never disagree. The last slot is always the full menu.
  */
 const BOTTOM_BAR: Record<Role, string[]> = {
-  ADMIN: ['', 'helpdesk', 'teams', 'judging'],
+  ADMIN: ['', 'support', 'teams', 'judging'],
   PARTICIPANT: ['', 'team', 'submission', 'announcements'],
   JUDGE: ['', 'judge', 'briefing', 'announcements'],
   STAFF: ['', 'checkin', 'tasks', 'issues'],
@@ -274,5 +269,13 @@ export function bottomBarFor(role: Role, groups: NavGroup[]): NavEntry[] {
 export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {
   ADMIN: {
     participants: 'teams?view=participants',
+    helpdesk: 'support?tab=general',
+    exceptions: 'support?tab=exceptions',
   },
+  PARTICIPANT: {
+    helpdesk: 'support',
+    exceptions: 'support?type=exception',
+  },
+  JUDGE: { helpdesk: 'support' },
+  STAFF: { helpdesk: 'support' },
 };

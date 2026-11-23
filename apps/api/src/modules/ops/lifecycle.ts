@@ -176,21 +176,21 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
     key: 'exceptions',
     label: `${plural(pendingExceptions, 'exception request')} awaiting a decision`,
     count: pendingExceptions,
-    to: 'exceptions?status=open',
+    to: 'support?tab=exceptions',
     tone: 'warning',
   });
   add({
     key: 'questions',
     label: `${plural(openQuestions, 'question')} from participants or judges not resolved`,
     count: openQuestions,
-    to: 'helpdesk?status=open',
+    to: 'support?tab=general',
     tone: 'warning',
   });
   add({
     key: 'unassigned-requests',
     label: `${plural(unassignedRequests, 'open request')} with nobody assigned`,
     count: unassignedRequests,
-    to: 'helpdesk?assignee=none',
+    to: 'support?assignee=none',
     tone: 'info',
   });
   add({

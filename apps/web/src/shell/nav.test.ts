@@ -16,8 +16,7 @@ const ROUTES = {
     'submissions',
     'people',
     'applications',
-    'helpdesk',
-    'exceptions',
+    'support',
     'communications',
     'engagement',
     'advancement',
@@ -49,8 +48,7 @@ const ROUTES = {
     'messages',
     'applications',
     'integrity',
-    'helpdesk',
-    'exceptions',
+    'support',
     'discovery',
     'submission',
     'results',
@@ -67,18 +65,21 @@ const ROUTES = {
     'judge',
     'briefing',
     'practice',
-    'helpdesk',
+    'support',
     'integrity',
     'feedback',
     'guidebook',
     'announcements',
   ],
-  STAFF: ['', 'tasks', 'checkin', 'issues', 'helpdesk', 'guidebook', 'announcements'],
+  STAFF: ['', 'tasks', 'checkin', 'issues', 'support', 'guidebook', 'announcements'],
 } as const;
 
 /** Destinations merged into a consolidated page; each must redirect so old links never dead-end. */
 const MERGED: Partial<Record<keyof typeof ROUTES, string[]>> = {
-  ADMIN: ['participants'],
+  ADMIN: ['participants', 'helpdesk', 'exceptions'],
+  PARTICIPANT: ['helpdesk', 'exceptions'],
+  JUDGE: ['helpdesk'],
+  STAFF: ['helpdesk'],
 };
 
 describe('role navigation', () => {

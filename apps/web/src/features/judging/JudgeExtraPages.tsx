@@ -91,7 +91,7 @@ export function JudgeBriefingPage() {
           <SimplePanel>
             <h3>Who to contact</h3>
             <p className="whitespace-pre-wrap">{briefing.contact}</p>
-            <Link to={`/events/${mine.eventId}/helpdesk`}>Ask Admin</Link>
+            <Link to={`/events/${mine.eventId}/support`}>Ask the organisers</Link>
           </SimplePanel>
         </>
       )}

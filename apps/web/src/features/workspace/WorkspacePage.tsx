@@ -1,9 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useParams } from 'react-router';
-import type { MyEvent, Role } from '@arthakram/shared';
+import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
-import { ROLE_LABEL } from '../../lib/format.js';
 import { Alert, Button, Spinner } from '../../ui/index.js';
 
 type Options = {
@@ -26,27 +25,6 @@ type Options = {
   }[];
   ownTeamId: string | null;
 };
-type Ticket = {
-  id: string;
-  subject: string;
-  kind: string;
-  status: string;
-  authorId: string;
-  authorName: string;
-  authorRole: Role | null;
-  assignedToId: string | null;
-  teamId: string | null;
-  decisionNote: string | null;
-  messages: {
-    id: string;
-    authorId: string;
-    authorName: string;
-    authorRole: Role | null;
-    body: string;
-    createdAt: string;
-  }[];
-};
-const roleName = (role: Role | null) => (role ? ROLE_LABEL[role] : 'Former member');
 const control = 'block w-full rounded-lg border border-line-strong bg-white px-3 py-2 text-ink';
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -71,7 +49,6 @@ export function WorkspacePage({ section }: { section: string }) {
   const { eventId = '' } = useParams();
   const me = useOutletContext<MyEvent>();
   const admin = me.role === 'ADMIN';
-  const manager = admin || me.role === 'STAFF';
   const base = `/events/${eventId}/workspace`;
   const cache = useQueryClient();
   const [error, setError] = useState('');
@@ -99,12 +76,6 @@ export function WorkspacePage({ section }: { section: string }) {
       setBusy(false);
     }
   }
-  const tickets = useQuery({
-    queryKey: ['workspace', 'tickets', eventId],
-    queryFn: () => request<{ tickets: Ticket[] }>('GET', `${base}/tickets`),
-    enabled: section === 'helpdesk' || section === 'exceptions',
-    refetchInterval: 30000,
-  });
   const engagement = useQuery({
     queryKey: ['workspace', 'engagement', eventId],
     queryFn: () =>
@@ -201,8 +172,6 @@ export function WorkspacePage({ section }: { section: string }) {
   });
   const titles: Record<string, string> = {
     messages: 'Event messages',
-    helpdesk: 'Helpdesk',
-    exceptions: 'Exception requests',
     applications: 'Application review',
     advancement: 'Round shortlists',
     calibration: 'Judge calibration',
@@ -234,7 +203,6 @@ export function WorkspacePage({ section }: { section: string }) {
   if (options.isPending) return <Spinner label="Loading workspace" />;
   const queryError =
     options.error ||
-    tickets.error ||
     engagement.error ||
     calibration.error ||
     discovery.error ||
@@ -265,194 +233,6 @@ export function WorkspacePage({ section }: { section: string }) {
             </Panel>
           ))}
           {inbox.data?.messages.length === 0 && <p>No messages yet.</p>}
-        </>
-      )}
-      {(section === 'helpdesk' || section === 'exceptions') && (
-        <>
-          <Panel>
-            <h3 className="text-xl">
-              {section === 'helpdesk' ? 'Ask Admin' : 'Request an exception'}
-            </h3>
-            <form
-              className="space-y-4"
-              onSubmit={async (e) => {
-                const d = data(e);
-                await act('/tickets', {
-                  subject: str(d, 'subject'),
-                  body: str(d, 'body'),
-                  kind: section === 'helpdesk' ? 'QUESTION' : str(d, 'kind'),
-                  ...(section === 'exceptions'
-                    ? {
-                        roundId: str(d, 'roundId'),
-                        minutes: Number(d.get('minutes')),
-                        ...(str(d, 'replacementEmail')
-                          ? { replacementEmail: str(d, 'replacementEmail') }
-                          : {}),
-                        ...(str(d, 'departingEmail')
-                          ? { departingEmail: str(d, 'departingEmail') }
-                          : {}),
-                      }
-                    : {}),
-                });
-              }}
-            >
-              <Field label="Subject">
-                <input name="subject" className={control} maxLength={200} required />
-              </Field>
-              <Field label="Message">
-                <textarea name="body" className={control} maxLength={4000} required />
-              </Field>
-              {section === 'exceptions' && (
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Request type">
-                    <select name="kind" className={control}>
-                      <option value="EXTENSION">Deadline extension</option>
-                      <option value="UNLOCK">Unlock submission</option>
-                      <option value="TEAM_CHANGE">Teammate change</option>
-                    </select>
-                  </Field>
-                  <Field label="Round">
-                    <RoundSelect />
-                  </Field>
-                  <Field label="Departing participant email (teammate swaps)">
-                    <input type="email" name="departingEmail" className={control} />
-                  </Field>
-                  <Field label="Replacement participant email (teammate swaps)">
-                    <input type="email" name="replacementEmail" className={control} />
-                  </Field>
-                  <Field label="Minutes requested">
-                    <input
-                      type="number"
-                      name="minutes"
-                      defaultValue={10}
-                      min={1}
-                      max={1440}
-                      className={control}
-                    />
-                  </Field>
-                </div>
-              )}
-              <Button type="submit" loading={busy}>
-                Send request
-              </Button>
-            </form>
-          </Panel>
-          <div className="space-y-4">
-            {tickets.data?.tickets
-              .filter((t) =>
-                section === 'helpdesk' ? t.kind === 'QUESTION' : t.kind !== 'QUESTION',
-              )
-              .map((t) => (
-                <Panel key={t.id}>
-                  <div className="flex justify-between gap-3">
-                    <h3 className="text-xl">{t.subject}</h3>
-                    <span className="text-sm font-bold">{t.status.replaceAll('_', ' ')}</span>
-                  </div>
-                  <p className="text-sm text-graphite">
-                    {t.kind} ·{' '}
-                    {options.data?.teams.find((x) => x.id === t.teamId)?.teamCode ??
-                      `${roleName(t.authorRole)} request`}{' '}
-                    · {t.authorName}
-                  </p>
-                  {t.messages.map((m) => (
-                    <div className="rounded-lg bg-blush p-3" key={m.id}>
-                      <p className="text-xs font-bold">
-                        {m.authorName} · {roleName(m.authorRole)} ·{' '}
-                        {new Date(m.createdAt).toLocaleString()}
-                      </p>
-                      <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                  ))}
-                  {t.decisionNote && <p>Decision: {t.decisionNote}</p>}
-                  <form
-                    className="flex gap-2"
-                    onSubmit={async (e) => {
-                      const d = data(e);
-                      await act(`/tickets/${t.id}/reply`, { body: str(d, 'body') });
-                    }}
-                  >
-                    <input
-                      name="body"
-                      aria-label="Reply"
-                      placeholder="Write a reply"
-                      className={control}
-                      required
-                      maxLength={4000}
-                    />
-                    <Button type="submit" loading={busy}>
-                      Reply
-                    </Button>
-                  </form>
-                  {manager && (
-                    <div className="flex flex-wrap gap-3">
-                      <select
-                        aria-label="Assigned staff"
-                        className={control}
-                        value={t.assignedToId ?? ''}
-                        onChange={(e) =>
-                          void act(
-                            `/tickets/${t.id}`,
-                            { assignedToId: e.target.value || null },
-                            'PATCH',
-                          )
-                        }
-                      >
-                        <option value="">Unassigned</option>
-                        {options.data?.staff
-                          .filter((s) => s.role !== 'JUDGE')
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.user.name}
-                            </option>
-                          ))}
-                      </select>
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          void act(
-                            `/tickets/${t.id}`,
-                            { status: t.status === 'RESOLVED' ? 'OPEN' : 'RESOLVED' },
-                            'PATCH',
-                          )
-                        }
-                      >
-                        {t.status === 'RESOLVED' ? 'Reopen' : 'Resolve'}
-                      </Button>
-                    </div>
-                  )}
-                  {admin && t.kind !== 'QUESTION' && ['OPEN', 'IN_PROGRESS'].includes(t.status) && (
-                    <form
-                      className="space-y-3"
-                      onSubmit={async (e) => {
-                        const d = data(e);
-                        await act(`/tickets/${t.id}/decision`, {
-                          approve: str(d, 'decision') === 'approve',
-                          note: str(d, 'note'),
-                        });
-                      }}
-                    >
-                      <Field label="Decision note">
-                        <input name="note" className={control} required />
-                      </Field>
-                      <select name="decision" className={control}>
-                        <option value="approve">Approve requested exception</option>
-                        <option value="deny">Deny request</option>
-                      </select>
-                      <Button type="submit" loading={busy}>
-                        Record decision
-                      </Button>
-                      {t.kind === 'TEAM_CHANGE' && (
-                        <p className="text-sm">
-                          Approval replaces the departing participant with the registered
-                          replacement, preserving their team role.
-                        </p>
-                      )}
-                    </form>
-                  )}
-                </Panel>
-              ))}
-            {tickets.data?.tickets.length === 0 && <p>No requests yet.</p>}
-          </div>
         </>
       )}
       {section === 'applications' &&

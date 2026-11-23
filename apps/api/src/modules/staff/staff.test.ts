@@ -352,7 +352,7 @@ describe('event lifecycle on the dashboard (UX restructuring)', () => {
     expect(l.attention.find((a) => a.key === 'questions')).toMatchObject({ count: 1 });
     expect(l.attention.find((a) => a.key === 'exceptions')).toMatchObject({
       count: 1,
-      to: 'exceptions?status=open',
+      to: 'support?tab=exceptions',
     });
     expect(l.attention.find((a) => a.key === 'unassigned-requests')).toMatchObject({ count: 2 });
   });
