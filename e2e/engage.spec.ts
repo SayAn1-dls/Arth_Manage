@@ -73,7 +73,10 @@ test('feedback and certificates: collect feedback, release judge comments, gener
   // Judge comments stay private until released, then appear anonymised
   await lead.goto(`/events/${s.eventId}/feedback`);
   await expect(lead.getByText('Sharp problem framing')).toHaveCount(0);
-  await admin.getByRole('button', { name: 'Release comments' }).click();
+  // Feedback & reviews: judges' comments have their own tab, and releasing them asks first
+  await admin.goto(`/events/${s.eventId}/feedback?tab=comments`);
+  await admin.getByRole('button', { name: 'Release comments…' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Release to teams' }).click();
   await expect(admin.getByText('Released to teams')).toBeVisible();
   await lead.reload();
   await expect(lead.getByText('Sharp problem framing, thin demo.')).toBeVisible();

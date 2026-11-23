@@ -59,7 +59,11 @@ test('results: review, tie decision, approval, publication and what participants
   await goToNav(p, 'Results', true);
   await expect(p.getByText('Results will appear here once published')).toBeVisible();
 
+  // Publishing shows what participants will see and asks first
   await admin.getByRole('button', { name: /Publish version 1/ }).click();
+  const publish = admin.getByRole('dialog');
+  await expect(publish.getByText(/Participants see this immediately/)).toBeVisible();
+  await publish.getByRole('button', { name: 'Publish version 1 to participants' }).click();
   await expect(admin.getByText(/Version 1 is now visible to participants/)).toBeVisible();
   await p.reload();
   await expect(p.getByRole('heading', { name: 'Round 1' })).toBeVisible();
