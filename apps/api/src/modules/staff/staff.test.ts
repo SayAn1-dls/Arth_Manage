@@ -3,6 +3,7 @@ import { createTestKit, createUser, resetDb, signedInAgent } from '../../test/he
 import {
   addJudge,
   closeSubmissions,
+  eventBody,
   judgedRound,
   openEvent,
   submitProject,
@@ -308,6 +309,81 @@ describe('operational dashboard (FR-043)', () => {
     });
     expect(await db.evaluation.count({ where: { status: 'SUBMITTED' } })).toBe(3);
     void closeSubmissions;
+  });
+});
+
+describe('event lifecycle on the dashboard (UX restructuring)', () => {
+  type Life = {
+    stage: string;
+    nextSteps: { key: string; done: boolean }[];
+    attention: { key: string; count: number; to: string }[];
+  };
+  const life = async (w: {
+    admin: { get: (u: string) => Promise<{ body: unknown }> };
+    base: string;
+  }) => ((await w.admin.get(`${w.base}/dashboard`)).body as { lifecycle: Life }).lifecycle;
+
+  it('a draft event is in setup and lists what is missing before publishing', async () => {
+    const owner = await createUser(db, { name: 'Draft owner' });
+    const admin = await signedInAgent(app, owner.email);
+    const created = await admin.post('/api/v1/events').send(eventBody());
+    const l = await life({ admin, base: `/api/v1/events/${created.body.id}` });
+    expect(l.stage).toBe('setup');
+    expect(l.nextSteps.find((s) => s.key === 'publish')).toMatchObject({ done: false });
+    expect(l.nextSteps.find((s) => s.key === 'judges')).toMatchObject({ done: false });
+    expect(l.attention).toEqual([]);
+  });
+
+  it('registration counts real open requests and links each to its filtered list', async () => {
+    const w = await openEvent(kit);
+    const t = await teamOfTwo(w, 'Alpha');
+    expect((await life(w)).stage).toBe('registration');
+    await t.lead.agent
+      .post(`${w.base}/workspace/tickets`)
+      .send({ subject: 'Wifi?', body: 'Is there wifi?', kind: 'QUESTION' });
+    await t.lead.agent.post(`${w.base}/workspace/tickets`).send({
+      subject: 'More time',
+      body: 'Laptop died',
+      kind: 'EXTENSION',
+      roundId: w.roundId,
+      minutes: 15,
+    });
+    const l = await life(w);
+    expect(l.attention.find((a) => a.key === 'questions')).toMatchObject({ count: 1 });
+    expect(l.attention.find((a) => a.key === 'exceptions')).toMatchObject({
+      count: 1,
+      to: 'exceptions?status=open',
+    });
+    expect(l.attention.find((a) => a.key === 'unassigned-requests')).toMatchObject({ count: 2 });
+  });
+
+  it('judging shows evaluations still to submit; closed judging asks for approval, then publishing', async () => {
+    const s = await judgedRound(kit, {
+      teams: { Zeta: [[8, 7, 4]] },
+      judges: 2,
+      closeJudging: false,
+    });
+    let l = await life(s.w);
+    expect(l.stage).toBe('judging');
+    expect(l.attention.find((a) => a.key === `pending-${s.w.roundId}`)).toMatchObject({ count: 1 });
+    expect(l.nextSteps.find((x) => x.key === 'evaluations')).toMatchObject({ done: false });
+
+    await s.evaluate(1, 'Zeta', [6, 9, 3]);
+    await s.w.admin.put(`${s.w.base}/rounds/${s.w.roundId}/judging`).send({ status: 'CLOSED' });
+    l = await life(s.w);
+    expect(l.stage).toBe('results');
+    expect(l.attention.map((a) => a.key)).toContain(`approve-${s.w.roundId}`);
+
+    await s.w.admin.post(`${s.w.base}/rounds/${s.w.roundId}/results/approve`);
+    l = await life(s.w);
+    expect(l.attention.map((a) => a.key)).toContain(`publish-${s.w.roundId}`);
+
+    await s.w.admin.post(`${s.w.base}/rounds/${s.w.roundId}/results/publish`);
+    l = await life(s.w);
+    expect(l.stage).toBe('wrapup');
+    expect(l.nextSteps.map((x) => x.key)).toEqual(
+      expect.arrayContaining(['comments', 'certificates', 'conclude']),
+    );
   });
 });
 

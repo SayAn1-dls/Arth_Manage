@@ -591,7 +591,7 @@ function LifecycleCard({ event }: { event: EventDto }) {
 
   if (event.status === 'DRAFT' || event.status === 'ARCHIVED') return null;
   return (
-    <Card footerLabel="Closing the event">
+    <Card footerLabel="Closing the event" id="conclude">
       <h3>Conclude and archive</h3>
       {errors.formError && <Alert className="mt-3" tone="error" title={errors.formError} />}
       {event.status === 'PUBLISHED' && (

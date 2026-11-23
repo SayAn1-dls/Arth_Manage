@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useOutletContext } from 'react-router';
-import { CheckCircle2, Circle } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { eventApi, MODE_LABEL, TYPE_LABEL, useEvent } from '../../lib/events.js';
 import { formatDateTime, ROLE_LABEL } from '../../lib/format.js';
@@ -9,6 +8,18 @@ import { ParticipantPanel } from '../participant/DashboardPanel.js';
 import { DashboardCards } from '../ops/DashboardCards.js';
 import { StaffPanel } from '../staff/StaffPages.js';
 import { JudgeRoundsPanel } from '../judging/JudgePages.js';
+
+const EVENT_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft, not public yet',
+  PUBLISHED: 'Published',
+  CONCLUDED: 'Concluded',
+  ARCHIVED: 'Archived',
+};
+const REGISTRATION_LABEL: Record<string, string> = {
+  NOT_OPEN: 'not open yet',
+  OPEN: 'open',
+  CLOSED: 'closed',
+};
 
 /** Role-aware overview built from real persisted data: dates, deadlines, setup progress and announcements. */
 export function EventOverviewPage() {
@@ -22,35 +33,29 @@ export function EventOverviewPage() {
     queryKey: ['announcements', mine.eventId],
     queryFn: () => eventApi.announcements(mine.eventId),
   });
-  const guidebook = useQuery({
-    queryKey: ['guidebook', mine.eventId],
-    queryFn: () => eventApi.guidebook(mine.eventId),
-  });
-  const checks = useQuery({
-    queryKey: ['publish-checks', mine.eventId],
-    queryFn: () => eventApi.checks(mine.eventId),
-    enabled: mine.role === 'ADMIN' && mine.status === 'DRAFT',
-  });
 
   if (event.isPending) return <Spinner label="Loading overview" />;
   const e = event.data;
   if (!e) return <Alert tone="error" title="We couldn't load this event" />;
   const base = `/events/${mine.eventId}`;
 
-  const steps = [
-    {
-      done: Boolean(rounds.data?.some((r) => r.submissionDeadline)),
-      label: 'Set a submission deadline',
-      to: `${base}/rounds`,
-    },
-    {
-      done: Boolean(guidebook.data?.published),
-      label: 'Publish the guidebook',
-      to: `${base}/guidebook`,
-    },
-    { done: e.status !== 'DRAFT', label: 'Publish the event', to: `${base}/setup` },
-    { done: e.registrationStatus === 'OPEN', label: 'Open registration', to: `${base}/setup` },
-  ];
+  // Core Admins land on the event dashboard: stage, needs attention, next steps and the seven divisions.
+  if (mine.role === 'ADMIN')
+    return (
+      <DashboardCards
+        mine={mine}
+        identity={
+          <p className="text-ink">
+            <strong>{EVENT_STATUS_LABEL[e.status] ?? e.status}</strong>
+            {e.status === 'PUBLISHED' && (
+              <> · Registration {REGISTRATION_LABEL[e.registrationStatus] ?? ''}</>
+            )}{' '}
+            · {formatDateTime(e.startsAt, e.timeZone)} to {formatDateTime(e.endsAt, e.timeZone)}
+            {e.venue ? ` · ${e.venue}` : ''}
+          </p>
+        }
+      />
+    );
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,7 +96,6 @@ export function EventOverviewPage() {
         </Card>
       </div>
 
-      {mine.role === 'ADMIN' && e.status !== 'DRAFT' && <DashboardCards mine={mine} />}
       {mine.role === 'STAFF' && <StaffPanel mine={mine} />}
       {mine.role === 'PARTICIPANT' && <ParticipantPanel mine={mine} />}
       {mine.role === 'JUDGE' && (
@@ -99,29 +103,6 @@ export function EventOverviewPage() {
           <h3 id="judge-h">Your rounds</h3>
           <JudgeRoundsPanel mine={mine} />
         </section>
-      )}
-
-      {mine.role === 'ADMIN' && e.status === 'DRAFT' && (
-        <Card footerLabel="Getting ready">
-          <h3>Setup checklist</h3>
-          <ul className="mt-3 flex flex-col gap-2">
-            {steps.map((s) => (
-              <li key={s.label} className="flex items-center gap-2">
-                {s.done ? (
-                  <CheckCircle2 aria-label="Done" className="size-5 text-success-fg" />
-                ) : (
-                  <Circle aria-label="To do" className="size-5" />
-                )}
-                <Link to={s.to}>{s.label}</Link>
-              </li>
-            ))}
-          </ul>
-          {checks.data && checks.data.blocking.length > 0 && (
-            <p className="mt-3 text-sm">
-              Still needed to publish: {checks.data.blocking.join(', ')}.
-            </p>
-          )}
-        </Card>
       )}
 
       <section aria-labelledby="latest-h" className="flex flex-col gap-3">

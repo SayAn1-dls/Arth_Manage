@@ -155,6 +155,27 @@ export interface AuditRow {
 }
 
 type Card<T> = T | { error: string };
+
+/** Event stage, next steps and needs-attention items worked out by the API from stored state. */
+export interface DashboardLifecycle {
+  stage: 'setup' | 'registration' | 'event' | 'judging' | 'results' | 'wrapup';
+  stages: { key: DashboardLifecycle['stage']; label: string }[];
+  nextSteps: {
+    key: string;
+    label: string;
+    done: boolean;
+    to: string;
+    optional?: boolean;
+    hint?: string;
+  }[];
+  attention: {
+    key: string;
+    label: string;
+    count: number;
+    to: string;
+    tone: 'error' | 'warning' | 'info';
+  }[];
+}
 export interface Dashboard {
   generatedAt: string;
   participants: Card<{
@@ -185,6 +206,7 @@ export interface Dashboard {
   issues: Card<{ open: number; urgent: { id: string; category: string; description: string }[] }>;
   tasks: Card<{ blocked: number; open: number; unassigned: number }>;
   deadlines: Card<{ label: string; at: string }[]>;
+  lifecycle: Card<DashboardLifecycle>;
   integrations: Card<{
     configured: boolean;
     status: 'NOT_CONNECTED' | 'CONNECTED' | 'FAILING' | 'NEEDS_REAUTH';

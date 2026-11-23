@@ -301,7 +301,7 @@ export function RegistrationFieldsCard({ eventId }: { eventId: string }) {
   });
 
   return (
-    <Card footerLabel="Registration questions">
+    <Card footerLabel="Registration questions" id="registration-questions">
       <h3>Custom registration questions</h3>
       <p className="mt-1 text-sm">
         Name, email, phone, institution, course, year and the name on the certificate are always

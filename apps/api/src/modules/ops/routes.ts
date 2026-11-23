@@ -9,6 +9,7 @@ import { checkinSummary } from '../staff/routes.js';
 import { submissionStatus } from '../submissions/logic.js';
 import { hasDraftContent, roundTiming } from '../submissions/service.js';
 import { effectiveRegistration } from '../events/registrationState.js';
+import { eventLifecycle } from './lifecycle.js';
 
 /** Operational dashboard and audit history for Core Admins (PRD FR-043, FR-046). */
 export function opsRouter(deps: Deps) {
@@ -135,7 +136,9 @@ export function opsRouter(deps: Deps) {
             take: 10,
           });
           return {
-            open: open.length,
+            open: await db.issueReport.count({
+              where: { eventId: e.id, status: { not: 'RESOLVED' } },
+            }),
             urgent: open
               .filter((i) => i.severity === 'URGENT')
               .map((i) => ({
@@ -185,6 +188,7 @@ export function opsRouter(deps: Deps) {
       issues,
       tasks,
       deadlines,
+      lifecycle: await card(() => eventLifecycle(db, e, now)),
       integrations: await card(async () => {
         const c = await db.integrationConnection.findUnique({ where: { eventId: e.id } });
         const on = c && c.status !== 'DISCONNECTED';

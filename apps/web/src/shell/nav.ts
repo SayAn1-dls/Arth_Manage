@@ -4,126 +4,272 @@ import type { CollapsibleNavGroup, CollapsibleNavItem } from '../ui/CollapsibleN
 export type NavGroup = CollapsibleNavGroup;
 export type NavEntry = CollapsibleNavItem;
 
-const item = (to: string, label: string, end = false): NavEntry => ({ to, label, end });
-const group = (id: string, label: string, items: NavEntry[]): NavGroup => ({ id, label, items });
+const item = (to: string, label: string, section?: string, end = false): NavEntry => ({
+  to,
+  label,
+  end,
+  ...(section ? { section } : {}),
+});
+const group = (
+  id: string,
+  label: string,
+  items: NavEntry[],
+  description: string,
+  flat = false,
+): NavGroup => ({ id, label, items, description, ...(flat ? { flat: true } : {}) });
 
 /** Every destination across all groups, in menu order. */
 export const navItems = (groups: NavGroup[]): NavEntry[] => groups.flatMap((g) => g.items);
 
-/** The group holding the page at `section` (first path segment under /events/:eventId; '' is the overview). */
+/** First path segment of a destination, e.g. 'teams' for 'teams' and '' for the dashboard. */
+export const segmentOf = (to: string) => to.split(/[/?]/)[0] ?? '';
+
+/** The group holding the page at `section` (first path segment under /events/:eventId; '' is the dashboard). */
 export function activeGroupId(groups: NavGroup[], section: string): string | null {
-  return groups.find((g) => g.items.some((i) => i.to.split('/')[0] === section))?.id ?? null;
+  const target = resolveSection(groups, section);
+  return groups.find((g) => g.items.some((i) => segmentOf(i.to) === target))?.id ?? null;
+}
+
+/** A section with its own menu entry is itself; otherwise the entry it belongs to (see NAV_ALIASES). */
+function resolveSection(groups: NavGroup[], section: string): string {
+  if (navItems(groups).some((i) => segmentOf(i.to) === section)) return section;
+  return NAV_ALIASES[section] ?? section;
+}
+
+/** The menu entry for the page at `section`, following detail pages back to their list. */
+export function activeItem(groups: NavGroup[], section: string): NavEntry | undefined {
+  const target = resolveSection(groups, section);
+  return navItems(groups).find((i) => segmentOf(i.to) === target);
 }
 
 /**
- * Role-specific navigation (PRD §5.4). Entries are added as each feature ships, so the menu never links
- * to a screen that does not exist. Hiding an entry is presentation only; the API enforces permissions.
+ * Pages reached from a list rather than the menu, mapped to the menu entry they belong to, so the menu
+ * still shows where the user is (for example a participant record belongs to Teams & participants).
+ */
+const NAV_ALIASES: Record<string, string> = {
+  participants: 'teams',
+};
+
+/**
+ * Core Admin information architecture: seven divisions (ArthManage navigation audit, docs/UX_RESTRUCTURING_PLAN.md).
+ * Sections inside a division follow the event's real order of work. Hiding an entry is presentation only; the
+ * API enforces every permission independently.
+ */
+function adminNav(): NavGroup[] {
+  return [
+    group(
+      'dashboard',
+      'Dashboard',
+      [item('', 'Dashboard', undefined, true)],
+      'What is happening, what needs you and what to do next.',
+      true,
+    ),
+    group(
+      'setup',
+      'Setup',
+      [
+        item('setup', 'Event details & publishing', 'Event configuration'),
+        item('rounds', 'Rounds & deadlines', 'Event configuration'),
+        item('structure', 'Tracks & problems', 'Event configuration'),
+        item('guidebook', 'Guidebook', 'Event resources'),
+        item('integrations', 'Integrations', 'Event resources'),
+      ],
+      'Event details, rounds, tracks, guidebook and integrations.',
+    ),
+    group(
+      'registrations',
+      'Registrations & people',
+      [
+        item('teams', 'Teams', 'Registration management'),
+        item('participants', 'Participants', 'Registration management'),
+        item('applications', 'Application review', 'Registration management'),
+        item('people', 'People', 'Organising team'),
+      ],
+      'Teams, participants, applications and your organising team.',
+    ),
+    group(
+      'administration',
+      'Administration',
+      [
+        item('access', 'Access & matching', 'Access & permissions'),
+        item('audit', 'Audit history', 'Records'),
+      ],
+      'Access levels, judge matching and the audit trail.',
+    ),
+    group(
+      'operations',
+      'Event operations',
+      [
+        item('helpdesk', 'Helpdesk', 'Participant support'),
+        item('exceptions', 'Exception requests', 'Participant support'),
+        item('announcements', 'Announcements', 'Communication'),
+        item('communications', 'Targeted messages', 'Communication'),
+        item('checkin', 'Check-in', 'Event-day management'),
+        item('tasks', 'Staff tasks', 'Event-day management'),
+        item('issues', 'Issues', 'Event-day management'),
+        item('engagement', 'Team engagement', 'Engagement'),
+      ],
+      'Requests, messages, check-in, staff tasks and issues.',
+    ),
+    group(
+      'evaluation',
+      'Submissions & evaluation',
+      [
+        item('rubric', 'Rubric', 'Judge configuration'),
+        item('briefing', 'Judge briefing & glossary', 'Judge configuration'),
+        item('submissions', 'Submissions', 'Work management'),
+        item('judging', 'Judging', 'Evaluation & integrity'),
+        item('calibration', 'Judge calibration', 'Evaluation & integrity'),
+        item('integrity', 'Project review', 'Evaluation & integrity'),
+        item('advancement', 'Round shortlists', 'Work management'),
+        item('sandbox', 'Practice workspace', 'Testing'),
+      ],
+      'Rubrics, submissions, judging, calibration and shortlists.',
+    ),
+    group(
+      'results',
+      'Results & insights',
+      [
+        item('results', 'Results', 'Results'),
+        item('feedback', 'Feedback', 'Post-event'),
+        item('certificates', 'Certificates', 'Post-event'),
+        item('report', 'Impact report', 'Post-event'),
+      ],
+      'Results, feedback, judges’ comments, certificates and the impact report.',
+    ),
+  ];
+}
+
+/**
+ * Role-specific navigation (PRD §5.4). Every role lands on its own dashboard ('' route); other destinations are
+ * grouped by the job the person is doing. Hiding an entry is presentation only; the API enforces permissions.
  */
 export function navFor(role: Role): NavGroup[] {
   switch (role) {
     case 'ADMIN':
-      return [
-        group('run', 'Run the event', [
-          item('', 'Overview', true),
-          item('participants', 'Participants'),
-          item('teams', 'Teams'),
-          item('submissions', 'Submissions'),
-          item('people', 'People'),
-          item('applications', 'Application review'),
-          item('helpdesk', 'Helpdesk'),
-          item('exceptions', 'Exception requests'),
-          item('communications', 'Targeted messages'),
-          item('engagement', 'Team engagement'),
-        ]),
-        group('judging', 'Judging and results', [
-          item('advancement', 'Round shortlists'),
-          item('calibration', 'Judge calibration'),
-          item('integrity', 'Project review'),
-          item('briefing', 'Judge briefing & glossary'),
-          item('rubric', 'Rubric'),
-          item('judging', 'Judging'),
-          item('results', 'Results'),
-        ]),
-        group('event-day', 'Event day', [
-          item('tasks', 'Staff tasks'),
-          item('checkin', 'Check-in'),
-          item('issues', 'Issues'),
-        ]),
-        group('setup', 'Set up', [
-          item('sandbox', 'Practice workspace'),
-          item('access', 'Access and matching'),
-          item('setup', 'Setup'),
-          item('rounds', 'Rounds and deadlines'),
-          item('structure', 'Tracks and problems'),
-          item('guidebook', 'Guidebook'),
-          item('announcements', 'Announcements'),
-          item('integrations', 'Integrations'),
-        ]),
-        group('after', 'After the event', [
-          item('report', 'Impact report'),
-          item('feedback', 'Feedback'),
-          item('certificates', 'Certificates'),
-        ]),
-        group('records', 'Records', [item('audit', 'Audit history')]),
-      ];
+      return adminNav();
     case 'PARTICIPANT':
       return [
-        group('workspace', 'My workspace', [
-          item('', 'Overview', true),
-          item('team', 'My team'),
-          item('discovery', 'Find teammates'),
-          item('profile', 'My details'),
-        ]),
-        group('participation', 'Participation', [
-          item('applications', 'Application status'),
-          item('submission', 'Submission'),
-          item('integrity', 'Project feedback'),
-          item('exceptions', 'Request exception'),
-          item('results', 'Results'),
-          item('certificates', 'Certificates'),
-        ]),
-        group('resources', 'Information', [
-          item('rounds', 'Rounds and deadlines'),
-          item('structure', 'Tracks and problems'),
-          item('guidebook', 'Guidebook'),
-          item('announcements', 'Announcements'),
-        ]),
-        group('communication', 'Communication', [
-          item('messages', 'Event messages'),
-          item('helpdesk', 'Ask Admin'),
-          item('feedback', 'Feedback'),
-        ]),
+        group(
+          'workspace',
+          'My event',
+          [
+            item('', 'My event', undefined, true),
+            item('team', 'My team'),
+            item('submission', 'Submission'),
+            item('announcements', 'Announcements'),
+            item('messages', 'Event messages'),
+          ],
+          'Your next step, team, submission and updates.',
+        ),
+        group(
+          'outcomes',
+          'Results & certificates',
+          [
+            item('results', 'Results & judges’ feedback'),
+            item('certificates', 'Certificates'),
+            item('feedback', 'Event survey'),
+          ],
+          'Results, judges’ comments, certificates and the event survey.',
+        ),
+        group(
+          'help',
+          'Help',
+          [
+            item('helpdesk', 'Ask the organisers'),
+            item('exceptions', 'Request an exception'),
+            item('guidebook', 'Guidebook'),
+          ],
+          'Ask the organisers, request an exception or read the rules.',
+        ),
+        group(
+          'more',
+          'More',
+          [
+            item('rounds', 'Rounds & deadlines'),
+            item('structure', 'Tracks & problems'),
+            item('applications', 'Application status'),
+            item('discovery', 'Find teammates'),
+            item('integrity', 'Market context'),
+            item('profile', 'My details'),
+          ],
+          'Event details, your profile and other tools.',
+        ),
       ];
     case 'JUDGE':
       return [
-        group('judging', 'Judging', [
-          item('', 'Overview', true),
-          item('judge', 'My teams'),
-          item('practice', 'Practice team'),
-          item('integrity', 'Market context'),
-        ]),
-        group('resources', 'Resources', [
-          item('briefing', 'Pinned briefing'),
-          item('guidebook', 'Guidebook'),
-          item('announcements', 'Announcements'),
-        ]),
-        group('communication', 'Communication', [
-          item('helpdesk', 'Ask Admin'),
-          item('feedback', 'Feedback'),
-        ]),
+        group(
+          'judging',
+          'Judging',
+          [
+            item('', 'Judge dashboard', undefined, true),
+            item('judge', 'My teams'),
+            item('briefing', 'Judge briefing'),
+            item('practice', 'Practice team'),
+            item('integrity', 'Market context'),
+          ],
+          'Your assigned teams, briefing and practice.',
+        ),
+        group(
+          'help',
+          'Help & updates',
+          [
+            item('announcements', 'Announcements'),
+            item('helpdesk', 'Ask the organisers'),
+            item('guidebook', 'Guidebook'),
+            item('feedback', 'Judge survey'),
+          ],
+          'Announcements, questions to organisers and the guidebook.',
+        ),
       ];
     case 'STAFF':
       return [
-        group('tasks', 'My tasks', [item('', 'Overview', true), item('tasks', 'My tasks')]),
-        group('operations', 'Event operations', [
-          item('checkin', 'Check-in'),
-          item('issues', 'Report an issue'),
-        ]),
-        group('info', 'Help and information', [
-          item('helpdesk', 'Helpdesk'),
-          item('guidebook', 'Guidebook'),
-          item('announcements', 'Announcements'),
-        ]),
+        group(
+          'operations',
+          'Event day',
+          [
+            item('', 'Staff dashboard', undefined, true),
+            item('checkin', 'Check-in'),
+            item('tasks', 'My tasks'),
+            item('issues', 'Report an issue'),
+          ],
+          'Check-in, your tasks and issue reports.',
+        ),
+        group(
+          'help',
+          'Help & updates',
+          [
+            item('announcements', 'Announcements'),
+            item('helpdesk', 'Helpdesk'),
+            item('guidebook', 'Guidebook'),
+          ],
+          'Announcements, the helpdesk and the guidebook.',
+        ),
       ];
   }
 }
+
+/**
+ * Up to five destinations for the small-screen bottom bar, taken from the same definitions as the sidebar so
+ * the two can never disagree. The last slot is always the full menu.
+ */
+const BOTTOM_BAR: Record<Role, string[]> = {
+  ADMIN: ['', 'helpdesk', 'teams', 'judging'],
+  PARTICIPANT: ['', 'team', 'submission', 'announcements'],
+  JUDGE: ['', 'judge', 'briefing', 'announcements'],
+  STAFF: ['', 'checkin', 'tasks', 'issues'],
+};
+
+export function bottomBarFor(role: Role, groups: NavGroup[]): NavEntry[] {
+  const all = navItems(groups);
+  return BOTTOM_BAR[role]
+    .map((to) => all.find((i) => i.to === to))
+    .filter((i): i is NavEntry => Boolean(i));
+}
+
+/**
+ * Old destinations that now live inside a consolidated page. EventLayout redirects them (keeping the query
+ * string) so bookmarks and habits never hit a dead end. Keyed by role because some paths are only merged for
+ * one role (participants keep their own pages).
+ */
+export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {};
