@@ -1,0 +1,47 @@
+# Render Blueprint for a public demo of the platform (seeded fake accounts, see README).
+databases:
+  - name: arthmanage-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: '16'
+    databaseName: arthmanage_db
+    user: arthmanage_db_user
+
+services:
+  - type: web
+    name: arthmanage
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run build
+    # Migrations must finish before the server takes traffic; the seed is idempotent, so it runs alongside the
+    # server to keep wake-ups from the free plan's sleep fast.
+    startCommand: cd apps/api && npx prisma migrate deploy && (NODE_ENV=development npx tsx --conditions=source prisma/seed.ts &) && NODE_ENV=production exec node dist/server.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: arthmanage-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      # APP_BASE_URL is optional: without it the API uses Render's RENDER_EXTERNAL_URL (this service's own address).
+      - key: API_PORT
+        value: '10000'
+      - key: EMAIL_PROVIDER
+        value: smtp
+      # Set these two in the Render dashboard; there is no mail server inside the service. Render's free plan blocks
+      # outbound ports 25/465/587, so use a provider with an alternative port, e.g. Resend:
+      # smtps://resend:<RESEND_API_KEY>@smtp.resend.com:2465 (see docs/DEPLOYMENT.md, section 11).
+      - key: SMTP_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: STORAGE_DIR
+        value: /opt/render/project/src/.data/uploads
+      # Requests pass Cloudflare, Render's load balancer and a local proxy. With fewer hops every visitor shares
+      # Render's internal address and one rate-limit bucket (10 sign-ups an hour for the whole site).
+      - key: TRUST_PROXY_HOPS
+        value: '3'
+      - key: NODE_VERSION
+        value: '26'
