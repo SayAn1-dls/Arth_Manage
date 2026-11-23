@@ -111,9 +111,22 @@ export const adminCreateTeamSchema = z
 // ───────────── Invitations ─────────────
 
 export const INVITABLE_ROLES = ['ADMIN', 'JUDGE', 'STAFF'] as const;
+/** Access labels narrow or reuse a role (DECISIONS D-57); an invitation can carry one (audit P0-10). */
+export const ACCESS_LEVELS = ['STANDARD', 'CO_ADMIN', 'SPONSOR_VIEWER', 'STAFF_LEAD'] as const;
+
 export const inviteSchema = z
-  .object({ email: emailSchema, role: z.enum(INVITABLE_ROLES) })
-  .strict();
+  .object({
+    email: emailSchema,
+    role: z.enum(INVITABLE_ROLES),
+    accessLevel: z.enum(ACCESS_LEVELS).default('STANDARD'),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.accessLevel === 'STANDARD' ||
+      (v.accessLevel === 'STAFF_LEAD' ? v.role === 'STAFF' : v.role === 'ADMIN'),
+    { message: 'That access level does not apply to this role', path: ['accessLevel'] },
+  );
 
 export const JOIN_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0, O, 1, I (PRD FR-052)
 

@@ -582,3 +582,58 @@ describe('invitations and members', () => {
     expect((await w.admin.delete(`${w.base}/members/${owner.id}`)).body.error.code).toBe('owner');
   });
 });
+
+describe('sponsor and access-label invitations (audit P0-10)', () => {
+  it('a sponsor viewer joins with sponsor access directly and never sees participant data', async () => {
+    const w = await openEvent(kit);
+    await w.participant('Private Person');
+    const sponsor = await createUser(db, { name: 'Sponsor Co' });
+    const inv = await w.admin
+      .post(`${w.base}/invitations`)
+      .send({ email: sponsor.email, role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    expect(inv.status).toBe(201);
+    expect(inv.body.accessLevel).toBe('SPONSOR_VIEWER');
+    const mail = await db.outboxEmail.findFirstOrThrow({ where: { toEmail: sponsor.email } });
+    expect(mail.subject).toMatch(/sponsor viewer/);
+    const token = new URL(mail.link!).searchParams.get('token')!;
+    const agent = await signedInAgent(app, sponsor.email);
+    expect((await agent.post('/api/v1/invitations/accept').send({ token })).status).toBe(200);
+    const m = await db.eventMembership.findFirstOrThrow({
+      where: { eventId: w.eventId, userId: sponsor.id },
+    });
+    expect(m).toMatchObject({ role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    // from the very first request: no participant list, no dashboard, only the aggregate report
+    expect((await agent.get(`${w.base}/participants`)).status).toBe(404);
+    expect((await agent.get(`${w.base}/dashboard`)).status).toBe(404);
+    expect((await agent.get(`${w.base}/workspace/report.pdf`)).status).toBe(200);
+    const members = (await w.admin.get(`${w.base}/members`)).body;
+    expect(members.viewerIsOwner).toBe(true);
+    expect(
+      members.members.find((x: { email: string }) => x.email === sponsor.email).accessLevel,
+    ).toBe('SPONSOR_VIEWER');
+  });
+
+  it('only the owner may invite with an access label, and the label must fit the role', async () => {
+    const w = await openEvent(kit);
+    const coUser = await createUser(db, { name: 'Co Admin' });
+    await db.eventMembership.create({
+      data: { eventId: w.eventId, userId: coUser.id, role: 'ADMIN' },
+    });
+    const co = await signedInAgent(app, coUser.email);
+    const denied = await co
+      .post(`${w.base}/invitations`)
+      .send({ email: 'sp@example.test', role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    expect(denied.status).toBe(403);
+    expect(
+      (await co.post(`${w.base}/invitations`).send({ email: 'j@example.test', role: 'JUDGE' }))
+        .status,
+    ).toBe(201); // plain roles are unchanged for any core admin
+    expect(
+      (
+        await w.admin
+          .post(`${w.base}/invitations`)
+          .send({ email: 'x@example.test', role: 'JUDGE', accessLevel: 'SPONSOR_VIEWER' })
+      ).status,
+    ).toBe(422);
+  });
+});

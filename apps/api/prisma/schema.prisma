@@ -449,6 +449,8 @@ model Invitation {
   eventId     String
   email       String
   role        EventRole
+  /// Access label the membership gets on acceptance (STANDARD, CO_ADMIN, SPONSOR_VIEWER, STAFF_LEAD).
+  accessLevel String           @default("STANDARD")
   tokenHash   String           @unique
   status      InvitationStatus @default(PENDING)
   invitedById String
