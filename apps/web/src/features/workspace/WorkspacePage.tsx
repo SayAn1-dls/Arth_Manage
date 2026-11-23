@@ -1,9 +1,24 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useOutletContext, useParams } from 'react-router';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useOutletContext, useParams } from 'react-router';
 import type { MyEvent } from '@arthakram/shared';
-import { request } from '../../lib/api.js';
-import { Alert, Button, Spinner } from '../../ui/index.js';
+import { ApiError, request } from '../../lib/api.js';
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Dialog,
+  Input,
+  Select,
+  Spinner,
+  Table,
+  TBody,
+  Td,
+  THead,
+  Th,
+  Tr,
+} from '../../ui/index.js';
 
 type Options = {
   rounds: { id: string; name: string; order: number; normalisation: boolean }[];
@@ -156,15 +171,6 @@ export function WorkspacePage({ section }: { section: string }) {
     sandbox: 'Practice workspace',
     integrity: 'Project review',
   };
-  const RoundSelect = ({ name = 'roundId' }: { name?: string }) => (
-    <select name={name} className={control} required>
-      {options.data?.rounds.map((r) => (
-        <option value={r.id} key={r.id}>
-          {r.name}
-        </option>
-      ))}
-    </select>
-  );
   if (me.accessLevel === 'SPONSOR_VIEWER' && section === 'report')
     return (
       <div className="flex flex-col gap-4">
@@ -251,41 +257,7 @@ export function WorkspacePage({ section }: { section: string }) {
           </Panel>
         ))}
       {section === 'advancement' && (
-        <Panel>
-          <form
-            className="space-y-4"
-            onSubmit={async (e) => {
-              const d = data(e);
-              await act('/shortlist', {
-                fromRoundId: str(d, 'fromRoundId'),
-                toRoundId: str(d, 'toRoundId'),
-                teamIds: d.getAll('teamIds'),
-              });
-            }}
-          >
-            <p>
-              Choose teams with a submitted project to advance. Only shortlisted teams can submit in
-              the destination round. All teams receive a decision message.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="From round">
-                <RoundSelect name="fromRoundId" />
-              </Field>
-              <Field label="To round">
-                <RoundSelect name="toRoundId" />
-              </Field>
-            </div>
-            {options.data?.teams.map((t) => (
-              <label className="flex gap-3 py-2" key={t.id}>
-                <input type="checkbox" name="teamIds" value={t.id} />
-                {t.teamCode} · {t.name}
-              </label>
-            ))}
-            <Button type="submit" loading={busy}>
-              Save shortlist and notify teams
-            </Button>
-          </form>
-        </Panel>
+        <ShortlistSection eventId={eventId} base={base} rounds={options.data?.rounds ?? []} />
       )}
       {section === 'calibration' && (
         <>
@@ -304,25 +276,22 @@ export function WorkspacePage({ section }: { section: string }) {
               Duration measures elapsed time since the first saved draft, including breaks; it is a
               review signal.
             </p>
-            <p>
-              Normalisation shifts each judge’s scores toward the panel mean, clamps to 0–100, and
-              leaves judges with fewer than three scores unchanged. Review raw and adjusted results
-              before approval.
-            </p>
-            <Button
-              variant="secondary"
-              loading={busy}
-              onClick={() =>
-                void act(
-                  `/normalisation/${roundId}`,
-                  { enabled: !calibration.data?.normalisation },
-                  'PUT',
-                )
-              }
-            >
-              {calibration.data?.normalisation ? 'Disable' : 'Enable'} score normalisation
-            </Button>
           </Panel>
+          {roundId && (
+            <ScoringMethod
+              key={roundId}
+              eventId={eventId}
+              base={base}
+              roundId={roundId}
+              roundName={options.data?.rounds.find((r) => r.id === roundId)?.name ?? 'this round'}
+              enabled={
+                calibration.data?.normalisation ??
+                options.data?.rounds.find((r) => r.id === roundId)?.normalisation ??
+                false
+              }
+              loading={calibration.isPending}
+            />
+          )}
           {calibration.data?.judges.map((j) => (
             <Panel key={j.judgeId}>
               <div className="flex justify-between">
@@ -554,5 +523,494 @@ export function WorkspacePage({ section }: { section: string }) {
         </Panel>
       )}
     </div>
+  );
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+type ShortlistContext = {
+  fromRound: { id: string; name: string; order: number };
+  toRound: {
+    id: string;
+    name: string;
+    order: number;
+    shortlistEnabled: boolean;
+    started: boolean;
+  };
+  results: { versionNo: number; published: boolean; rankingScope: string } | null;
+  currentShortlist: number;
+  recipients: number;
+  teams: {
+    id: string;
+    teamCode: string;
+    name: string;
+    submitted: boolean;
+    rank: number | null;
+    score: string | null;
+    group: string | null;
+    shortlisted: boolean;
+  }[];
+};
+
+/** Round shortlists (D-57): see who submitted, how they ranked and who is on the shortlist before notifying anyone. */
+function ShortlistSection({
+  eventId,
+  base,
+  rounds,
+}: {
+  eventId: string;
+  base: string;
+  rounds: Options['rounds'];
+}) {
+  const [fromId, setFromId] = useState('');
+  const [toId, setToId] = useState('');
+  const from = rounds.find((r) => r.id === fromId) ?? rounds[0];
+  const later = from ? rounds.filter((r) => r.order > from.order) : [];
+  const to = later.find((r) => r.id === toId) ?? later[0];
+  const context = useQuery({
+    queryKey: ['workspace', 'shortlist', eventId, from?.id, to?.id],
+    queryFn: () =>
+      request<ShortlistContext>(
+        'GET',
+        `${base}/shortlist/${to!.id}?fromRoundId=${encodeURIComponent(from!.id)}`,
+      ),
+    enabled: Boolean(from && to),
+  });
+  if (rounds.length < 2)
+    return (
+      <Panel>
+        <Alert tone="info" title="Add a second round to shortlist teams">
+          A shortlist moves teams from one round to a later one.{' '}
+          <Link to={`/events/${eventId}/rounds`}>Set up rounds</Link>
+        </Alert>
+      </Panel>
+    );
+  return (
+    <Panel>
+      <p>
+        Choose which teams with a submitted project advance. Only shortlisted teams can submit in
+        the destination round, and every active team is emailed the decision.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="From round"
+          value={from?.id ?? ''}
+          onChange={(e) => {
+            setFromId(e.target.value);
+            setToId('');
+          }}
+        >
+          {rounds.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="To round"
+          value={to?.id ?? ''}
+          onChange={(e) => setToId(e.target.value)}
+          disabled={!to}
+          hint="Teams can only advance to a later round, so the source round and earlier rounds cannot be chosen."
+        >
+          {!to && <option value="">No later round</option>}
+          {rounds.map((r) => (
+            <option key={r.id} value={r.id} disabled={!from || r.order <= from.order}>
+              {r.name}
+              {r.id === from?.id ? ' (source round)' : ''}
+            </option>
+          ))}
+        </Select>
+      </div>
+      {!to && (
+        <Alert tone="info" title={`${from?.name ?? 'This round'} is the last round`}>
+          Choose an earlier source round. Teams can only advance to a later round.
+        </Alert>
+      )}
+      {to && context.isPending && <Spinner label="Loading teams" />}
+      {context.error && (
+        <Alert tone="error" title="Could not load the teams for this shortlist">
+          {context.error.message}
+        </Alert>
+      )}
+      {to && from && context.data && (
+        <ShortlistForm
+          key={`${from.id}:${to.id}`}
+          ctx={context.data}
+          base={base}
+          eventId={eventId}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function ShortlistForm({
+  ctx,
+  base,
+  eventId,
+}: {
+  ctx: ShortlistContext;
+  base: string;
+  eventId: string;
+}) {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState(
+    () => new Set(ctx.teams.filter((t) => t.shortlisted && t.submitted).map((t) => t.id)),
+  );
+  const [topN, setTopN] = useState('3');
+  const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState('');
+  const save = useMutation({
+    mutationFn: (teamIds: string[]) =>
+      request<{ advanced: number }>('POST', `${base}/shortlist`, {
+        fromRoundId: ctx.fromRound.id,
+        toRoundId: ctx.toRound.id,
+        teamIds,
+      }),
+    onSuccess: async (r) => {
+      setConfirming(false);
+      setNotice(
+        `Shortlist saved. ${plural(r.advanced, 'team')} advance to ${ctx.toRound.name}; decision emails are queued.`,
+      );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['workspace'] }),
+        qc.invalidateQueries({ queryKey: ['workspace-options', eventId] }),
+      ]);
+    },
+  });
+  const from = ctx.fromRound.name,
+    to = ctx.toRound.name,
+    locked = ctx.toRound.started;
+  const perGroup = ctx.results?.rankingScope === 'PER_TRACK';
+  const ranked = ctx.teams.some((t) => t.rank !== null);
+  const n = selected.size,
+    m = ctx.teams.length - n;
+  const top = Math.max(1, Math.floor(Number(topN)) || 1);
+  const rows = [...ctx.teams].sort(
+    (a, b) =>
+      Number(a.rank === null) - Number(b.rank === null) ||
+      (perGroup ? (a.group ?? '').localeCompare(b.group ?? '') : 0) ||
+      (a.rank ?? 0) - (b.rank ?? 0) ||
+      a.teamCode.localeCompare(b.teamCode),
+  );
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return (
+    <div className="space-y-4">
+      {notice && <Alert tone="success" title={notice} />}
+      {locked && (
+        <Alert tone="warning" title={`${to} has already started`}>
+          Judging has opened or teams have submitted in {to}, so its shortlist can no longer change.
+        </Alert>
+      )}
+      <p>
+        {ctx.toRound.shortlistEnabled
+          ? `${to} already has a shortlist of ${plural(ctx.currentShortlist, 'team')}. Teams on it are ticked below.`
+          : `${to} has no shortlist yet.`}
+      </p>
+      {ctx.results ? (
+        <p className="text-sm">
+          Ranks and scores come from approved results version {ctx.results.versionNo} for {from} (
+          {ctx.results.published ? 'published' : 'not yet published'}).
+        </p>
+      ) : (
+        <Alert tone="info" title={`No approved results for ${from} yet`}>
+          Ranks appear here once the results for {from} are approved. You can still choose teams by
+          hand.
+        </Alert>
+      )}
+      {ranked && !locked && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-36">
+              <Input
+                label="Top positions"
+                type="number"
+                min={1}
+                value={topN}
+                onChange={(e) => setTopN(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setSelected(
+                  new Set(
+                    ctx.teams
+                      .filter((t) => t.submitted && t.rank !== null && t.rank <= top)
+                      .map((t) => t.id),
+                  ),
+                )
+              }
+            >
+              Select the top {top} by rank{perGroup ? ' in each track' : ''}
+            </Button>
+            <Button variant="ghost" onClick={() => setSelected(new Set())}>
+              Clear selection
+            </Button>
+          </div>
+          <p className="text-sm">
+            This replaces the ticks below. Teams tied at position {top} are all included.
+          </p>
+        </div>
+      )}
+      <Table caption={`Teams that can advance from ${from} to ${to}`}>
+        <THead>
+          <Tr>
+            <Th>Advance</Th>
+            <Th>Submitted in {from}</Th>
+            <Th>Rank and score</Th>
+            <Th>Current shortlist</Th>
+          </Tr>
+        </THead>
+        <TBody>
+          {rows.map((t) => (
+            <Tr key={t.id}>
+              <Td>
+                <Checkbox
+                  label={`${t.teamCode} · ${t.name}`}
+                  hint={t.submitted ? undefined : 'No submitted project, so it cannot advance'}
+                  checked={selected.has(t.id)}
+                  disabled={!t.submitted || locked}
+                  onChange={() => toggle(t.id)}
+                />
+              </Td>
+              <Td>
+                {t.submitted ? (
+                  <Badge tone="success">Submitted</Badge>
+                ) : (
+                  <Badge tone="warning">Not submitted</Badge>
+                )}
+              </Td>
+              <Td>
+                {t.rank !== null
+                  ? `Rank ${t.rank}${perGroup && t.group ? ` in ${t.group}` : ''} · ${Number(t.score).toFixed(2)}`
+                  : ctx.results
+                    ? 'Not ranked'
+                    : 'No approved results yet'}
+              </Td>
+              <Td>
+                {t.shortlisted ? <Badge tone="info">On shortlist</Badge> : 'Not on shortlist'}
+              </Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
+      {ctx.teams.length === 0 && <p>There are no active teams in this event.</p>}
+      <p aria-live="polite">
+        <strong>{plural(n, 'team')} selected to advance</strong> · {plural(m, 'team')} will be told
+        they were not shortlisted
+      </p>
+      {n === 0 && (
+        <p className="text-sm">
+          Select at least one team. Saving with nobody selected would tell every team it was not
+          shortlisted, so it is not allowed.
+        </p>
+      )}
+      <Button
+        disabled={n === 0 || locked}
+        onClick={() => {
+          save.reset();
+          setNotice('');
+          setConfirming(true);
+        }}
+      >
+        Review and save shortlist
+      </Button>
+      <Dialog
+        open={confirming}
+        title={`Advance ${plural(n, 'team')} to ${to}?`}
+        onClose={() => setConfirming(false)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button loading={save.isPending} onClick={() => save.mutate([...selected])}>
+              Save shortlist and notify {n} + {m} teams
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p>
+            <strong>
+              {plural(n, 'team')} {n === 1 ? 'advances' : 'advance'} to {to}; {plural(m, 'team')}{' '}
+              will be told they were not shortlisted.
+            </strong>
+          </p>
+          <p>
+            Emails are queued now to {plural(ctx.recipients, 'person', 'people')} and cannot be
+            recalled.
+          </p>
+          <p>
+            {ctx.toRound.shortlistEnabled
+              ? `This replaces the current shortlist of ${plural(ctx.currentShortlist, 'team')}.`
+              : `${to} has no shortlist yet. After saving, only the shortlisted teams can submit in it.`}
+          </p>
+          <p className="text-sm">Saving exactly the same selection again does not resend emails.</p>
+          {save.error && (
+            <Alert tone="error" title="The shortlist was not saved">
+              {save.error.message}
+            </Alert>
+          )}
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Scoring method per round (D-54): the state is stated, and changing it is confirmed with its caveats. */
+function ScoringMethod({
+  eventId,
+  base,
+  roundId,
+  roundName,
+  enabled,
+  loading,
+}: {
+  eventId: string;
+  base: string;
+  roundId: string;
+  roundName: string;
+  enabled: boolean;
+  loading: boolean;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [understood, setUnderstood] = useState(false);
+  const [notice, setNotice] = useState('');
+  const change = useMutation({
+    mutationFn: (next: boolean) =>
+      request('PUT', `${base}/normalisation/${roundId}`, { enabled: next }),
+    onSuccess: async (_r, next) => {
+      setOpen(false);
+      setNotice(
+        next
+          ? `Scoring method for ${roundName} is now normalised.`
+          : `Scoring method for ${roundName} is now the raw average.`,
+      );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['workspace'] }),
+        qc.invalidateQueries({ queryKey: ['workspace-options', eventId] }),
+        qc.invalidateQueries({ queryKey: ['results-review', eventId] }),
+      ]);
+    },
+  });
+  const blocked = change.error instanceof ApiError && change.error.code === 'approved_results';
+  const results = <Link to={`/events/${eventId}/results`}>Results page</Link>;
+  return (
+    <Panel>
+      {notice && <Alert tone="success" title={notice} />}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p>
+          <strong>Scoring method for {roundName}:</strong>{' '}
+          {enabled
+            ? 'Normalised (each judge shifted to the panel mean)'
+            : 'Raw average (normalisation off)'}
+        </p>
+        <Button
+          variant="secondary"
+          disabled={loading}
+          onClick={() => {
+            change.reset();
+            setNotice('');
+            setUnderstood(false);
+            setOpen(true);
+          }}
+        >
+          {enabled ? 'Turn off normalisation' : 'Turn on normalisation'}
+        </Button>
+      </div>
+      <p className="text-sm">
+        Normalisation is off by default. Raw and adjusted scores are both shown on the {results}.
+      </p>
+      <Dialog
+        open={open}
+        title={
+          enabled
+            ? `Turn off normalisation for ${roundName}?`
+            : `Turn on normalisation for ${roundName}?`
+        }
+        onClose={() => setOpen(false)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              loading={change.isPending}
+              disabled={!enabled && !understood}
+              onClick={() => change.mutate(!enabled)}
+            >
+              {enabled ? 'Use the raw average' : 'Normalise scores'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {enabled ? (
+            <p>
+              Team scores for {roundName} go back to the plain average of judges’ scores. This can
+              change rankings if the adjusted scores differed.
+            </p>
+          ) : (
+            <>
+              <p>
+                Team scores for {roundName} will use adjusted judge scores instead of the plain
+                average. <strong>This can change rankings and reorder winners.</strong>
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  Each judge with at least 3 submitted scores is shifted by the gap between the
+                  panel mean and their own mean. Adjusted scores stay within 0–100.
+                </li>
+                <li>
+                  Judges with fewer than 3 scores are not adjusted. Three scores is a small sample,
+                  so an adjustment can be mostly noise.
+                </li>
+                <li>
+                  Judges are not assigned at random and the panel mean mixes all tracks. A judge who
+                  happened to draw strong teams looks like a generous marker, so those teams are
+                  marked down (and a judge who drew weaker teams has theirs marked up).
+                </li>
+                <li>
+                  Do not use it where prizes depend on the outcome unless the organisers have
+                  decided to.
+                </li>
+              </ul>
+              <Checkbox
+                label="I understand this can change rankings"
+                checked={understood}
+                onChange={(e) => setUnderstood(e.target.checked)}
+              />
+            </>
+          )}
+          <p className="text-sm">
+            The change cannot be made while approved results exist for {roundName}.
+          </p>
+          {blocked ? (
+            <Alert
+              tone="error"
+              title="Approved results for this round must be withdrawn before the scoring method can change"
+            >
+              {change.error?.message}. Review them on the {results}.
+            </Alert>
+          ) : (
+            change.error && (
+              <Alert tone="error" title="The scoring method was not changed">
+                {change.error.message}
+              </Alert>
+            )
+          )}
+        </div>
+      </Dialog>
+    </Panel>
   );
 }

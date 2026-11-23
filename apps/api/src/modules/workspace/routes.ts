@@ -5,7 +5,7 @@ import type { Deps } from '../../http/deps.js';
 import { requireCtx } from '../../http/context.js';
 import { AppError } from '../../http/errors.js';
 import { parse } from '../../http/validate.js';
-import { adminOnly, loadRound } from '../judging/common.js';
+import { adminOnly, judgedVersions, loadRound } from '../judging/common.js';
 import { assertWritable } from '../events/service.js';
 import { writeAudit } from '../../audit/audit.js';
 import { calibration, engagement } from './analytics.js';
@@ -499,6 +499,92 @@ export function workspaceRouter({ db }: Deps) {
         : null,
     });
   });
+  /** Whether destination judging or submissions have begun; a shortlist can no longer change then. */
+  const destinationStarted = async (to: { id: string; judgingStatus: string }) =>
+    to.judgingStatus !== 'NOT_OPEN' ||
+    (await db.submission.count({ where: { roundId: to.id, lastVersionNo: { gt: 0 } } })) > 0;
+  /**
+   * What an organiser needs before shortlisting: every active team with its source-round submission,
+   * its rank and score from the source round's latest approved snapshot (if any) and whether it is on
+   * the destination shortlist now, plus who would be emailed.
+   */
+  router.get('/workspace/shortlist/:toRoundId', async (req, res) => {
+    const c = requireCtx(req);
+    adminOnly(c);
+    const to = await loadRound(db, c, String(req.params.toRoundId));
+    const { fromRoundId } = parse(
+      z.object({ fromRoundId: z.string().min(1).optional() }),
+      req.query,
+    );
+    const from = fromRoundId
+      ? await loadRound(db, c, fromRoundId)
+      : await db.round.findFirst({
+          where: { eventId: c.event.id, order: { lt: to.order } },
+          orderBy: { order: 'desc' },
+        });
+    if (!from) throw AppError.invalid('Choose the round teams advance from');
+    if (from.id === to.id)
+      throw AppError.invalid('Choose a destination round different from the source round', {
+        toRoundId: 'Choose a different round',
+      });
+    const [teams, submitted, snapshot, entries, recipients] = await Promise.all([
+      db.team.findMany({
+        where: { eventId: c.event.id, status: 'ACTIVE' },
+        select: { id: true, teamCode: true, name: true },
+        orderBy: { teamCode: 'asc' },
+      }),
+      judgedVersions(db, from.id),
+      db.resultSnapshot.findFirst({
+        where: { roundId: from.id, status: 'APPROVED' },
+        orderBy: { versionNo: 'desc' },
+      }),
+      db.roundEntry.findMany({ where: { roundId: to.id, eventId: c.event.id } }),
+      db.teamMember.count({
+        where: { eventId: c.event.id, leftAt: null, team: { status: 'ACTIVE' } },
+      }),
+    ]);
+    const ranked = new Map(
+      (
+        (snapshot?.entries ?? []) as unknown as {
+          teamId: string;
+          rank: number;
+          score: string;
+          group: string;
+        }[]
+      ).map((e) => [e.teamId, e]),
+    );
+    const shortlisted = new Set(entries.map((e) => e.teamId));
+    res.json({
+      fromRound: { id: from.id, name: from.name, order: from.order },
+      toRound: {
+        id: to.id,
+        name: to.name,
+        order: to.order,
+        shortlistEnabled: to.shortlistEnabled,
+        started: await destinationStarted(to),
+      },
+      results: snapshot
+        ? {
+            versionNo: snapshot.versionNo,
+            published: Boolean(snapshot.publishedAt && !snapshot.unpublishedAt),
+            rankingScope: from.rankingScope,
+          }
+        : null,
+      currentShortlist: entries.length,
+      recipients,
+      teams: teams.map((t) => {
+        const r = ranked.get(t.id);
+        return {
+          ...t,
+          submitted: submitted.has(t.id),
+          rank: r?.rank ?? null,
+          score: r?.score ?? null,
+          group: r?.group ?? null,
+          shortlisted: shortlisted.has(t.id),
+        };
+      }),
+    });
+  });
   router.post('/workspace/shortlist', async (req, res) => {
     const c = requireCtx(req);
     adminOnly(c);
@@ -512,13 +598,19 @@ export function workspaceRouter({ db }: Deps) {
         .strict(),
       req.body,
     );
+    if (input.fromRoundId === input.toRoundId)
+      throw AppError.invalid('Choose a destination round different from the source round', {
+        toRoundId: 'Choose a different round',
+      });
+    // An empty shortlist would tell every active team it was not shortlisted.
+    if (!input.teamIds.length)
+      throw AppError.invalid('Choose at least one team to advance', {
+        teamIds: 'Choose at least one team',
+      });
     const from = await loadRound(db, c, input.fromRoundId),
       to = await loadRound(db, c, input.toRoundId);
     if (to.order <= from.order) throw AppError.invalid('Choose a later destination round');
-    if (
-      to.judgingStatus !== 'NOT_OPEN' ||
-      (await db.submission.count({ where: { roundId: to.id, lastVersionNo: { gt: 0 } } }))
-    )
+    if (await destinationStarted(to))
       throw AppError.conflict(
         'round_started',
         'Shortlist before destination judging or submissions begin',

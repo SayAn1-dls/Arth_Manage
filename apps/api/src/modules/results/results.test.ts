@@ -341,3 +341,40 @@ describe('who may do what with results (AT-16 permissions)', () => {
     expect(await db.auditLog.count({ where: { action: 'export.results' } })).toBe(1);
   });
 });
+
+describe('approved results feeding later decisions (P0-04, P0-05)', () => {
+  it('reports source-round rank and score from the latest approved snapshot in the shortlist context', async () => {
+    const s = await judgedRound(kit, { teams: { Zeta: T100, Xray: T74, Wolf: T53 } });
+    const next = await db.round.create({
+      data: {
+        eventId: s.w.eventId,
+        order: 2,
+        name: 'Final',
+        submissionDeadline: new Date(Date.now() + 86400000),
+      },
+    });
+    const url = `${s.w.base}/workspace/shortlist/${next.id}?fromRoundId=${s.w.roundId}`;
+    expect((await s.w.admin.get(url)).body.results).toBeNull(); // reviewed but not approved
+    expect((await s.w.admin.post(base(s, '/approve'))).status).toBe(201);
+    const ctx = (await s.w.admin.get(url)).body;
+    expect(ctx.results).toMatchObject({ versionNo: 1, published: false });
+    const team = (name: string) => ctx.teams.find((t: { name: string }) => t.name === name);
+    expect(team('Zeta')).toMatchObject({ rank: 1, score: '100.0000', submitted: true });
+    expect(team('Xray')).toMatchObject({ rank: 2, score: '74.0000', submitted: true });
+    expect(team('Wolf')).toMatchObject({ rank: 3, submitted: true });
+  });
+
+  it('refuses to change the scoring method while approved results exist, and says why', async () => {
+    const s = await judgedRound(kit, { teams: { Zeta: T100, Xray: T74 } });
+    await s.w.admin.post(base(s, '/approve'));
+    const blocked = await s.w.admin
+      .put(`${s.w.base}/workspace/normalisation/${s.w.roundId}`)
+      .send({ enabled: true });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe('approved_results');
+    expect(blocked.body.error.message).toMatch(/approved results/i);
+    expect((await db.round.findUniqueOrThrow({ where: { id: s.w.roundId } })).normalisation).toBe(
+      false,
+    );
+  });
+});

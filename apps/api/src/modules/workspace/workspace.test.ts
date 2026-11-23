@@ -82,8 +82,10 @@ describe('expanded workspace', () => {
   });
   it('enforces shortlisting on draft writes and rejects reverse progression', async () => {
     const w = await openEvent(kit),
-      team = await teamOfTwo(w);
+      team = await teamOfTwo(w),
+      advancing = await teamOfTwo(w, 'Advancing');
     await submitProject(w, team);
+    await submitProject(w, advancing);
     const next = await db.round.create({
       data: {
         eventId: w.eventId,
@@ -96,9 +98,9 @@ describe('expanded workspace', () => {
       (
         await w.admin
           .post(`${w.base}/workspace/shortlist`)
-          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [] })
+          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [advancing.teamId] })
       ).status,
-    ).toBe(200);
+    ).toBe(200); // `team` is not shortlisted, so its draft write for the next round is refused
     expect(
       (
         await team.lead.agent
@@ -434,5 +436,106 @@ describe('Communication safeguards', () => {
             .send({ channel: 'announcement', audience: 'EVERYONE' })
         ).status,
       ).toBe(404);
+  });
+});
+
+describe('round shortlist safeguards (P0-04)', () => {
+  const finalRound = (eventId: string) =>
+    db.round.create({
+      data: {
+        eventId,
+        order: 2,
+        name: 'Final',
+        submissionDeadline: new Date(Date.now() + 86400000),
+      },
+    });
+  type ContextTeam = { id: string; submitted: boolean; shortlisted: boolean; rank: number | null };
+  const byId = (body: { teams: ContextTeam[] }) =>
+    Object.fromEntries(body.teams.map((t) => [t.id, t]));
+
+  it('rejects an empty selection and an identical source and destination round, saving nothing', async () => {
+    const w = await openEvent(kit),
+      team = await teamOfTwo(w);
+    await submitProject(w, team);
+    const next = await finalRound(w.eventId);
+    const empty = await w.admin
+      .post(`${w.base}/workspace/shortlist`)
+      .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [] });
+    expect(empty.status).toBe(422);
+    expect(empty.body.error.code).toBe('validation_error');
+    const same = await w.admin
+      .post(`${w.base}/workspace/shortlist`)
+      .send({ fromRoundId: w.roundId, toRoundId: w.roundId, teamIds: [team.teamId] });
+    expect(same.status).toBe(422);
+    expect(same.body.error.code).toBe('validation_error');
+    expect(await db.roundEntry.count({ where: { roundId: { in: [next.id, w.roundId] } } })).toBe(0);
+    expect((await db.round.findUniqueOrThrow({ where: { id: next.id } })).shortlistEnabled).toBe(
+      false,
+    );
+    expect(
+      await db.messageDelivery.count({
+        where: { eventId: w.eventId, key: { startsWith: 'shortlist:' } },
+      }),
+    ).toBe(0);
+  });
+
+  it('shows admins submission flags and current shortlist membership, and is not found for anyone else', async () => {
+    const w = await openEvent(kit),
+      advanced = await teamOfTwo(w, 'Advanced'),
+      idle = await teamOfTwo(w, 'Idle');
+    await submitProject(w, advanced);
+    const next = await finalRound(w.eventId);
+    const url = `${w.base}/workspace/shortlist/${next.id}?fromRoundId=${w.roundId}`;
+
+    const before = await w.admin.get(url);
+    expect(before.status).toBe(200);
+    expect(before.body.fromRound.id).toBe(w.roundId);
+    expect(before.body.toRound).toMatchObject({
+      id: next.id,
+      shortlistEnabled: false,
+      started: false,
+    });
+    expect(before.body.currentShortlist).toBe(0);
+    expect(before.body.results).toBeNull(); // nothing approved in the source round yet
+    expect(before.body.recipients).toBe(4); // every member of both active teams is emailed
+    expect(byId(before.body)[advanced.teamId]).toMatchObject({
+      submitted: true,
+      shortlisted: false,
+      rank: null,
+    });
+    expect(byId(before.body)[idle.teamId]).toMatchObject({ submitted: false, shortlisted: false });
+
+    expect(
+      (
+        await w.admin
+          .post(`${w.base}/workspace/shortlist`)
+          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [advanced.teamId] })
+      ).status,
+    ).toBe(200);
+    const after = (await w.admin.get(url)).body;
+    expect(after.toRound.shortlistEnabled).toBe(true);
+    expect(after.currentShortlist).toBe(1);
+    expect(byId(after)[advanced.teamId]!.shortlisted).toBe(true);
+    expect(byId(after)[idle.teamId]!.shortlisted).toBe(false);
+
+    // Without a source round the previous round is used; the same round is refused.
+    expect((await w.admin.get(`${w.base}/workspace/shortlist/${next.id}`)).body.fromRound.id).toBe(
+      w.roundId,
+    );
+    expect(
+      (await w.admin.get(`${w.base}/workspace/shortlist/${next.id}?fromRoundId=${next.id}`)).status,
+    ).toBe(422);
+
+    const judge = await addJudge(kit, w, 'Jaya Judge');
+    for (const who of [advanced.lead.agent, idle.mate.agent, judge.agent])
+      expect((await who.get(url)).status).toBe(404);
+    const other = await openEvent(kit);
+    expect(
+      (
+        await other.admin.get(
+          `${other.base}/workspace/shortlist/${next.id}?fromRoundId=${w.roundId}`,
+        )
+      ).status,
+    ).toBe(404);
   });
 });
