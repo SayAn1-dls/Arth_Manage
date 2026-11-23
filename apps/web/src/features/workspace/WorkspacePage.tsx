@@ -136,31 +136,6 @@ export function WorkspacePage({ section }: { section: string }) {
       }>('GET', `${base}/discovery`),
     enabled: section === 'discovery',
   });
-  const deliveries = useQuery({
-    queryKey: ['workspace', 'deliveries', eventId],
-    queryFn: () =>
-      request<{
-        deliveries: {
-          id: string;
-          subject: string;
-          status: string;
-          error: string | null;
-          createdAt: string;
-        }[];
-      }>('GET', `${base}/deliveries`),
-    enabled: section === 'communications',
-    refetchInterval: 30000,
-  });
-  const inbox = useQuery({
-    queryKey: ['workspace', 'inbox', eventId],
-    queryFn: () =>
-      request<{ messages: { id: string; subject: string; body: string; createdAt: string }[] }>(
-        'GET',
-        `${base}/inbox`,
-      ),
-    enabled: section === 'messages',
-    refetchInterval: 30000,
-  });
   const application = useQuery({
     queryKey: ['workspace', 'application', eventId],
     queryFn: () =>
@@ -171,12 +146,10 @@ export function WorkspacePage({ section }: { section: string }) {
     enabled: section === 'applications' && !admin,
   });
   const titles: Record<string, string> = {
-    messages: 'Event messages',
     applications: 'Application review',
     advancement: 'Round shortlists',
     calibration: 'Judge calibration',
     engagement: 'Team engagement',
-    communications: 'Targeted messages',
     discovery: 'Find teammates',
     access: 'Access and judge matching',
     report: 'Event impact report',
@@ -202,12 +175,7 @@ export function WorkspacePage({ section }: { section: string }) {
     );
   if (options.isPending) return <Spinner label="Loading workspace" />;
   const queryError =
-    options.error ||
-    engagement.error ||
-    calibration.error ||
-    discovery.error ||
-    deliveries.error ||
-    application.error;
+    options.error || engagement.error || calibration.error || discovery.error || application.error;
   return (
     <div className="space-y-6">
       <div>
@@ -222,19 +190,6 @@ export function WorkspacePage({ section }: { section: string }) {
         </Alert>
       )}
       {notice && <Alert tone="info" title={notice} />}
-      {section === 'messages' && (
-        <>
-          {inbox.error && <Alert tone="error" title={inbox.error.message} />}{' '}
-          {inbox.data?.messages.map((m) => (
-            <Panel key={m.id}>
-              <h3 className="text-xl">{m.subject}</h3>
-              <p className="text-sm">{new Date(m.createdAt).toLocaleString()}</p>
-              <p className="whitespace-pre-wrap">{m.body}</p>
-            </Panel>
-          ))}
-          {inbox.data?.messages.length === 0 && <p>No messages yet.</p>}
-        </>
-      )}
       {section === 'applications' &&
         (admin ? (
           <Panel>
@@ -430,75 +385,6 @@ export function WorkspacePage({ section }: { section: string }) {
               <a href={`/events/${eventId}/tasks`}>Assign a mentor / staff task</a>
             </Panel>
           ))}
-        </>
-      )}
-      {section === 'communications' && (
-        <>
-          <Panel>
-            <form
-              className="space-y-4"
-              onSubmit={async (e) => {
-                const d = data(e);
-                await act('/broadcast', {
-                  subject: str(d, 'subject'),
-                  body: str(d, 'body'),
-                  ...(str(d, 'trackId') ? { trackId: str(d, 'trackId') } : {}),
-                  ...(str(d, 'roundId') ? { roundId: str(d, 'roundId') } : {}),
-                  shortlistedOnly: d.has('shortlistedOnly'),
-                });
-              }}
-            >
-              <p>
-                Messages use the configured email provider. Development messages stay in the local
-                outbox. One-hour submission reminders are queued automatically.
-              </p>
-              <Field label="Subject">
-                <input name="subject" className={control} required maxLength={200} />
-              </Field>
-              <Field label="Message">
-                <textarea name="body" className={control} required maxLength={4000} />
-              </Field>
-              <Field label="Track">
-                <select name="trackId" className={control}>
-                  <option value="">All tracks</option>
-                  {options.data?.tracks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Round">
-                <select name="roundId" className={control}>
-                  <option value="">No round filter</option>
-                  {options.data?.rounds.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <label className="flex gap-2">
-                <input name="shortlistedOnly" type="checkbox" />
-                Only teams shortlisted for the selected round
-              </label>
-              <Button type="submit" loading={busy}>
-                Queue messages
-              </Button>
-            </form>
-          </Panel>
-          <Panel>
-            <h3 className="text-xl">Delivery history</h3>
-            {deliveries.data?.deliveries.map((d) => (
-              <div key={d.id} className="border-b border-line py-3">
-                <strong>{d.subject}</strong>
-                <p>
-                  {d.status} · {new Date(d.createdAt).toLocaleString()}
-                </p>
-                {d.error && <p>{d.error}</p>}
-              </div>
-            ))}
-          </Panel>
         </>
       )}
       {section === 'discovery' && (

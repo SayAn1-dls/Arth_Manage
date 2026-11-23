@@ -8,7 +8,7 @@ import {
   navItems,
 } from './nav.js';
 
-/** Destinations as they were before navigation was grouped: grouping must never add or drop a route. */
+/** Every destination each role must be able to reach from the menu (merged pages are in MERGED). */
 const ROUTES = {
   ADMIN: [
     '',
@@ -17,7 +17,7 @@ const ROUTES = {
     'people',
     'applications',
     'support',
-    'communications',
+    'communication',
     'engagement',
     'advancement',
     'calibration',
@@ -35,7 +35,6 @@ const ROUTES = {
     'rounds',
     'structure',
     'guidebook',
-    'announcements',
     'integrations',
     'report',
     'feedback',
@@ -45,7 +44,6 @@ const ROUTES = {
   PARTICIPANT: [
     '',
     'team',
-    'messages',
     'applications',
     'integrity',
     'support',
@@ -58,7 +56,7 @@ const ROUTES = {
     'rounds',
     'structure',
     'guidebook',
-    'announcements',
+    'updates',
   ],
   JUDGE: [
     '',
@@ -69,17 +67,17 @@ const ROUTES = {
     'integrity',
     'feedback',
     'guidebook',
-    'announcements',
+    'updates',
   ],
-  STAFF: ['', 'tasks', 'checkin', 'issues', 'support', 'guidebook', 'announcements'],
+  STAFF: ['', 'tasks', 'checkin', 'issues', 'support', 'guidebook', 'updates'],
 } as const;
 
 /** Destinations merged into a consolidated page; each must redirect so old links never dead-end. */
 const MERGED: Partial<Record<keyof typeof ROUTES, string[]>> = {
-  ADMIN: ['participants', 'helpdesk', 'exceptions'],
-  PARTICIPANT: ['helpdesk', 'exceptions'],
-  JUDGE: ['helpdesk'],
-  STAFF: ['helpdesk'],
+  ADMIN: ['participants', 'helpdesk', 'exceptions', 'announcements', 'communications'],
+  PARTICIPANT: ['helpdesk', 'exceptions', 'announcements', 'messages'],
+  JUDGE: ['helpdesk', 'announcements'],
+  STAFF: ['helpdesk', 'announcements'],
 };
 
 describe('role navigation', () => {

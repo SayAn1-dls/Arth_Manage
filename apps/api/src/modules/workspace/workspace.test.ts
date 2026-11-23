@@ -383,3 +383,56 @@ describe('Support & requests inbox', () => {
     expect((await t.mate.agent.get(`${w.base}/workspace/tickets`)).body.tickets).toHaveLength(0);
   });
 });
+
+describe('Communication safeguards', () => {
+  it('previews the exact recipient count, never sends the same message twice, and groups history', async () => {
+    const w = await openEvent(kit);
+    await teamOfTwo(w, 'Alpha');
+    await teamOfTwo(w, 'Beta');
+    await w.participant('Solo Sam');
+    const judge = await addJudge(kit, w, 'Judge J');
+
+    const everyone = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'announcement', audience: 'EVERYONE' });
+    expect(everyone.body).toEqual({ channel: 'announcement', recipients: 7 }); // 5 participants, admin, judge
+    const judges = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'announcement', audience: 'JUDGES' });
+    expect(judges.body.recipients).toBe(1);
+
+    const preview = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'email' });
+    expect(preview.body).toEqual({ channel: 'email', recipients: 5 });
+
+    const requestId = '6f1c2f8e-6a1f-4a8e-9a55-2d3b6c7d8e9f';
+    const first = await w.admin
+      .post(`${w.base}/workspace/broadcast`)
+      .send({ subject: 'Venue change', body: 'We moved to Hall B.', requestId });
+    expect(first.body).toEqual({ queued: 5, recipients: 5, duplicate: false });
+    const again = await w.admin
+      .post(`${w.base}/workspace/broadcast`)
+      .send({ subject: 'Venue change', body: 'We moved to Hall B.', requestId });
+    expect(again.body).toMatchObject({ queued: 0, duplicate: true });
+    expect(await kit.db.messageDelivery.count({ where: { eventId: w.eventId } })).toBe(5);
+
+    const summary = (await w.admin.get(`${w.base}/workspace/deliveries/summary`)).body;
+    expect(summary.sends).toEqual([
+      expect.objectContaining({
+        key: `broadcast:${requestId}`,
+        subject: 'Venue change',
+        source: 'broadcast',
+        counts: { QUEUED: 5 },
+      }),
+    ]);
+    for (const who of [judge.agent])
+      expect(
+        (
+          await who
+            .post(`${w.base}/workspace/audience-preview`)
+            .send({ channel: 'announcement', audience: 'EVERYONE' })
+        ).status,
+      ).toBe(404);
+  });
+});

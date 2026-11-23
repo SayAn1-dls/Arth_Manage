@@ -245,7 +245,7 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
     key: 'failed-messages',
     label: `${plural(failedMessages, 'message')} could not be delivered`,
     count: failedMessages,
-    to: 'communications?delivery=FAILED',
+    to: 'communication?history=targeted&delivery=FAILED',
     tone: 'error',
   });
   add({

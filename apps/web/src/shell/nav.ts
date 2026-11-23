@@ -100,8 +100,7 @@ function adminNav(): NavGroup[] {
       'Event operations',
       [
         item('support', 'Support & requests', 'Participant support'),
-        item('announcements', 'Announcements', 'Communication'),
-        item('communications', 'Targeted messages', 'Communication'),
+        item('communication', 'Communication', 'Communication'),
         item('checkin', 'Check-in', 'Event-day management'),
         item('tasks', 'Staff tasks', 'Event-day management'),
         item('issues', 'Issues', 'Event-day management'),
@@ -155,8 +154,7 @@ export function navFor(role: Role): NavGroup[] {
             item('', 'My event', undefined, true),
             item('team', 'My team'),
             item('submission', 'Submission'),
-            item('announcements', 'Announcements'),
-            item('messages', 'Event messages'),
+            item('updates', 'Updates'),
           ],
           'Your next step, team, submission and updates.',
         ),
@@ -208,7 +206,7 @@ export function navFor(role: Role): NavGroup[] {
           'help',
           'Help & updates',
           [
-            item('announcements', 'Announcements'),
+            item('updates', 'Updates'),
             item('support', 'Ask the organisers'),
             item('guidebook', 'Guidebook'),
             item('feedback', 'Judge survey'),
@@ -232,11 +230,7 @@ export function navFor(role: Role): NavGroup[] {
         group(
           'help',
           'Help & updates',
-          [
-            item('announcements', 'Announcements'),
-            item('support', 'Helpdesk'),
-            item('guidebook', 'Guidebook'),
-          ],
+          [item('updates', 'Updates'), item('support', 'Helpdesk'), item('guidebook', 'Guidebook')],
           'Announcements, the helpdesk and the guidebook.',
         ),
       ];
@@ -249,8 +243,8 @@ export function navFor(role: Role): NavGroup[] {
  */
 const BOTTOM_BAR: Record<Role, string[]> = {
   ADMIN: ['', 'support', 'teams', 'judging'],
-  PARTICIPANT: ['', 'team', 'submission', 'announcements'],
-  JUDGE: ['', 'judge', 'briefing', 'announcements'],
+  PARTICIPANT: ['', 'team', 'submission', 'updates'],
+  JUDGE: ['', 'judge', 'briefing', 'updates'],
   STAFF: ['', 'checkin', 'tasks', 'issues'],
 };
 
@@ -271,11 +265,15 @@ export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {
     participants: 'teams?view=participants',
     helpdesk: 'support?tab=general',
     exceptions: 'support?tab=exceptions',
+    announcements: 'communication?history=announcements',
+    communications: 'communication?history=targeted',
   },
   PARTICIPANT: {
     helpdesk: 'support',
     exceptions: 'support?type=exception',
+    announcements: 'updates',
+    messages: 'updates',
   },
-  JUDGE: { helpdesk: 'support' },
-  STAFF: { helpdesk: 'support' },
+  JUDGE: { helpdesk: 'support', announcements: 'updates' },
+  STAFF: { helpdesk: 'support', announcements: 'updates' },
 };

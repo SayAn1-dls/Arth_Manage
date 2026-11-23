@@ -108,8 +108,8 @@ export function EventOverviewPage() {
       <section aria-labelledby="latest-h" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h3 id="latest-h">Latest announcements</h3>
-          <Link to={`${base}/announcements`} className="text-sm">
-            All announcements
+          <Link to={`${base}/updates`} className="text-sm">
+            All updates
           </Link>
         </div>
         {announcements.data?.length === 0 && <p>Nothing posted yet.</p>}

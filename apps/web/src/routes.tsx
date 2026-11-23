@@ -9,6 +9,14 @@ const ProjectReviewPage = lazy(() =>
 const SandboxPage = lazy(() =>
   import('./features/workspace/SandboxPage.js').then((m) => ({ default: m.SandboxPage })),
 );
+const CommunicationPage = lazy(() =>
+  import('./features/workspace/CommunicationPage.js').then((m) => ({
+    default: m.CommunicationPage,
+  })),
+);
+const UpdatesPage = lazy(() =>
+  import('./features/workspace/CommunicationPage.js').then((m) => ({ default: m.UpdatesPage })),
+);
 const SupportPage = lazy(() =>
   import('./features/workspace/SupportPage.js').then((m) => ({ default: m.SupportPage })),
 );
@@ -40,7 +48,6 @@ import { SetupPage } from './features/events/SetupPage.js';
 import { RoundsPage } from './features/events/RoundsPage.js';
 import { StructurePage } from './features/events/StructurePage.js';
 import { GuidebookPage } from './features/events/GuidebookPages.js';
-import { AnnouncementsPage } from './features/events/AnnouncementsPage.js';
 import { PublicEventPage } from './features/events/PublicEventPage.js';
 import { RegisterForEventPage } from './features/participant/RegisterPage.js';
 import { TeamPage } from './features/participant/TeamPage.js';
@@ -135,12 +142,10 @@ const routes: RouteObject[] = [
                 ),
               },
               ...[
-                'messages',
                 'applications',
                 'advancement',
                 'calibration',
                 'engagement',
-                'communications',
                 'discovery',
                 'access',
                 'report',
@@ -160,11 +165,26 @@ const routes: RouteObject[] = [
                   </Suspense>
                 ),
               },
+              {
+                path: 'communication',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading communication" />}>
+                    <CommunicationPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'updates',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading updates" />}>
+                    <UpdatesPage />
+                  </Suspense>
+                ),
+              },
               { path: 'setup', element: <SetupPage /> },
               { path: 'rounds', element: <RoundsPage /> },
               { path: 'structure', element: <StructurePage /> },
               { path: 'guidebook', element: <GuidebookPage /> },
-              { path: 'announcements', element: <AnnouncementsPage /> },
               { path: 'results', element: <ResultsPage /> },
               { path: 'tasks', element: <TasksPage /> },
               { path: 'checkin', element: <CheckInPage /> },
