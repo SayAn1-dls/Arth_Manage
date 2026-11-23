@@ -136,7 +136,9 @@ function DetailsForm({ event }: { event: EventDto }) {
     },
   });
 
-  const declarationsText = draft.declarations.join('\n');
+  // The box keeps exactly what the organiser types (spaces, new lines); only the saved list is trimmed
+  // and split, so typing a declaration word by word works (audit P0-08).
+  const [declarationsText, setDeclarationsText] = useState(() => draft.declarations.join('\n'));
 
   return (
     <Card footerLabel="Event details and rules">
@@ -286,15 +288,16 @@ function DetailsForm({ event }: { event: EventDto }) {
           label="Participant declarations"
           hint="One per line, up to five. Participants must tick each one when registering."
           value={declarationsText}
-          onChange={(e) =>
+          onChange={(e) => {
+            setDeclarationsText(e.target.value);
             set(
               'declarations',
               e.target.value
                 .split('\n')
                 .map((l) => l.trim())
                 .filter(Boolean),
-            )
-          }
+            );
+          }}
           error={errors.fields.declarations}
         />
         <Textarea

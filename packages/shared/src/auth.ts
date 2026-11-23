@@ -14,11 +14,25 @@ export const passwordSchema = z
   .min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters`)
   .max(200);
 
+/**
+ * Where to continue after signing up and verifying (for example an event's registration page or an
+ * invitation). Only same-site relative paths are accepted, so an emailed link can never send anyone to
+ * another website.
+ */
+export const returnToSchema = z
+  .string()
+  .max(300)
+  .regex(/^\/(?![/\\])[A-Za-z0-9\-._~/?=&%]*$/, 'Invalid return path');
+
+/** The same rule for the browser, used before following a ?next= value. */
+export const isSafeReturnTo = (v: unknown): v is string => returnToSchema.safeParse(v).success;
+
 export const registerSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(80),
     email: emailSchema,
     password: passwordSchema,
+    returnTo: returnToSchema.optional(),
   })
   .strict();
 

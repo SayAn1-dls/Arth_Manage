@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { PASSWORD_MIN } from '@arthakram/shared';
+import { isSafeReturnTo, PASSWORD_MIN } from '@arthakram/shared';
 import { api } from '../../lib/api.js';
 import { AuthLayout } from '../../shell/AuthLayout.js';
 import { Alert, Button, FormErrorSummary, Input, Spinner } from '../../ui/index.js';
@@ -10,15 +10,25 @@ import { useFormErrors } from './useFormErrors.js';
 
 const linkCls = 'font-bold text-ink underline underline-offset-4';
 
+/** The page to continue to after auth: router state first, then a safe ?next= from an emailed link. */
+function useReturnTo(): string | undefined {
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const fromState = (location.state as { from?: string } | null)?.from;
+  const candidate = fromState ?? params.get('next') ?? undefined;
+  return isSafeReturnTo(candidate) ? candidate : undefined;
+}
+const withNext = (path: string, next?: string) =>
+  next ? `${path}?next=${encodeURIComponent(next)}` : path;
+
 export function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const qc = useQueryClient();
   const errors = useFormErrors();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState('');
   const [resent, setResent] = useState(false);
-  const from = (location.state as { from?: string } | null)?.from ?? '/events';
+  const from = useReturnTo() ?? '/events';
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -91,7 +101,7 @@ export function LoginPage() {
         </p>
         <p className="text-sm">
           New here?{' '}
-          <Link to="/register" className={linkCls}>
+          <Link to={withNext('/register', from)} state={{ from }} className={linkCls}>
             Create an account
           </Link>
         </p>
@@ -101,6 +111,7 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
+  const returnTo = useReturnTo();
   const errors = useFormErrors();
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -116,7 +127,7 @@ export function RegisterPage() {
       password: String(form.get('password')),
     };
     try {
-      await api.register(input);
+      await api.register(returnTo ? { ...input, returnTo } : input);
       setSentTo(input.email);
     } catch (err) {
       errors.capture(err);
@@ -130,9 +141,17 @@ export function RegisterPage() {
       <AuthLayout title="Check your email">
         <Alert tone="success" title={`We sent a confirmation link to ${sentTo}`}>
           Open it to finish creating your account. The link works once and expires in 24 hours.
+          {returnTo &&
+            ' After you confirm and sign in, you will go straight back to where you were.'}
         </Alert>
         <p className="mt-4 text-sm">
-          <Link to="/login" className={linkCls}>
+          Wrong address?{' '}
+          <button type="button" className={linkCls} onClick={() => setSentTo(null)}>
+            Use a different email
+          </button>
+        </p>
+        <p className="mt-2 text-sm">
+          <Link to={withNext('/login', returnTo)} state={{ from: returnTo }} className={linkCls}>
             Back to sign in
           </Link>
         </p>
@@ -179,7 +198,7 @@ export function RegisterPage() {
         </Button>
         <p className="text-sm">
           Already registered?{' '}
-          <Link to="/login" className={linkCls}>
+          <Link to={withNext('/login', returnTo)} state={{ from: returnTo }} className={linkCls}>
             Sign in
           </Link>
         </p>
@@ -191,6 +210,7 @@ export function RegisterPage() {
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
+  const next = useReturnTo();
   const [state, setState] = useState<'working' | 'ok' | 'failed'>('working');
   const [message, setMessage] = useState('');
   const started = useRef(false);
@@ -217,7 +237,7 @@ export function VerifyEmailPage() {
         <>
           <Alert tone="success" title={message} />
           <p className="mt-4">
-            <Link to="/login" className={linkCls}>
+            <Link to={withNext('/login', next)} state={{ from: next }} className={linkCls}>
               Continue to sign in
             </Link>
           </p>
