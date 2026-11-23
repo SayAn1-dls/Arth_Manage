@@ -128,7 +128,7 @@ function adminNav(): NavGroup[] {
       'Results & insights',
       [
         item('results', 'Results', 'Results'),
-        item('feedback', 'Feedback', 'Post-event'),
+        item('feedback', 'Feedback & reviews', 'Post-event'),
         item('certificates', 'Certificates', 'Post-event'),
         item('report', 'Impact report', 'Post-event'),
       ],

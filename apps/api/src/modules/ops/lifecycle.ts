@@ -412,7 +412,7 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
         key: 'comments',
         label: 'Release judges’ comments to teams',
         done: rounds.filter(published).every((r) => r.commentsReleasedAt),
-        to: 'feedback',
+        to: 'feedback?tab=comments',
         optional: true,
       },
       {
