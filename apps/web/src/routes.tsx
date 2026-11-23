@@ -40,9 +40,8 @@ import { AnnouncementsPage } from './features/events/AnnouncementsPage.js';
 import { PublicEventPage } from './features/events/PublicEventPage.js';
 import { RegisterForEventPage } from './features/participant/RegisterPage.js';
 import { TeamPage } from './features/participant/TeamPage.js';
-import { ParticipantsPage } from './features/admin/ParticipantsPage.js';
 import { ParticipantDetailPage } from './features/admin/ParticipantDetailPage.js';
-import { TeamsPage } from './features/admin/TeamsPage.js';
+import { TeamsAndParticipantsPage } from './features/admin/TeamsAndParticipantsPage.js';
 import { TeamDetailPage } from './features/admin/TeamDetailPage.js';
 import {
   SubmissionsMonitorPage,
@@ -172,9 +171,8 @@ const routes: RouteObject[] = [
               { path: 'judge', element: <JudgeIndexPage /> },
               { path: 'judge/:roundId', element: <JudgeTeamsPage /> },
               { path: 'judge/:roundId/:teamId', element: <EvaluationPage /> },
-              { path: 'participants', element: <ParticipantsPage /> },
               { path: 'participants/:membershipId', element: <ParticipantDetailPage /> },
-              { path: 'teams', element: <TeamsPage /> },
+              { path: 'teams', element: <TeamsAndParticipantsPage /> },
               { path: 'teams/:teamId', element: <TeamDetailPage /> },
               { path: 'submissions', element: <SubmissionsMonitorPage /> },
               { path: 'submissions/:roundId/:teamId', element: <SubmissionDetailPage /> },
@@ -183,6 +181,9 @@ const routes: RouteObject[] = [
               { path: 'profile', element: <ProfilePage /> },
               { path: 'submission', element: <SubmissionIndexPage /> },
               { path: 'submission/:roundId', element: <SubmissionPage /> },
+              // Old and unknown paths stay inside the event: EventLayout redirects merged pages
+              // (for example participants → teams?view=participants) and explains anything else.
+              { path: '*', element: null },
             ],
           },
         ],

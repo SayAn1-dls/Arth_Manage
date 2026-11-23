@@ -143,8 +143,9 @@ export function EventLayout() {
           {allowed ? (
             <Outlet context={mine} />
           ) : (
-            <Alert tone="info" title="This page isn't available to you">
-              Use the menu to open the screens for your role in this event.
+            <Alert tone="info" title="This page isn't available">
+              It may have moved, or it isn't part of your role in this event.{' '}
+              <Link to={`/events/${eventId}`}>Go to the event home</Link>
             </Alert>
           )}
         </main>

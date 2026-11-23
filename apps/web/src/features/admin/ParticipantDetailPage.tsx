@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
@@ -57,6 +57,8 @@ export function ParticipantDetailPage() {
 }
 
 function Editor({ d, eventId }: { d: Detail; eventId: string }) {
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const backTo = from ?? `/events/${eventId}/teams?view=participants`;
   const qc = useQueryClient();
   const navigate = useNavigate();
   const errors = useFormErrors();
@@ -104,7 +106,7 @@ function Editor({ d, eventId }: { d: Detail; eventId: string }) {
       request('POST', `/events/${eventId}/participants/${d.membershipId}/remove`, { reason }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['participants', eventId] });
-      navigate('..');
+      navigate(`/events/${eventId}/teams?view=participants`);
     },
     onError: (e) => {
       setRemoving(false);
@@ -119,8 +121,8 @@ function Editor({ d, eventId }: { d: Detail; eventId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to=".." className="text-sm">
-        Back to participants
+      <Link to={backTo} className="text-sm">
+        Back to teams & participants
       </Link>
       <div className="flex flex-wrap items-center gap-3">
         <h2>{reg.fullName}</h2>
@@ -131,7 +133,7 @@ function Editor({ d, eventId }: { d: Detail; eventId: string }) {
         {d.team ? (
           <>
             in{' '}
-            <Link to={`../../teams/${d.team.id}`}>
+            <Link to={`/events/${eventId}/teams/${d.team.id}`}>
               {d.team.teamCode} {d.team.name}
             </Link>{' '}
             ({d.team.role.toLowerCase()})

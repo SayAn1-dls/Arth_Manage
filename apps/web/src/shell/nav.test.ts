@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { activeGroupId, activeItem, bottomBarFor, navFor, navItems } from './nav.js';
+import {
+  activeGroupId,
+  activeItem,
+  bottomBarFor,
+  LEGACY_REDIRECTS,
+  navFor,
+  navItems,
+} from './nav.js';
 
 /** Destinations as they were before navigation was grouped: grouping must never add or drop a route. */
 const ROUTES = {
   ADMIN: [
     '',
-    'participants',
     'teams',
     'submissions',
     'people',
@@ -70,7 +76,21 @@ const ROUTES = {
   STAFF: ['', 'tasks', 'checkin', 'issues', 'helpdesk', 'guidebook', 'announcements'],
 } as const;
 
+/** Destinations merged into a consolidated page; each must redirect so old links never dead-end. */
+const MERGED: Partial<Record<keyof typeof ROUTES, string[]>> = {
+  ADMIN: ['participants'],
+};
+
 describe('role navigation', () => {
+  it('redirects every merged destination to the page that replaced it', () => {
+    for (const [role, paths] of Object.entries(MERGED) as [keyof typeof ROUTES, string[]][])
+      for (const p of paths) {
+        const target = LEGACY_REDIRECTS[role]?.[p];
+        expect(target, `${role} ${p}`).toBeTruthy();
+        expect(navItems(navFor(role)).map((i) => i.to)).toContain(target!.split('?')[0]);
+      }
+  });
+
   for (const role of ['ADMIN', 'PARTICIPANT', 'JUDGE', 'STAFF'] as const) {
     it(`${role}: keeps exactly the existing destinations, each once`, () => {
       const to = navItems(navFor(role)).map((i) => i.to);

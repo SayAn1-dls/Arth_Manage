@@ -80,8 +80,7 @@ function adminNav(): NavGroup[] {
       'registrations',
       'Registrations & people',
       [
-        item('teams', 'Teams', 'Registration management'),
-        item('participants', 'Participants', 'Registration management'),
+        item('teams', 'Teams & participants', 'Registration management'),
         item('applications', 'Application review', 'Registration management'),
         item('people', 'People', 'Organising team'),
       ],
@@ -272,4 +271,8 @@ export function bottomBarFor(role: Role, groups: NavGroup[]): NavEntry[] {
  * string) so bookmarks and habits never hit a dead end. Keyed by role because some paths are only merged for
  * one role (participants keep their own pages).
  */
-export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {};
+export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {
+  ADMIN: {
+    participants: 'teams?view=participants',
+  },
+};

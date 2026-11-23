@@ -250,11 +250,15 @@ function LiveNumbers({
       <Card key="reg">
         <h3>Registrations</h3>
         <div className="mt-3 grid grid-cols-3 gap-3">
-          <Stat value={participants.registered} label="registered" to={`${base}/participants`} />
+          <Stat
+            value={participants.registered}
+            label="registered"
+            to={`${base}/teams?view=participants`}
+          />
           <Stat
             value={participants.noTeam}
             label="without a team"
-            to={`${base}/participants?team=none`}
+            to={`${base}/teams?view=participants&team=none`}
           />
           <Stat value={teams.complete} label="complete teams" to={`${base}/teams?complete=yes`} />
         </div>

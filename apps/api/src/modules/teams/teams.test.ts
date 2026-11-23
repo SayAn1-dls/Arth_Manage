@@ -495,6 +495,47 @@ describe('admin people and team management (FR-016..020)', () => {
   });
 });
 
+describe('Teams & participants consolidation', () => {
+  it('finds a team by any member detail, lists member names, and finds a participant by ID', async () => {
+    const w = await openEvent(kit);
+    const lead = await w.participant('Meera Iyer');
+    const created = await lead.agent.post(`${w.base}/teams`).send({ name: 'Quill Squad' });
+    const mate = await w.participant('Dev Malhotra');
+    await mate.agent.post(`${w.base}/teams/join`).send({ code: created.body.team.joinCode });
+
+    const byMember = (await w.admin.get(`${w.base}/teams?q=dev mal`)).body.rows;
+    expect(byMember).toHaveLength(1);
+    expect(byMember[0].members).toEqual(['Meera Iyer', 'Dev Malhotra']); // leader first
+    expect((await w.admin.get(`${w.base}/teams?q=rishihood`)).body.rows).toHaveLength(1);
+    expect((await w.admin.get(`${w.base}/teams?q=${mate.membershipId}`)).body.rows).toHaveLength(1);
+
+    const byId = (await w.admin.get(`${w.base}/participants?q=${mate.membershipId}`)).body.rows;
+    expect(byId.map((r: { name: string }) => r.name)).toEqual(['Dev Malhotra']);
+    // participant search never depends on the team name
+    expect(
+      (await w.admin.get(`${w.base}/participants?q=meera`)).body.rows.map(
+        (r: { teamName: string }) => r.teamName,
+      ),
+    ).toEqual(['Quill Squad']);
+  });
+
+  it('team detail shows the submission state for every round', async () => {
+    const w = await openEvent(kit);
+    const lead = await w.participant('Asha');
+    const created = await lead.agent.post(`${w.base}/teams`).send({ name: 'Byte Me' });
+    const d = (await w.admin.get(`${w.base}/teams/${created.body.team.id}`)).body;
+    expect(d.createdAt).toBeTruthy();
+    expect(d.submissions).toHaveLength(1);
+    expect(d.submissions[0]).toMatchObject({
+      roundId: w.roundId,
+      status: 'NOT_STARTED',
+      versions: 0,
+      lastSubmittedAt: null,
+    });
+    expect((await lead.agent.get(`${w.base}/teams/${created.body.team.id}`)).status).toBe(404);
+  });
+});
+
 describe('invitations and members', () => {
   it('invites a judge by email, accepts only for the matching account, and enforces one role per event', async () => {
     const w = await openEvent(kit);

@@ -120,7 +120,10 @@ describe('CollapsibleNav', () => {
     await user.click(screen.getByRole('link', { name: 'Rubric' }));
     expect(screen.getByRole('link', { name: 'Rubric' })).toHaveAttribute('aria-current', 'page');
     await user.click(screen.getByText('history-back'));
-    expect(screen.getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Teams & participants' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     await user.click(screen.getByText('history-forward'));
     expect(screen.getByRole('link', { name: 'Rubric' })).toHaveAttribute('aria-current', 'page');
   });
