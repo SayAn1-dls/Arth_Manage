@@ -803,8 +803,16 @@ export function workspaceRouter({ db }: Deps) {
       });
       return res.json({ channel: 'announcement', recipients });
     }
-    const { channel: _c, ...target } = input;
-    res.json({ channel: 'email', recipients: (await targetRecipients(c, target)).size });
+    res.json({
+      channel: 'email',
+      recipients: (
+        await targetRecipients(c, {
+          trackId: input.trackId,
+          roundId: input.roundId,
+          shortlistedOnly: input.shortlistedOnly,
+        })
+      ).size,
+    });
   });
 
   router.post('/workspace/broadcast', async (req, res) => {
