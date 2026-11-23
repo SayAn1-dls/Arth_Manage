@@ -90,7 +90,31 @@ export function SetupPage() {
     return <Alert tone="error" title="We couldn't load the event setup" />;
   return (
     <div className="flex flex-col gap-6">
-      <h2>Setup</h2>
+      <div>
+        <h2>Event details &amp; publishing</h2>
+        <p className="mt-1">
+          Details, team rules, what teams see in results and certificate rules save together with{' '}
+          <strong>Save changes</strong>. Publishing, registration questions and closing the event
+          take effect as soon as you use them.
+        </p>
+        <nav aria-label="Sections on this page" className="mt-3">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {[
+              ['publishing', 'Publishing and registration'],
+              ['details', 'Details'],
+              ['teams-eligibility', 'Teams and eligibility'],
+              ['results-visibility', 'Results visibility'],
+              ['certificate-rules', 'Certificates'],
+              ['registration-questions', 'Registration questions'],
+              ['conclude', 'Closing the event'],
+            ].map(([id, label]) => (
+              <li key={id}>
+                <a href={`#${id}`}>{label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
       <PublicationCard event={event.data} />
       <DetailsForm key={event.data.version} event={event.data} />
       <RegistrationFieldsCard eventId={event.data.id} />
@@ -136,6 +160,7 @@ function DetailsForm({ event }: { event: EventDto }) {
     },
   });
 
+  const dirty = JSON.stringify(draft) !== JSON.stringify(fromEvent(event));
   // The box keeps exactly what the organiser types (spaces, new lines); only the saved list is trimmed
   // and split, so typing a declaration word by word works (audit P0-08).
   const [declarationsText, setDeclarationsText] = useState(() => draft.declarations.join('\n'));
@@ -151,7 +176,9 @@ function DetailsForm({ event }: { event: EventDto }) {
           save.mutate(false);
         }}
       >
-        <h3>Details</h3>
+        <h3 id="details" className="scroll-mt-4">
+          Details
+        </h3>
         {errors.formError && (
           <Alert tone="error" title={errors.formError}>
             {errors.code === 'stale_version' && (
@@ -259,7 +286,9 @@ function DetailsForm({ event }: { event: EventDto }) {
           error={errors.fields.description}
         />
 
-        <h3 className="mt-4">Teams and eligibility</h3>
+        <h3 id="teams-eligibility" className="mt-4 scroll-mt-4">
+          Teams and eligibility
+        </h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             id="su-min"
@@ -315,7 +344,9 @@ function DetailsForm({ event }: { event: EventDto }) {
           onChange={(e) => set('trackRequired', e.target.checked)}
         />
 
-        <h3 className="mt-4">What teams see when results are published</h3>
+        <h3 id="results-visibility" className="mt-4 scroll-mt-4">
+          What teams see when results are published
+        </h3>
         <Checkbox
           label="Show the winners list"
           checked={draft.showWinners}
@@ -332,7 +363,9 @@ function DetailsForm({ event }: { event: EventDto }) {
           onChange={(e) => set('showOwnScores', e.target.checked)}
         />
 
-        <h3 className="mt-4">Certificates</h3>
+        <h3 id="certificate-rules" className="mt-4 scroll-mt-4">
+          Certificates
+        </h3>
         <Select
           label="Who receives a participation certificate"
           value={draft.certParticipationRule}
@@ -349,15 +382,14 @@ function DetailsForm({ event }: { event: EventDto }) {
           onChange={(e) => set('certWinnersAlsoParticipate', e.target.checked)}
         />
 
-        <div className="flex items-center gap-3">
-          <Button type="submit" loading={save.isPending}>
+        {/* Stays in view while scrolling the long form, so unsaved edits are never missed (audit P1-27). */}
+        <div className="sticky bottom-16 z-10 -mx-5 flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-3 sm:-mx-6 sm:px-6 lg:bottom-0">
+          <Button type="submit" loading={save.isPending} disabled={!dirty}>
             Save changes
           </Button>
-          {saved && (
-            <span role="status" className="text-sm font-semibold text-success-fg">
-              Saved
-            </span>
-          )}
+          <span role="status" className="text-sm font-semibold">
+            {saved ? 'Saved' : dirty ? 'You have unsaved changes' : 'No changes to save'}
+          </span>
         </div>
       </form>
       <Dialog
@@ -448,7 +480,7 @@ function PublicationCard({ event }: { event: EventDto }) {
   } as const;
 
   return (
-    <Card footerLabel="Publication and registration">
+    <Card footerLabel="Publication and registration" id="publishing">
       <div className="flex flex-wrap items-center gap-2">
         <h3>Publication</h3>
         <Badge tone={statusTone[event.status]}>

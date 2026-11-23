@@ -166,9 +166,14 @@ export function JudgeTeamsPage() {
     queryFn: () => judgingApi.judgeTeams(mine.eventId, roundId, qs.toString()),
     placeholderData: (p) => p,
   });
+  const rounds = useQuery({
+    queryKey: ['judge-rounds', mine.eventId],
+    queryFn: () => judgingApi.judgeRounds(mine.eventId),
+  });
   if (res.isPending) return <Spinner label="Loading your teams" />;
   if (res.isError || !res.data) return <Alert tone="error" title="We couldn't load your teams" />;
   const { round, rows, total } = res.data;
+  const progress = rounds.data?.find((x) => x.roundId === roundId);
   return (
     <div className="flex flex-col gap-4">
       <JudgeLinks eventId={mine.eventId} />
@@ -189,6 +194,31 @@ export function JudgeTeamsPage() {
           {roundLabel[round.judgingStatus as keyof typeof roundLabel]}
         </Badge>
       </div>
+      {progress && (
+        <p className="text-lg text-ink" role="status">
+          <strong>
+            {progress.submitted} of {progress.toEvaluate}
+          </strong>{' '}
+          evaluations submitted
+          {round.judgingDeadline && (
+            <>
+              {' '}
+              · judging deadline {formatDateTime(round.judgingDeadline, mine.timeZone)}
+              {round.judgingStatus === 'OPEN' && +new Date(round.judgingDeadline) > Date.now() && (
+                <>
+                  {' · '}
+                  <Countdown until={round.judgingDeadline} className="font-semibold text-ink" />
+                </>
+              )}
+            </>
+          )}
+          {round.judgingStatus === 'OPEN' && (
+            <span className="block text-base">
+              Only submitted evaluations count; drafts do not.
+            </span>
+          )}
+        </p>
+      )}
       {round.judgingStatus === 'NOT_OPEN' && (
         <Alert tone="info" title="Judging opens after submissions close">
           You can see your assigned teams now. Their work and the rubric appear when judging opens.
@@ -269,23 +299,17 @@ export function JudgeTeamsPage() {
                 </h3>
                 <Badge tone="info">{r.teamCode}</Badge>
               </div>
-              <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="font-semibold">Your evaluation:</span>
                 <Badge tone={evalTone[r.evaluationStatus]}>{evalLabel[r.evaluationStatus]}</Badge>
-                <Badge
-                  tone={
-                    r.submission === 'DID_NOT_SUBMIT'
-                      ? 'warning'
-                      : r.submission === 'LATE'
-                        ? 'warning'
-                        : 'success'
-                  }
-                >
-                  {r.submission === 'DID_NOT_SUBMIT'
-                    ? 'Did not submit'
-                    : r.submission === 'LATE'
-                      ? 'Submitted late'
-                      : 'Submitted'}
-                </Badge>
+              </p>
+              <p className="mt-1">
+                <span className="font-semibold">Project:</span>{' '}
+                {r.submission === 'DID_NOT_SUBMIT'
+                  ? 'the team did not submit, nothing to evaluate'
+                  : r.submission === 'LATE'
+                    ? 'submitted late'
+                    : 'submitted on time'}
               </p>
               {r.problemTitle && <p className="mt-2 text-sm">{r.problemTitle}</p>}
             </Card>
