@@ -1,10 +1,14 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import type { MyEvent } from '@arthakram/shared';
+import { request } from '../../lib/api.js';
+import { engageApi } from '../../lib/engage.js';
 import { eventApi, useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
-import { participantApi } from '../../lib/participant.js';
-import { Badge, Card, Countdown } from '../../ui/index.js';
+import { opsApi } from '../../lib/ops.js';
+import { participantApi, type SubmissionView } from '../../lib/participant.js';
+import { Alert, Badge, Card, Countdown, Spinner } from '../../ui/index.js';
+import { APPLICATION_TEXT, DeadlineLines } from './Deadline.js';
 
 const tone = {
   NOT_STARTED: 'info',
@@ -15,7 +19,18 @@ const tone = {
   NOT_SUBMITTED: 'error',
 } as const;
 
-/** What a team needs to know right now: team state, the next deadline and each round's submission status (PRD FR-059). */
+interface Step {
+  title: string;
+  text: string;
+  to?: string;
+  action?: string;
+}
+
+/**
+ * My event: the participant's home (PRD FR-059, §11.6 "next required action"). The next step comes first,
+ * then the official deadlines, application state, team, updates, and results and certificates once they
+ * exist. Statuses are always explained in words.
+ */
 export function ParticipantPanel({ mine }: { mine: MyEvent }) {
   const base = `/events/${mine.eventId}`;
   const event = useEvent(mine.eventId);
@@ -35,75 +50,276 @@ export function ParticipantPanel({ mine }: { mine: MyEvent }) {
       retry: false,
     })),
   });
+  const application = useQuery({
+    queryKey: ['application', mine.eventId],
+    queryFn: () =>
+      request<{ team: { applicationStatus: string; applicationNote: string | null } | null }>(
+        'GET',
+        `${base}/workspace/application`,
+      ),
+    enabled: Boolean(event.data?.applicationReview && team.data),
+  });
+  const results = useQuery({
+    queryKey: ['published-results', mine.eventId],
+    queryFn: () => opsApi.published(mine.eventId),
+    retry: false,
+  });
+  const certificates = useQuery({
+    queryKey: ['my-certificates', mine.eventId],
+    queryFn: () => engageApi.myCertificates(mine.eventId),
+    retry: false,
+  });
+  const announcements = useQuery({
+    queryKey: ['announcements', mine.eventId],
+    queryFn: () => eventApi.announcements(mine.eventId),
+  });
+  const inbox = useQuery({
+    queryKey: ['inbox', mine.eventId],
+    queryFn: () =>
+      request<{ messages: { id: string; subject: string; createdAt: string }[] }>(
+        'GET',
+        `${base}/workspace/inbox`,
+      ),
+  });
+
+  if (team.isPending || event.isPending) return <Spinner label="Loading your event" />;
+  const e = event.data;
+  const t = team.data;
+  const views = subs.map((s) => s.data).filter((s): s is SubmissionView => Boolean(s));
+  const appStatus = application.data?.team?.applicationStatus;
+  const published = results.data?.rounds ?? [];
+  const certs = (certificates.data?.certificates ?? []).filter((c) => c.downloadable);
+  const now = Date.now();
+
+  // ── The one next step ──
+  const open = views.find(
+    (v) => v.editable && v.cutoff && +new Date(v.cutoff) > now && v.status !== 'SUBMITTED',
+  );
+  let next: Step;
+  if (!t)
+    next =
+      e?.registrationStatus === 'OPEN'
+        ? {
+            title: 'Join or create a team',
+            text: 'You need a team before you can submit.',
+            to: `${base}/team`,
+            action: 'Go to My team',
+          }
+        : {
+            title: 'Ask to be placed in a team',
+            text: 'Registration is closed, so new teams cannot be formed here.',
+            to: `${base}/support`,
+            action: 'Ask the organisers',
+          };
+  else if (!t.complete)
+    next = {
+      title: `Add ${t.min - t.size} more teammate${t.min - t.size === 1 ? '' : 's'}`,
+      text: `Your team needs at least ${t.min} members. Share your invite code from My team.`,
+      to: `${base}/team`,
+      action: 'Go to My team',
+    };
+  else if (appStatus && appStatus !== 'ACCEPTED')
+    next = {
+      title: `Application: ${APPLICATION_TEXT[appStatus]?.label ?? appStatus}`,
+      text: APPLICATION_TEXT[appStatus]?.text ?? '',
+    };
+  else if (open)
+    next = {
+      title: `Submit for ${open.round.name}`,
+      text: `${open.status === 'DRAFT' ? 'You have a draft. ' : ''}Submit before your cutoff, ${formatDateTime(open.cutoff!, mine.timeZone)}.`,
+      to: `${base}/submission/${open.round.id}`,
+      action: open.status === 'DRAFT' ? 'Continue your draft' : 'Start your submission',
+    };
+  else if (published.length > 0)
+    next = {
+      title: 'Results are out',
+      text: 'See how your team did and read the judges’ comments.',
+      to: `${base}/results`,
+      action: 'See results',
+    };
+  else if (
+    views.some(
+      (v) => v.status === 'SUBMITTED' || v.status === 'SUBMITTED_LATE' || v.status === 'LOCKED',
+    )
+  )
+    next = {
+      title: 'You have submitted',
+      text: 'Nothing else is needed right now. Results will appear here when the organisers publish them.',
+    };
+  else
+    next = {
+      title: 'Read the guidebook',
+      text: 'Rules, schedule and judging criteria are in the guidebook.',
+      to: `${base}/guidebook`,
+      action: 'Open the guidebook',
+    };
+
+  const updates = [
+    ...(announcements.data ?? []).map((a) => ({
+      id: `a-${a.id}`,
+      title: a.title,
+      at: a.createdAt,
+    })),
+    ...(inbox.data?.messages ?? []).map((m) => ({
+      id: `m-${m.id}`,
+      title: m.subject,
+      at: m.createdAt,
+    })),
+  ]
+    .sort((x, y) => y.at.localeCompare(x.at))
+    .slice(0, 3);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Card footerLabel="My team">
-        {team.isPending && <p>Loading…</p>}
-        {team.data === null && (
-          <>
-            <h3>You are not in a team yet</h3>
-            <p className="mt-1">
-              {event.data?.registrationStatus === 'OPEN' ? (
-                <>
-                  Create a team or join one with a code.{' '}
-                  <Link to={`${base}/team`}>Go to My team</Link>
-                </>
-              ) : (
-                'Registration is closed. Contact the organisers to be placed in a team.'
-              )}
-            </p>
-          </>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2>My event</h2>
+        {e && (
+          <p className="mt-1">
+            {formatDateTime(e.startsAt, e.timeZone)} to {formatDateTime(e.endsAt, e.timeZone)}
+            {e.venue ? ` · ${e.venue}` : ''}
+          </p>
         )}
-        {team.data && (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3>
-                <Link to={`${base}/team`}>{team.data.name}</Link>
-              </h3>
-              <Badge tone="info">{team.data.teamCode}</Badge>
-              {team.data.complete ? (
-                <Badge tone="success">Complete</Badge>
-              ) : (
-                <Badge tone="warning">Needs {team.data.min - team.data.size} more</Badge>
-              )}
-            </div>
-            <p className="mt-2 text-sm">
-              {team.data.size} of {team.data.max} members
-            </p>
-          </>
+      </div>
+
+      <section
+        aria-labelledby="next-h"
+        className="rounded-card border-2 border-ink bg-white p-5 sm:p-6"
+      >
+        <p className="text-sm font-semibold">Your next step</p>
+        <h3 id="next-h" className="mt-1 text-xl">
+          {next.title}
+        </h3>
+        <p className="mt-1">{next.text}</p>
+        {next.to && (
+          <Link
+            to={next.to}
+            className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-ember px-5 font-bold text-ink no-underline"
+          >
+            {next.action}
+          </Link>
         )}
-      </Card>
-      <Card footerLabel="Submissions">
-        <ul className="flex flex-col gap-3">
-          {rounds.data?.map((r, i) => {
-            const s = subs[i]?.data;
-            const deadline = s?.cutoff ?? r.submissionDeadline;
-            return (
-              <li key={r.id}>
-                <p className="flex flex-wrap items-center gap-2">
-                  <strong>
-                    <Link to={`${base}/submission/${r.id}`}>{r.name}</Link>
-                  </strong>
-                  {s ? (
-                    <Badge tone={tone[s.status]}>{s.statusLabel}</Badge>
-                  ) : (
-                    <Badge tone="info">{team.data ? 'Loading' : 'Needs a team'}</Badge>
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <h3>Team</h3>
+          {t ? (
+            <>
+              <p className="mt-2 flex flex-wrap items-center gap-2">
+                <Link to={`${base}/team`} className="font-bold">
+                  {t.name}
+                </Link>
+                {t.complete ? (
+                  <Badge tone="success">Complete</Badge>
+                ) : (
+                  <Badge tone="warning">Needs {t.min - t.size} more</Badge>
+                )}
+              </p>
+              <p className="mt-1 text-sm">
+                {t.size} of {t.max} members · team number {t.teamCode}
+              </p>
+              {appStatus && (
+                <p className="mt-2">
+                  <strong>Application:</strong> {APPLICATION_TEXT[appStatus]?.label ?? appStatus}.{' '}
+                  {APPLICATION_TEXT[appStatus]?.text}
+                  {application.data?.team?.applicationNote && (
+                    <span className="block">“{application.data.team.applicationNote}”</span>
                   )}
                 </p>
-                {deadline && (
-                  <p className="text-sm">
-                    {formatDateTime(deadline, mine.timeZone)}{' '}
-                    {(s ? s.editable : true) && new Date(deadline) > new Date() && (
-                      <Countdown until={deadline} className="font-semibold text-ink" />
+              )}
+            </>
+          ) : (
+            <p className="mt-2">You are not in a team yet.</p>
+          )}
+        </Card>
+
+        <Card>
+          <h3>Submissions</h3>
+          {(rounds.data?.length ?? 0) === 0 && (
+            <p className="mt-2">No rounds have been announced yet.</p>
+          )}
+          <ul className="mt-2 flex flex-col gap-4">
+            {rounds.data?.map((r, i) => {
+              const s = subs[i];
+              const v = s?.data;
+              return (
+                <li key={r.id}>
+                  <p className="flex flex-wrap items-center gap-2">
+                    <Link to={`${base}/submission/${r.id}`} className="font-bold">
+                      {r.name}
+                    </Link>
+                    {v ? (
+                      <Badge tone={tone[v.status]}>{v.statusLabel}</Badge>
+                    ) : !t ? (
+                      <Badge tone="info">Needs a team</Badge>
+                    ) : s?.isError ? (
+                      <Badge tone="warning">Couldn’t load: open the round</Badge>
+                    ) : (
+                      <Badge tone="info">Loading</Badge>
                     )}
                   </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
+                  {v?.blockedReason && <p className="mt-1 text-sm">{v.blockedReason}</p>}
+                  <DeadlineLines
+                    compact
+                    deadline={r.submissionDeadline ?? null}
+                    graceMinutes={r.graceMinutes}
+                    extensionDeadline={v?.extensionDeadline ?? null}
+                    timeZone={mine.timeZone}
+                  />
+                  {v?.editable && v.cutoff && +new Date(v.cutoff) > now && (
+                    <p className="text-sm">
+                      Time left: <Countdown until={v.cutoff} className="font-semibold text-ink" />
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between gap-2">
+            <h3>Updates</h3>
+            <Link to={`${base}/updates`} className="text-sm">
+              All updates
+            </Link>
+          </div>
+          {updates.length === 0 ? (
+            <p className="mt-2">No updates yet.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2">
+              {updates.map((u) => (
+                <li key={u.id}>
+                  <Link to={`${base}/updates`}>{u.title}</Link>
+                  <span className="block text-sm">{formatDateTime(u.at, mine.timeZone)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        {(published.length > 0 || certs.length > 0) && (
+          <Card>
+            <h3>Results &amp; certificates</h3>
+            {published.map((p) => (
+              <p key={p.roundId} className="mt-2">
+                <Link to={`${base}/results`}>{p.roundName} results</Link>
+                {p.own?.rank ? ` · your team placed ${p.own.rank}` : ''}
+              </p>
+            ))}
+            {certs.length > 0 && (
+              <p className="mt-2">
+                <Link to={`${base}/certificates`}>
+                  {certs.length} certificate{certs.length === 1 ? '' : 's'} ready to download
+                </Link>
+              </p>
+            )}
+          </Card>
+        )}
+      </div>
+      {results.isError && certificates.isError && (
+        <Alert tone="warning" title="Some information could not load. Refresh to try again." />
+      )}
     </div>
   );
 }

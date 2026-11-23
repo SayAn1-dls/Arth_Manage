@@ -69,9 +69,9 @@ export function EventLayout() {
     ? [
         {
           id: 'report',
-          label: 'Impact report',
+          label: 'Sponsor overview',
           flat: true,
-          items: [{ to: 'report', label: 'Impact report' }],
+          items: [{ to: 'report', label: 'Sponsor overview' }],
         },
       ]
     : navFor(mine.role);

@@ -228,6 +228,8 @@ export interface EventDto {
   teamMax: number;
   declarations: string[];
   trackRequired: boolean;
+  /** True once the organisers started screening team applications (submissions then need acceptance). */
+  applicationReview: boolean;
   showWinners: boolean;
   showOwnRank: boolean;
   showOwnScores: boolean;

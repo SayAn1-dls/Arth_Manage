@@ -24,6 +24,7 @@ export function eventDto(e: Event): EventDto {
     teamMax: e.teamMax,
     declarations: e.declarations,
     trackRequired: e.trackRequired,
+    applicationReview: e.applicationReview,
     showWinners: e.showWinners,
     showOwnRank: e.showOwnRank,
     showOwnScores: e.showOwnScores,

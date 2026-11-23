@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useOutletContext } from 'react-router';
+import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, MapPin, Undo2 } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
+import { cn } from '../../ui/cn.js';
 import { opsApi, type CheckInCard, type Issue, type StaffTask } from '../../lib/ops.js';
 import {
   Alert,
@@ -42,39 +43,85 @@ const typeLabel = {
   GENERAL: 'General',
 } as const;
 
-/** Staff home: what to do next, from real task data (PRD FR-122). */
+/** Staff home: check-in first, then the tasks that need doing (PRD FR-122, §11.6: check in a team in ≤ 30 s). */
 export function StaffPanel({ mine }: { mine: MyEvent }) {
+  const base = `/events/${mine.eventId}`;
   const q = useQuery({
     queryKey: ['staff-tasks', mine.eventId, ''],
     queryFn: () => opsApi.tasks(mine.eventId),
   });
-  if (q.isPending) return <Skeleton className="h-24" />;
+  const summary = useQuery({
+    queryKey: ['checkin-summary', mine.eventId],
+    queryFn: () => opsApi.checkinSummary(mine.eventId),
+    refetchInterval: 30000,
+  });
   const tasks = q.data ?? [];
-  const open = tasks.filter((t) => t.status !== 'DONE');
+  // Overdue first, then blocked, then by due time: what needs doing now is at the top.
+  const open = tasks
+    .filter((t) => t.status !== 'DONE')
+    .sort(
+      (x, y) =>
+        Number(y.overdue) - Number(x.overdue) ||
+        Number(y.status === 'BLOCKED') - Number(x.status === 'BLOCKED') ||
+        (x.dueAt ?? '9').localeCompare(y.dueAt ?? '9'),
+    );
+  const action =
+    'flex min-h-16 items-center justify-center rounded-card border-2 border-ink bg-white px-4 text-center text-lg font-bold text-ink no-underline hover:bg-blush';
   return (
-    <Card footerLabel="Your tasks">
-      {tasks.length === 0 ? (
-        <p>
-          No tasks assigned yet. Open <strong>Check-in</strong> to help at the desk.
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2>Staff dashboard</h2>
+        <p className="mt-1">
+          Check people in, work through your tasks, and report anything that goes wrong.
         </p>
-      ) : (
-        <>
-          <h3>
-            {open.length === 0
-              ? 'All your tasks are done'
-              : `${open.length} task${open.length === 1 ? '' : 's'} to do`}
-          </h3>
-          <ul className="mt-2 flex flex-col gap-1">
-            {open.slice(0, 4).map((t) => (
-              <li key={t.id}>
-                {t.title} <Badge tone={statusTone[t.status]}>{statusLabel[t.status]}</Badge>
-                {t.overdue && <Badge tone="error">Overdue</Badge>}
-              </li>
-            ))}
-          </ul>
-        </>
+      </div>
+      <nav aria-label="Staff actions" className="grid gap-3 sm:grid-cols-3">
+        <Link to={`${base}/checkin`} className={cn(action, 'bg-ember')}>
+          Check in a team
+        </Link>
+        <Link to={`${base}/tasks`} className={action}>
+          My tasks
+        </Link>
+        <Link to={`${base}/issues`} className={action}>
+          Report an issue
+        </Link>
+      </nav>
+      {summary.data && (
+        <p className="text-lg text-ink">
+          <strong>
+            {summary.data.checkedIn} of {summary.data.participants}
+          </strong>{' '}
+          people checked in · {summary.data.teams.checkedIn} teams fully in ·{' '}
+          {summary.data.teams.partial} partly in
+        </p>
       )}
-    </Card>
+      <Card>
+        {q.isPending ? (
+          <Skeleton className="h-16" />
+        ) : q.isError ? (
+          <Alert tone="error" title="We couldn't load your tasks" />
+        ) : tasks.length === 0 ? (
+          <p>No tasks are assigned to you yet. Help at the check-in desk in the meantime.</p>
+        ) : (
+          <>
+            <h3>
+              {open.length === 0
+                ? 'All your tasks are done'
+                : `${open.length} task${open.length === 1 ? '' : 's'} to do`}
+            </h3>
+            <ul className="mt-2 flex flex-col gap-2">
+              {open.slice(0, 5).map((t) => (
+                <li key={t.id} className="flex flex-wrap items-center gap-2">
+                  <Link to={`${base}/tasks`}>{t.title}</Link>
+                  <Badge tone={statusTone[t.status]}>{statusLabel[t.status]}</Badge>
+                  {t.overdue && <Badge tone="error">Overdue</Badge>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -537,8 +584,11 @@ function TeamCard({ card, mine, term }: { card: CheckInCard; mine: MyEvent; term
         ))}
       </ul>
       <p className="mt-2 text-sm">
-        Wrong name or team? <a href={`../issues`}>Report an issue</a>. Staff cannot edit names or
-        team membership.
+        Wrong name or team?{' '}
+        <Link to={`/events/${mine.eventId}/issues?team=${encodeURIComponent(card.teamCode)}`}>
+          Report an issue for {card.teamCode}
+        </Link>
+        . Staff cannot edit names or team membership.
       </p>
       <Dialog
         open={verifying !== null}
@@ -587,7 +637,8 @@ export function IssuesPage() {
   });
   const [category, setCategory] = useState('OTHER');
   const [description, setDescription] = useState('');
-  const [teamCode, setTeamCode] = useState('');
+  const [params] = useSearchParams();
+  const [teamCode, setTeamCode] = useState(params.get('team') ?? '');
   const [urgent, setUrgent] = useState(false);
   const [resolving, setResolving] = useState<Issue | null>(null);
   const [note, setNote] = useState('');

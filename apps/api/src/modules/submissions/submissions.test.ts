@@ -469,3 +469,31 @@ describe('rounds created later', () => {
     ]);
   });
 });
+
+describe('submission eligibility is explained before anyone types (audit P0-03)', () => {
+  it('reports the block on the view, makes the form read-only, and the write path refuses with the same words', async () => {
+    const w = await openEvent(kit);
+    const lead = await w.participant('Lead');
+    await lead.agent.post(`${w.base}/teams`).send({ name: 'Byte Me' });
+    const url = `${w.base}/rounds/${w.roundId}/submission`;
+    const before = (await lead.agent.get(url)).body;
+    expect(before.blockedReason).toBeNull();
+    expect(before.editable).toBe(true);
+
+    await db.event.update({ where: { id: w.eventId }, data: { applicationReview: true } });
+    const view = (await lead.agent.get(url)).body;
+    expect(view.editable).toBe(false);
+    expect(view.blockedReason).toMatch(/application must be accepted/);
+    const write = await lead.agent
+      .put(`${url}/draft`)
+      .send({ title: 'x', summary: 'y', values: {}, version: view.draft.version });
+    expect(write.status).toBe(403);
+    expect(write.body.error.message).toBe(view.blockedReason);
+
+    await db.team.updateMany({
+      where: { eventId: w.eventId },
+      data: { applicationStatus: 'ACCEPTED' },
+    });
+    expect((await lead.agent.get(url)).body.blockedReason).toBeNull();
+  });
+});

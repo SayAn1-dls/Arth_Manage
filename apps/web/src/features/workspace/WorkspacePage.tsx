@@ -167,11 +167,23 @@ export function WorkspacePage({ section }: { section: string }) {
   );
   if (me.accessLevel === 'SPONSOR_VIEWER' && section === 'report')
     return (
-      <Panel>
-        <h2 className="text-3xl">Event impact report</h2>
-        <p>Aggregated event outcomes for sponsors.</p>
-        <a href={`/api/v1${base}/report.pdf`}>Download impact report PDF</a>
-      </Panel>
+      <div className="flex flex-col gap-4">
+        <h2>Sponsor overview</h2>
+        <p>
+          As a sponsor you can see this event's aggregate impact report: totals, colleges, tracks
+          and judging averages. It never contains participants' names, contact details or individual
+          scores.
+        </p>
+        <a
+          href={`/api/v1${base}/report.pdf`}
+          className="inline-flex min-h-11 items-center self-start rounded-pill bg-ember px-5 font-bold text-ink no-underline"
+        >
+          Download the impact report (PDF)
+        </a>
+        <p className="text-sm">
+          The report reflects the event's data at the moment you download it.
+        </p>
+      </div>
     );
   if (options.isPending) return <Spinner label="Loading workspace" />;
   const queryError =

@@ -89,6 +89,10 @@ export interface JudgeRound {
   judgingDeadline: string | null;
   assigned: number;
   submitted: number;
+  /** Assigned teams that never submitted once judging opened: nothing to evaluate (D-40). */
+  notRequired: number;
+  /** Assigned teams that need an evaluation from this judge. */
+  toEvaluate: number;
   rubricState: string | null;
 }
 export interface JudgeTeamRow {

@@ -46,6 +46,8 @@ export interface SubmissionView {
   cutoff: string | null;
   editable: boolean;
   closedReason: string | null;
+  /** Why this team may not submit in this round at all (screening, shortlist), or null. */
+  blockedReason?: string | null;
   extensionDeadline?: string | null;
   minSizeOverride?: boolean;
   team: {

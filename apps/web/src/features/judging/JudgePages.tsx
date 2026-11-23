@@ -42,53 +42,89 @@ export const evalLabel: Record<EvalStatus, string> = {
   CONFLICT: 'Conflict',
 };
 
-/** Judge home: assigned rounds with live progress from persisted evaluations (PRD FR-091). */
+/** Judge home: assigned rounds with live progress from persisted evaluations (PRD FR-091, audit P1-18..20). */
 export function JudgeRoundsPanel({ mine }: { mine: MyEvent }) {
   const q = useQuery({
     queryKey: ['judge-rounds', mine.eventId],
     queryFn: () => judgingApi.judgeRounds(mine.eventId),
   });
   if (q.isPending) return <Skeleton className="h-32" />;
+  if (q.isError) return <Alert tone="error" title="We couldn't load your rounds" />;
   if (q.data?.length === 0)
     return (
       <EmptyState title="You have no teams assigned yet">
         The organisers will assign teams to you before judging opens. You will see them here.
       </EmptyState>
     );
+  const now = Date.now();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {q.data?.map((r: JudgeRound) => (
-        <Card key={r.roundId} footerLabel={`${r.submitted} of ${r.assigned} evaluated`}>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3>
-              <Link to={`/events/${mine.eventId}/judge/${r.roundId}`}>{r.name}</Link>
-            </h3>
-            <Badge tone={roundTone[r.judgingStatus]}>{roundLabel[r.judgingStatus]}</Badge>
-          </div>
-          <p className="mt-2 text-sm">
-            {r.submitted === r.assigned && r.assigned > 0
-              ? 'All your evaluations are submitted.'
-              : `${r.assigned - r.submitted} team${r.assigned - r.submitted === 1 ? '' : 's'} left to evaluate.`}
-          </p>
-          {r.judgingDeadline && (
-            <p className="text-sm">
-              Judging deadline {formatDateTime(r.judgingDeadline, mine.timeZone)}{' '}
-              {r.judgingStatus === 'OPEN' && (
-                <Countdown until={r.judgingDeadline} className="font-semibold text-ink" />
-              )}
+      {q.data?.map((r: JudgeRound) => {
+        const left = Math.max(r.toEvaluate - r.submitted, 0);
+        const passed = r.judgingDeadline !== null && +new Date(r.judgingDeadline) <= now;
+        return (
+          <Card key={r.roundId}>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3>{r.name}</h3>
+              <Badge tone={roundTone[r.judgingStatus]}>{roundLabel[r.judgingStatus]}</Badge>
+            </div>
+            <p className="mt-2 text-lg font-semibold text-ink">
+              {r.toEvaluate === 0
+                ? 'No teams need your evaluation.'
+                : left === 0
+                  ? 'All your evaluations are submitted.'
+                  : `${left} of ${r.toEvaluate} team${r.toEvaluate === 1 ? '' : 's'} left to evaluate`}
             </p>
-          )}
-          {r.judgingStatus === 'NOT_OPEN' && (
-            <p className="mt-1 text-sm">Judging opens after submissions close.</p>
-          )}
-          <progress
-            className="mt-3 w-full accent-ember"
-            value={r.submitted}
-            max={Math.max(r.assigned, 1)}
-            aria-label={`${r.submitted} of ${r.assigned} evaluations submitted`}
-          />
-        </Card>
-      ))}
+            {r.notRequired > 0 && (
+              <p>
+                {r.notRequired} assigned team{r.notRequired === 1 ? '' : 's'} did not submit, so
+                there is nothing to evaluate for {r.notRequired === 1 ? 'it' : 'them'}.
+              </p>
+            )}
+            <progress
+              className="mt-3 w-full accent-ember"
+              value={r.submitted}
+              max={Math.max(r.toEvaluate, 1)}
+              aria-label={`${r.submitted} of ${r.toEvaluate} evaluations submitted`}
+            />
+            {r.judgingDeadline && (
+              <p className="mt-2">
+                Judging deadline {formatDateTime(r.judgingDeadline, mine.timeZone)}
+                {r.judgingStatus === 'OPEN' && !passed && (
+                  <>
+                    {' · '}
+                    <Countdown until={r.judgingDeadline} className="font-semibold text-ink" />
+                  </>
+                )}
+              </p>
+            )}
+            {r.judgingStatus === 'OPEN' && passed && left > 0 && (
+              <Alert tone="warning" title="The judging deadline has passed" className="mt-2">
+                Submit your remaining evaluations now. Organisers will close judging soon, and
+                drafts do not count.
+              </Alert>
+            )}
+            {r.judgingStatus === 'OPEN' && !passed && (
+              <p className="mt-1 text-sm">Only submitted evaluations count; drafts do not.</p>
+            )}
+            {r.judgingStatus === 'NOT_OPEN' && (
+              <p className="mt-1">
+                Judging opens after submissions close. Until then you can read the briefing and try
+                the practice team.
+              </p>
+            )}
+            {r.judgingStatus === 'CLOSED' && (
+              <p className="mt-1">Judging for this round is closed.</p>
+            )}
+            <Link
+              to={`/events/${mine.eventId}/judge/${r.roundId}`}
+              className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-ember px-5 font-bold text-ink no-underline"
+            >
+              {r.judgingStatus === 'OPEN' && left > 0 ? 'Continue judging' : 'Open my teams'}
+            </Link>
+          </Card>
+        );
+      })}
     </div>
   );
 }
