@@ -22,8 +22,9 @@ export function AppShell() {
               variant="ghost"
               icon={<LogOut aria-hidden className="size-4" />}
               onClick={async () => {
+                // Leave the event first, so the next person to sign in is not sent back to this page.
+                navigate('/login', { replace: true });
                 await signOut();
-                navigate('/login');
               }}
             >
               Sign out

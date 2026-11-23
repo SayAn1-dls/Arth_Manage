@@ -97,6 +97,7 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
     certificates,
     feedbackForms,
     firstRoundAssignments,
+    urgentList,
   ] = await Promise.all([
     db.eventMembership.count({ where: { eventId: e.id, role: 'JUDGE', status: 'ACTIVE' } }),
     db.eventMembership.count({ where: { eventId: e.id, role: 'STAFF', status: 'ACTIVE' } }),
@@ -134,6 +135,12 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
     rounds[0]
       ? db.judgeAssignment.count({ where: { roundId: rounds[0].id, status: 'ACTIVE' } })
       : Promise.resolve(0),
+    db.issueReport.findMany({
+      where: { eventId: e.id, status: { not: 'RESOLVED' }, severity: 'URGENT' },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { id: true, description: true },
+    }),
   ]);
 
   // Judging work per round: submitted teams without enough judges, and evaluations still to submit.
@@ -165,11 +172,20 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
   // ── Needs attention: only items with something to do, each linking to its filtered list ──
   const attention: AttentionItem[] = [];
   const add = (item: AttentionItem) => item.count > 0 && attention.push(item);
+  // Urgent issues are listed one by one with what happened, so nobody has to open the queue to know.
+  for (const i of urgentList)
+    add({
+      key: `urgent-${i.id}`,
+      label: `Urgent issue: ${i.description.slice(0, 100)}`,
+      count: 1,
+      to: 'issues',
+      tone: 'error',
+    });
   add({
-    key: 'urgent-issues',
-    label: `${plural(urgentIssues, 'urgent issue')} open`,
-    count: urgentIssues,
-    to: 'issues?severity=URGENT',
+    key: 'urgent-issues-more',
+    label: `${plural(urgentIssues - urgentList.length, 'more urgent issue')} open`,
+    count: Math.max(urgentIssues - urgentList.length, 0),
+    to: 'issues',
     tone: 'error',
   });
   add({

@@ -162,9 +162,9 @@ export function navFor(role: Role): NavGroup[] {
           'outcomes',
           'Results & certificates',
           [
-            item('results', 'Results & judges’ feedback'),
+            item('results', 'Results'),
             item('certificates', 'Certificates'),
-            item('feedback', 'Event survey'),
+            item('feedback', 'Survey & judges’ comments'),
           ],
           'Results, judges’ comments, certificates and the event survey.',
         ),

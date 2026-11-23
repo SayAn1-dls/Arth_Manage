@@ -66,7 +66,7 @@ export function StaffPanel({ mine }: { mine: MyEvent }) {
         (x.dueAt ?? '9').localeCompare(y.dueAt ?? '9'),
     );
   const action =
-    'flex min-h-16 items-center justify-center rounded-card border-2 border-ink bg-white px-4 text-center text-lg font-bold text-ink no-underline hover:bg-blush';
+    'flex min-h-16 items-center justify-center rounded-card border-2 border-ink px-4 text-center text-lg font-bold text-ink no-underline';
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -79,10 +79,10 @@ export function StaffPanel({ mine }: { mine: MyEvent }) {
         <Link to={`${base}/checkin`} className={cn(action, 'bg-ember')}>
           Check in a team
         </Link>
-        <Link to={`${base}/tasks`} className={action}>
+        <Link to={`${base}/tasks`} className={cn(action, 'bg-white hover:bg-blush')}>
           My tasks
         </Link>
-        <Link to={`${base}/issues`} className={action}>
+        <Link to={`${base}/issues`} className={cn(action, 'bg-white hover:bg-blush')}>
           Report an issue
         </Link>
       </nav>
@@ -91,7 +91,8 @@ export function StaffPanel({ mine }: { mine: MyEvent }) {
           <strong>
             {summary.data.checkedIn} of {summary.data.participants}
           </strong>{' '}
-          people checked in · {summary.data.teams.checkedIn} teams fully in ·{' '}
+          people checked in · {summary.data.teams.checkedIn}{' '}
+          {summary.data.teams.checkedIn === 1 ? 'team' : 'teams'} fully in ·{' '}
           {summary.data.teams.partial} partly in
         </p>
       )}

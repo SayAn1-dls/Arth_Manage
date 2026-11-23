@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useOutletContext, useParams } from 'react-router';
+import { APPLICATION_TEXT } from '../participant/Deadline.js';
 import type { MyEvent } from '@arthakram/shared';
 import { ApiError, request } from '../../lib/api.js';
 import {
@@ -250,10 +251,29 @@ export function WorkspacePage({ section }: { section: string }) {
           </Panel>
         ) : (
           <Panel>
-            <h3 className="text-xl">
-              {application.data?.team?.applicationStatus ?? 'Create or join a team first'}
-            </h3>
-            <p>{application.data?.team?.applicationNote}</p>
+            {!application.data?.team ? (
+              <>
+                <h3 className="text-xl">You are not in a team yet</h3>
+                <p>
+                  Applications are made by teams.{' '}
+                  <Link to={`/events/${eventId}/team`}>Create or join a team</Link> first.
+                </p>
+              </>
+            ) : (
+              (() => {
+                const st = application.data.team.applicationStatus;
+                const t = APPLICATION_TEXT[st];
+                return (
+                  <>
+                    <h3 className="text-xl">Application: {t?.label ?? st}</h3>
+                    <p>{t?.text}</p>
+                    {application.data.team.applicationNote && (
+                      <p>Note from the organisers: “{application.data.team.applicationNote}”</p>
+                    )}
+                  </>
+                );
+              })()
+            )}
           </Panel>
         ))}
       {section === 'advancement' && (

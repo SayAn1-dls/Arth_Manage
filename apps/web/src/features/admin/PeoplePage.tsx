@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
-import { formatDateTime, } from '../../lib/format.js';
+import { formatDateTime } from '../../lib/format.js';
 import {
   Alert,
   Badge,
