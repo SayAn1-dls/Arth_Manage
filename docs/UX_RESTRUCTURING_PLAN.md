@@ -334,3 +334,27 @@ No other schema changes are needed.
 ### Verification
 
 API, web unit, e2e, lint, brand lint, typecheck and production build are run before the final commit. Visual QA was done in the browser at 1024 and 375 px for every admin division, the participant, judge and staff dashboards, Support & requests, Communication, Feedback & reviews and the stacked tables. The final report gives the exact figures.
+
+---
+
+## 13. UX spec v1.0: layout restructuring (24 Nov 2026)
+
+Built on this same branch, as the owner chose. Frontend only: there are no backend changes in this round.
+
+| Spec milestone | State | Commit |
+|---|---|---|
+| 1. Global layout and navigation | Done. No sidebar for any role. Compact event bar: breadcrumbs, role, Dashboard, All areas, panel toggle, event switcher. Full-width workspace (`--ak-width-workspace`) | `3ddca44` |
+| 2. Dashboard and division cards | Done. Order: identity and stage, division cards with live status, Needs attention, Next steps, upcoming deadlines | `c84ba4c` |
+| 3. Division landing pages | Done (`area/:division`). Task cards with purpose, live status and a Critical label; advanced tools behind a disclosure. All areas for every role | `3ddca44` |
+| 4. Focused task pages | Existing task pages, now full width under breadcrumbs. Not individually re-sectioned beyond the earlier Setup work | n/a |
+| 5. Contextual right panel | Done. Role-, page- and stage-aware; collapsible and remembered; a fold-out on small screens; hidden when it has nothing to add | `3ddca44` |
+| 6. Role-specific layouts | Done. Role homes keep their earlier dashboards; All areas lists every destination | `3ddca44` |
+| 7. Four consolidations | Done in the earlier round | see section 12 |
+| 8. Visual consistency | Partly done: cards, breadcrumbs and the panel are shared. A shared page header component is not introduced yet | n/a |
+| 9. Responsive refinement | Done for layout: bottom bar with All areas, fold-out panel, stacked tables; checked at 375 and 1440 px | `3ddca44` |
+| §5 Defaults and suggestions | Round date suggestions and a suggested rubric template, never applied silently | `6ce9612` |
+
+**Not done in this round:**
+- Compact event activity on the dashboard. The audit log is the record, and a feed would repeat Needs attention.
+- Per-page re-sectioning of every inner screen by priority.
+- A shared page header component.
