@@ -5,7 +5,7 @@ import { ArrowRight, CheckCircle2, Circle, CircleAlert, RefreshCw } from 'lucide
 import type { MyEvent } from '@arthakram/shared';
 import { formatDateTime } from '../../lib/format.js';
 import { opsApi, type Dashboard, type DashboardLifecycle } from '../../lib/ops.js';
-import { navFor } from '../../shell/nav.js';
+import { DivisionCards } from '../events/AreasPage.js';
 import { Alert, Button, Card, Skeleton } from '../../ui/index.js';
 import { cn } from '../../ui/cn.js';
 
@@ -14,36 +14,6 @@ function isError(x: unknown): x is { error: string } {
   return typeof x === 'object' && x !== null && 'error' in x;
 }
 const ok = <T,>(x: CardData<T>): T | null => (isError(x) ? null : x);
-
-const SUBMISSION_LABEL: Record<string, string> = {
-  NOT_STARTED: 'not started',
-  DRAFT: 'drafting',
-  SUBMITTED: 'submitted',
-  SUBMITTED_LATE: 'submitted late',
-  LOCKED: 'locked',
-  NOT_SUBMITTED: 'did not submit',
-};
-const JUDGING_LABEL: Record<string, string> = {
-  NOT_OPEN: 'Not open',
-  OPEN: 'Open',
-  CLOSED: 'Closed',
-};
-
-function Stat({ value, label, to }: { value: number | string; label: string; to?: string }) {
-  const inner = (
-    <>
-      <span className="font-display text-3xl font-extrabold text-ink">{value}</span>
-      <span className="block">{label}</span>
-    </>
-  );
-  return to ? (
-    <Link to={to} className="block no-underline hover:underline">
-      {inner}
-    </Link>
-  ) : (
-    <div>{inner}</div>
-  );
-}
 
 /**
  * Core Admin dashboard (PRD FR-043, §11.6 "next required action"): the event's stage, what needs attention,
@@ -73,7 +43,6 @@ export function DashboardCards({ mine, identity }: { mine: MyEvent; identity?: R
     );
   const d: Dashboard = q.data;
   const life = ok(d.lifecycle);
-  const stage = life?.stage ?? 'event';
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -97,20 +66,73 @@ export function DashboardCards({ mine, identity }: { mine: MyEvent; identity?: R
       {isError(d.lifecycle) ? (
         <Alert tone="warning" title={d.lifecycle.error} />
       ) : (
-        life && (
-          <>
-            <StageStrip life={life} />
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Attention life={life} base={base} />
-              <NextSteps life={life} base={base} />
-            </div>
-          </>
-        )
+        life && <StageStrip life={life} />
       )}
 
-      <LiveNumbers d={d} stage={stage} base={base} mine={mine} />
-      <Divisions d={d} base={base} />
+      {/* The seven divisions are the primary way in (UX spec v1.0 §6); this card set is the other six. */}
+      <section aria-labelledby="divisions-h" className="flex flex-col gap-3">
+        <h3 id="divisions-h">Manage the event</h3>
+        <DivisionCards mine={mine} status={divisionStatus(d, life)} />
+      </section>
+
+      {life && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Attention life={life} base={base} />
+          <NextSteps life={life} base={base} />
+        </div>
+      )}
+
+      <Deadlines d={d} mine={mine} />
     </div>
+  );
+}
+
+/** One short, real status line per division card; nothing is shown when there is nothing useful to say. */
+function divisionStatus(
+  d: Dashboard,
+  life: DashboardLifecycle | null,
+): Record<string, string | null> {
+  const participants = ok(d.participants);
+  const teams = ok(d.teams);
+  const issues = ok(d.issues);
+  const judging = ok(d.judging);
+  const setupLeft =
+    life?.stage === 'setup' ? life.nextSteps.filter((s) => !s.done && !s.optional).length : 0;
+  const openRound = judging?.find((r) => r.status === 'OPEN');
+  return {
+    setup:
+      setupLeft > 0
+        ? `${setupLeft} required step${setupLeft === 1 ? '' : 's'} before publishing`
+        : null,
+    registrations: participants
+      ? `${participants.registered} registered${participants.noTeam ? ` · ${participants.noTeam} without a team` : ''}${teams ? ` · ${teams.total} teams` : ''}`
+      : null,
+    operations:
+      issues && issues.open > 0 ? `${issues.open} open issue${issues.open === 1 ? '' : 's'}` : null,
+    evaluation: openRound
+      ? `${openRound.name}: ${openRound.submitted} of ${openRound.assigned} evaluations submitted`
+      : null,
+    results: null,
+    administration: null,
+  };
+}
+
+function Deadlines({ d, mine }: { d: Dashboard; mine: MyEvent }) {
+  const deadlines = ok(d.deadlines);
+  if (!deadlines?.length) return null;
+  return (
+    <section aria-labelledby="deadlines-h" className="flex flex-col gap-3">
+      <h3 id="deadlines-h">Upcoming deadlines</h3>
+      <Card>
+        <ul className="flex flex-col gap-1">
+          {deadlines.map((x) => (
+            <li key={x.label}>
+              <strong>{x.label}</strong>: {formatDateTime(x.at, mine.timeZone)}
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }
 
@@ -222,173 +244,5 @@ function NextSteps({ life, base }: { life: DashboardLifecycle; base: string }) {
         ))}
       </ul>
     </Card>
-  );
-}
-
-/** The few live numbers that matter at this stage; everything else lives on its own page. */
-function LiveNumbers({
-  d,
-  stage,
-  base,
-  mine,
-}: {
-  d: Dashboard;
-  stage: string;
-  base: string;
-  mine: MyEvent;
-}) {
-  const participants = ok(d.participants);
-  const teams = ok(d.teams);
-  const checkin = ok(d.checkin);
-  const submissions = ok(d.submissions);
-  const judging = ok(d.judging);
-  const deadlines = ok(d.deadlines);
-  const integrations = ok(d.integrations);
-  const show = (...stages: string[]) => stages.includes(stage);
-  const cards = [
-    show('registration', 'event') && participants && teams && (
-      <Card key="reg">
-        <h3>Registrations</h3>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <Stat
-            value={participants.registered}
-            label="registered"
-            to={`${base}/teams?view=participants`}
-          />
-          <Stat
-            value={participants.noTeam}
-            label="without a team"
-            to={`${base}/teams?view=participants&team=none`}
-          />
-          <Stat value={teams.complete} label="complete teams" to={`${base}/teams?complete=yes`} />
-        </div>
-      </Card>
-    ),
-    show('event') && checkin && (
-      <Card key="checkin">
-        <h3>Check-in</h3>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          <Stat
-            value={`${checkin.checkedIn}/${checkin.participants}`}
-            label="people checked in"
-            to={`${base}/checkin`}
-          />
-          <Stat value={checkin.teams.checkedIn} label="teams fully in" to={`${base}/checkin`} />
-          <Stat value={checkin.teams.partial} label="teams partly in" to={`${base}/checkin`} />
-        </div>
-      </Card>
-    ),
-    show('event', 'judging') && submissions && submissions.length > 0 && (
-      <Card key="subs">
-        <h3>Submissions</h3>
-        <ul className="mt-3 flex flex-col gap-2">
-          {submissions.map((r) => (
-            <li key={r.roundId}>
-              <Link to={`${base}/submissions?round=${r.roundId}`} className="font-bold">
-                {r.name}
-              </Link>
-              :{' '}
-              {Object.entries(r.counts)
-                .map(([k, n]) => `${n} ${SUBMISSION_LABEL[k] ?? k.toLowerCase()}`)
-                .join(', ') || 'no teams yet'}
-            </li>
-          ))}
-        </ul>
-      </Card>
-    ),
-    show('judging', 'results') && judging && judging.length > 0 && (
-      <Card key="judging">
-        <h3>Judging</h3>
-        <ul className="mt-3 flex flex-col gap-2">
-          {judging.map((r) => (
-            <li key={r.roundId}>
-              <Link to={`${base}/judging?round=${r.roundId}`} className="font-bold">
-                {r.name}
-              </Link>
-              : {r.submitted} of {r.assigned} evaluations submitted ·{' '}
-              {JUDGING_LABEL[r.status] ?? r.status}
-            </li>
-          ))}
-        </ul>
-      </Card>
-    ),
-    show('registration', 'event', 'judging') && deadlines && deadlines.length > 0 && (
-      <Card key="deadlines">
-        <h3>Coming up</h3>
-        <ul className="mt-3 flex flex-col gap-1">
-          {deadlines.map((x) => (
-            <li key={x.label}>
-              <strong>{x.label}</strong>: {formatDateTime(x.at, mine.timeZone)}
-            </li>
-          ))}
-        </ul>
-      </Card>
-    ),
-    integrations &&
-      (integrations.status === 'FAILING' || integrations.status === 'NEEDS_REAUTH') && (
-        <Alert
-          key="integrations"
-          tone="error"
-          title={
-            integrations.status === 'FAILING'
-              ? 'The last Google Sheets sync failed'
-              : 'Google needs reconnecting'
-          }
-        >
-          {integrations.lastError && <p>{integrations.lastError}</p>}
-          <Link to={`${base}/integrations`}>Open integrations</Link>
-        </Alert>
-      ),
-  ].filter(Boolean);
-  if (cards.length === 0) return null;
-  return (
-    <section aria-labelledby="live-h" className="flex flex-col gap-3">
-      <h3 id="live-h">At a glance</h3>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards}</div>
-    </section>
-  );
-}
-
-/** One entry card per division (the sidebar's seven divisions, minus this dashboard). */
-function Divisions({ d, base }: { d: Dashboard; base: string }) {
-  const participants = ok(d.participants);
-  const issues = ok(d.issues);
-  const judging = ok(d.judging);
-  const status: Record<string, string | null> = {
-    registrations: participants ? `${participants.registered} registered` : null,
-    operations:
-      issues && issues.open > 0 ? `${issues.open} open issue${issues.open === 1 ? '' : 's'}` : null,
-    evaluation: judging && judging.some((r) => r.status === 'OPEN') ? 'Judging is open' : null,
-  };
-  const divisions = navFor('ADMIN').filter((g) => g.id !== 'dashboard');
-  return (
-    <section aria-labelledby="divisions-h" className="flex flex-col gap-3">
-      <h3 id="divisions-h">Manage the event</h3>
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {divisions.map((g) => {
-          const first = g.items[0]!;
-          return (
-            <li key={g.id}>
-              <Card className="h-full">
-                <h4 className="font-display text-lg font-bold">
-                  <Link to={`${base}/${first.to}`} className="text-ink">
-                    {g.label}
-                  </Link>
-                </h4>
-                <p className="mt-1">{g.description}</p>
-                {status[g.id] && <p className="mt-2 font-semibold">{status[g.id]}</p>}
-                <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-                  {g.items.map((i) => (
-                    <li key={i.to}>
-                      <Link to={`${base}/${i.to}`}>{i.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
   );
 }
