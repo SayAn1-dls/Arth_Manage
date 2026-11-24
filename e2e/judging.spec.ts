@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { buildJudgingScenario } from './scenario.js';
-import { signInUi } from './helpers.js';
+import { goToNav, signInUi } from './helpers.js';
 
 test('judging: assignment, scoring with live weighted score, submit, and admin progress (AT-10, AT-13, AT-14)', async ({
   playwright,
@@ -24,7 +24,7 @@ test('judging: assignment, scoring with live weighted score, submit, and admin p
   await signInUi(page, judge.email, judge.password);
   await page.getByRole('link', { name: /Scenario Cup/ }).click();
   await expect(page.getByText('2 teams left to evaluate')).toBeVisible();
-  await page.getByRole('link', { name: 'My teams', exact: true }).click();
+  await goToNav(page, 'My teams', true);
   await expect(page.getByRole('heading', { name: 'Round 1' })).toBeVisible();
   await page.getByRole('link', { name: 'Alpha Squad' }).click();
   await expect(page.getByRole('heading', { name: 'Alpha Squad project' })).toBeVisible();

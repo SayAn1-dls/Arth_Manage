@@ -1,19 +1,34 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { navFor } from '../apps/web/src/shell/nav.js';
 
-/** Opens a sidebar destination, expanding collapsed groups first when the link is not currently shown. */
+/**
+ * Opens a destination the way a person would without a sidebar (UX spec v1.0): All areas, then (for Core
+ * Admins) the division card that holds the task, then the task card. "Advanced tools" are unfolded first.
+ * The division is looked up in the app's own navigation definitions, so the helper never drifts from them.
+ */
 export async function goToNav(page: Page, name: string, exact = false) {
-  const nav = page.getByRole('navigation', { name: 'Event' });
-  const link = nav.getByRole('link', { name, exact });
-  await nav.waitFor(); // the layout renders a spinner first
-  const menu = nav.getByRole('button', { name: /^Menu/ }); // folded menu on small screens
-  if ((await menu.isVisible()) && (await menu.getAttribute('aria-expanded')) === 'false')
-    await menu.click();
-  // Role queries skip hidden elements; the Menu button itself is handled above.
-  const collapsed = nav.getByRole('button', { expanded: false }).filter({ hasNotText: /^Menu/ });
-  while (!(await link.isVisible()) && (await collapsed.count()) > 0)
-    await collapsed.first().click();
-  await link.click();
+  const match = page.url().match(/\/events\/[^/?#]+/);
+  if (!match) throw new Error(`goToNav needs an event page, got ${page.url()}`);
+  const main = page.getByRole('main');
+  const ready = () => main.getByRole('heading', { level: 2 }).first().waitFor();
+  await page.goto(`${match[0]}/areas`);
+  await ready();
+  const division = navFor('ADMIN').find(
+    (g) =>
+      g.id !== 'dashboard' &&
+      g.items.some((i) => (exact ? i.label === name : i.label.includes(name))),
+  );
+  const divisionCard = division
+    ? main.getByRole('link', { name: division.label, exact: true })
+    : null;
+  if (divisionCard && (await divisionCard.count()) > 0) {
+    await divisionCard.first().click();
+    await ready();
+  }
+  for (const summary of await main.locator('details:not([open]) > summary:visible').all())
+    await summary.click();
+  await main.getByRole('link', { name, exact }).first().click();
 }
 
 export const DEV_PASSWORD = 'Password!2345';

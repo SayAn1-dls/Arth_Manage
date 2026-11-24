@@ -49,6 +49,7 @@
   --ak-radius-pill: 7px;
   --ak-measure: 65ch;
   --ak-width-content: 72rem;
+  --ak-width-workspace: 100rem; /* full-width event workspace (UX spec v1.0 §3) */
   --ak-width-form: 36rem;
   --ak-touch: 2.75rem; /* 44px minimum interactive height */
 

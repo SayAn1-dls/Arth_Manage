@@ -11,13 +11,15 @@ export function AppShell() {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-line bg-paper">
-        <div className="mx-auto flex max-w-content items-center justify-between gap-3 px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-workspace items-center justify-between gap-3 px-4 py-2 sm:px-8">
           <Link to="/events" aria-label="My events" className="shrink-0">
             <Logo width={132} className="hidden sm:block" />
             <Logo mark width={36} className="sm:hidden" />
           </Link>
           <div className="flex min-w-0 items-center gap-2">
-            <span className="hidden truncate text-sm text-ink sm:inline">{user?.name}</span>
+            <span className="max-w-[10rem] truncate text-sm text-ink sm:max-w-none">
+              {user?.name}
+            </span>
             <Button
               variant="ghost"
               icon={<LogOut aria-hidden className="size-4" />}

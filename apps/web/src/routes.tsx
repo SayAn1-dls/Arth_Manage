@@ -45,6 +45,7 @@ import { MyEventsPage } from './features/events/MyEventsPage.js';
 import { EventOverviewPage } from './features/events/EventOverviewPage.js';
 import { CreateEventPage } from './features/events/CreateEventPage.js';
 import { SetupPage } from './features/events/SetupPage.js';
+import { AreasPage, DivisionPage } from './features/events/AreasPage.js';
 import { RoundsPage } from './features/events/RoundsPage.js';
 import { StructurePage } from './features/events/StructurePage.js';
 import { GuidebookPage } from './features/events/GuidebookPages.js';
@@ -181,6 +182,8 @@ const routes: RouteObject[] = [
                   </Suspense>
                 ),
               },
+              { path: 'areas', element: <AreasPage /> },
+              { path: 'area/:groupId', element: <DivisionPage /> },
               { path: 'setup', element: <SetupPage /> },
               { path: 'rounds', element: <RoundsPage /> },
               { path: 'structure', element: <StructurePage /> },
