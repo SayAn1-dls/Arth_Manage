@@ -42,9 +42,14 @@ export function createAuthService({ db, email: provider, env, logger }: Deps) {
     return raw;
   }
 
-  async function sendVerification(user: { id: string; email: string; name: string }) {
+  async function sendVerification(
+    user: { id: string; email: string; name: string },
+    returnTo?: string,
+  ) {
     const token = await issueToken(user.id, 'VERIFY_EMAIL');
-    const link = `${env.APP_BASE_URL}/verify-email?token=${token}`;
+    // The page the person was on (an event's registration form, an invitation) survives the email round trip.
+    const next = returnTo ? `&next=${encodeURIComponent(returnTo)}` : '';
+    const link = `${env.APP_BASE_URL}/verify-email?token=${token}${next}`;
     await email.send({
       to: user.email,
       subject: 'Verify your email for Arthakram events',
@@ -55,14 +60,14 @@ export function createAuthService({ db, email: provider, env, logger }: Deps) {
 
   return {
     /** Always answers the same way so account existence is not revealed. */
-    async register(input: { name: string; email: string; password: string }) {
+    async register(input: { name: string; email: string; password: string; returnTo?: string }) {
       const existing = await db.user.findUnique({ where: { email: input.email } });
       if (existing) {
         await email.send({
           to: existing.email,
           subject: 'You already have an Arthakram events account',
           body: 'Someone tried to create an account with this email. If it was you, sign in or reset your password.',
-          link: `${env.APP_BASE_URL}/login`,
+          link: `${env.APP_BASE_URL}/login${input.returnTo ? `?next=${encodeURIComponent(input.returnTo)}` : ''}`,
         });
         return;
       }
@@ -79,7 +84,7 @@ export function createAuthService({ db, email: provider, env, logger }: Deps) {
         entityType: 'User',
         entityId: user.id,
       });
-      await sendVerification(user);
+      await sendVerification(user, input.returnTo);
     },
 
     async verifyEmail(rawToken: string) {

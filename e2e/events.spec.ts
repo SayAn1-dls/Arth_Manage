@@ -18,17 +18,17 @@ test.describe('event setup and guidebook', () => {
     await page.getByRole('button', { name: 'Create event' }).click();
 
     // Publishing is blocked until a submission deadline exists (AT-01N)
-    await expect(page.getByRole('heading', { name: 'Setup' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Event details & publishing' })).toBeVisible();
     await expect(page.getByText('Missing: Round 1 submission deadline')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Publish event' })).toBeDisabled();
 
-    await page.getByRole('link', { name: 'Rounds and deadlines' }).click();
+    await goToNav(page, 'Rounds & deadlines');
     await page.getByRole('button', { name: 'Edit' }).click();
     await page.getByLabel('Submission deadline').fill('2030-03-02T12:00');
     await page.getByRole('button', { name: 'Save round' }).click();
     await expect(page.getByText(/2 Mar 2030, 12:00 IST/)).toBeVisible();
 
-    await page.getByRole('link', { name: 'Setup' }).click();
+    await goToNav(page, 'Event details & publishing');
     await expect(page.getByText('Everything required is set')).toBeVisible();
     await page.getByRole('button', { name: 'Publish event' }).click();
     await expect(page.getByText('Public link:')).toBeVisible();
@@ -45,19 +45,22 @@ test.describe('event setup and guidebook', () => {
       .click();
     await expect(page.getByText(/Latest published: version 1/)).toBeVisible();
 
-    await page.getByRole('link', { name: 'Announcements' }).click();
-    await expect(
-      page.getByText('Nothing posted yet.').or(page.getByText('No announcements yet')),
-    ).toBeVisible();
+    // One Communication page: compose, review the audience and recipient count, then post
+    await goToNav(page, 'Communication');
+    await expect(page.getByText('Nothing sent yet')).toBeVisible();
     await page.getByLabel('Title').fill('Doors open at 9');
     await page.getByLabel('Message').fill('Bring your ID card.');
-    await page.getByRole('button', { name: 'Post announcement' }).click();
+    await page.getByRole('button', { name: 'Review and send' }).click();
+    const review = page.getByRole('dialog');
+    await expect(review.getByText('In-app announcement')).toBeVisible();
+    await review.getByRole('button', { name: /^Post to \d+/ }).click();
+    await expect(page.getByText(/Posted to everyone in the event/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Doors open at 9' })).toBeVisible();
 
     // The public page works without signing in
     const slug = page.url().includes('/events/') ? await page.evaluate(() => '') : '';
     void slug;
-    await page.getByRole('link', { name: 'Setup' }).click();
+    await goToNav(page, 'Event details & publishing');
     const publicLink = page.getByRole('link', { name: /^\/e\// });
     const href = await publicLink.getAttribute('href');
     await page.context().clearCookies();
@@ -69,11 +72,11 @@ test.describe('event setup and guidebook', () => {
   test('participants and judges see published content but no admin screens', async ({ page }) => {
     await signInUi(page, ACCOUNTS.asha);
     await page.getByRole('link', { name: 'HackSonipat 2026' }).click();
-    await expect(page.getByRole('link', { name: 'Setup' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Event details & publishing' })).toHaveCount(0);
     await goToNav(page, 'Guidebook');
     await expect(page.getByRole('heading', { name: 'Welcome to HackSonipat' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible();
-    await page.getByRole('link', { name: 'Announcements' }).click();
+    await goToNav(page, 'Updates');
     await expect(page.getByRole('heading', { name: 'Welcome to HackSonipat 2026' })).toBeVisible();
     await expect(page.getByText('Judge briefing')).toHaveCount(0); // judge-only announcement is hidden
   });

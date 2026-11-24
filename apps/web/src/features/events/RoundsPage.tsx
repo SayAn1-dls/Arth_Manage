@@ -222,6 +222,13 @@ function RoundForm({
           onChange={(e) => set('name', e.target.value)}
           error={errors.fields.name}
         />
+        <Suggestions
+          eventId={eventId}
+          timeZone={timeZone}
+          deadline={d.submissionDeadline ?? null}
+          judgingDeadline={d.judgingDeadline ?? null}
+          onUse={(k, v) => set(k, v)}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <DateTimeField
             id="rd-opens"
@@ -322,5 +329,70 @@ function RoundForm({
         </div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * Suggested dates from the event's own schedule (UX spec v1.0 §5): always visible, explained, marked as not
+ * saved, and only applied to the form when the organiser chooses Use. Nothing is ever filled in silently.
+ */
+function Suggestions({
+  eventId,
+  timeZone,
+  deadline,
+  judgingDeadline,
+  onUse,
+}: {
+  eventId: string;
+  timeZone: string;
+  deadline: string | null;
+  judgingDeadline: string | null;
+  onUse: (k: 'submissionDeadline' | 'judgingDeadline', v: string) => void;
+}) {
+  const event = useEvent(eventId);
+  if (!event.data || (deadline && judgingDeadline)) return null;
+  const ends = new Date(event.data.endsAt).getTime();
+  const hour = 3600_000;
+  const suggestedDeadline = new Date(ends - 3 * hour).toISOString();
+  const base = deadline ? new Date(deadline).getTime() : ends - 3 * hour;
+  const suggestedJudging = new Date(Math.min(base + 2 * hour, ends)).toISOString();
+  return (
+    <div className="rounded-card border border-dashed border-line-strong bg-paper p-4">
+      <p className="font-bold text-ink">Suggestions (not saved)</p>
+      <ul className="mt-2 flex flex-col gap-3">
+        {!deadline && (
+          <li className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              <strong>Submission deadline:</strong> {formatDateTime(suggestedDeadline, timeZone)}
+              <span className="block text-sm">
+                Three hours before the event ends, so judges can read the work before results.
+              </span>
+            </span>
+            <Button
+              variant="secondary"
+              onClick={() => onUse('submissionDeadline', suggestedDeadline)}
+            >
+              Use this date
+            </Button>
+          </li>
+        )}
+        {!judgingDeadline && (
+          <li className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              <strong>Judging deadline:</strong> {formatDateTime(suggestedJudging, timeZone)}
+              <span className="block text-sm">
+                Two hours after submissions close, and no later than the end of the event.
+              </span>
+            </span>
+            <Button variant="secondary" onClick={() => onUse('judgingDeadline', suggestedJudging)}>
+              Use this date
+            </Button>
+          </li>
+        )}
+      </ul>
+      <p className="mt-2 text-sm">
+        Using a suggestion only fills the field; nothing is saved until you save the round.
+      </p>
+    </div>
   );
 }

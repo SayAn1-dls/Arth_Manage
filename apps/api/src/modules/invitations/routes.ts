@@ -18,6 +18,12 @@ const ROLE_NAME = {
   PARTICIPANT: 'a participant',
 } as const;
 
+const ACCESS_NAME: Record<string, string> = {
+  CO_ADMIN: 'a co-admin',
+  SPONSOR_VIEWER: 'a sponsor viewer (impact report only)',
+  STAFF_LEAD: 'a staff lead',
+};
+
 /** Invitations for core admins, judges and helping staff, and member management (PRD FR-006, §8.2, §8.4). */
 export function invitationsRouter(deps: Deps) {
   const { db, email, env, limit } = deps;
@@ -60,7 +66,12 @@ export function invitationsRouter(deps: Deps) {
         if (existing)
           await tx.eventMembership.update({
             where: { id: existing.id },
-            data: { role: inv.role, status: 'ACTIVE', invitedById: inv.invitedById },
+            data: {
+              role: inv.role,
+              accessLevel: inv.accessLevel,
+              status: 'ACTIVE',
+              invitedById: inv.invitedById,
+            },
           });
         else
           await tx.eventMembership.create({
@@ -68,6 +79,7 @@ export function invitationsRouter(deps: Deps) {
               eventId: inv.eventId,
               userId: user.id,
               role: inv.role,
+              accessLevel: inv.accessLevel,
               invitedById: inv.invitedById,
             },
           });
@@ -80,7 +92,7 @@ export function invitationsRouter(deps: Deps) {
           actorId: user.id,
           action: 'member.joined',
           entityType: 'EventMembership',
-          after: { role: inv.role, via: 'invitation' },
+          after: { role: inv.role, accessLevel: inv.accessLevel, via: 'invitation' },
         });
       });
       res.json({ eventId: inv.eventId, eventName: inv.event.name, role: inv.role });
@@ -112,14 +124,18 @@ export function invitationsRouter(deps: Deps) {
         name: m.user.name,
         email: m.user.email,
         role: m.role,
+        accessLevel: m.accessLevel,
         owner: m.userId === ctx.event.ownerId,
       })),
       invitations: invitations.map((i) => ({
         id: i.id,
         email: i.email,
         role: i.role,
+        accessLevel: i.accessLevel,
         expiresAt: i.expiresAt,
       })),
+      // Lets the screen offer access labels only to the person who may grant them.
+      viewerIsOwner: ctx.event.ownerId === ctx.membership.userId,
     });
   });
 
@@ -130,7 +146,12 @@ export function invitationsRouter(deps: Deps) {
     async (req, res) => {
       const ctx = requireCtx(req);
       assertWritable(ctx);
-      const { email: to, role } = parse(inviteSchema, req.body);
+      const { email: to, role, accessLevel } = parse(inviteSchema, req.body);
+      // Same rule as changing access later (Access & matching): only the owner grants access labels.
+      if (accessLevel !== 'STANDARD' && ctx.event.ownerId !== ctx.membership.userId)
+        throw AppError.forbidden(
+          'Only the event owner can invite co-admins, sponsor viewers or staff leads',
+        );
       const user = await db.user.findUnique({ where: { email: to } });
       if (user) {
         const m = await db.eventMembership.findUnique({
@@ -155,6 +176,7 @@ export function invitationsRouter(deps: Deps) {
             eventId: ctx.event.id,
             email: to,
             role,
+            accessLevel,
             tokenHash: sha256(token),
             invitedById: ctx.membership.userId,
             expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -166,19 +188,24 @@ export function invitationsRouter(deps: Deps) {
           action: 'member.invited',
           entityType: 'Invitation',
           entityId: row.id,
-          after: { email: to, role },
+          after: { email: to, role, accessLevel },
         });
         return row;
       });
+      const as = ACCESS_NAME[accessLevel] ?? ROLE_NAME[role];
       await email.send({
         to,
-        subject: `You're invited to ${ctx.event.name} as ${ROLE_NAME[role]}`,
-        body: `You have been invited to ${ctx.event.name} as ${ROLE_NAME[role]}. Sign in (or create an account) with this email address to accept. The invitation expires in 14 days.`,
+        subject: `You're invited to ${ctx.event.name} as ${as}`,
+        body: `You have been invited to ${ctx.event.name} as ${as}. Sign in (or create an account) with this email address to accept. The invitation expires in 14 days.`,
         link: `${env.APP_BASE_URL}/invitations/accept?token=${token}`,
       });
-      res
-        .status(201)
-        .json({ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt });
+      res.status(201).json({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        accessLevel: inv.accessLevel,
+        expiresAt: inv.expiresAt,
+      });
     },
   );
 

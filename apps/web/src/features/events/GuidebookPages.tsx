@@ -6,6 +6,7 @@ import type { GuidebookSection, MyEvent } from '@arthakram/shared';
 import { ApiError, request } from '../../lib/api.js';
 import { eventApi } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
+import { useUnsavedGuard } from '../../lib/useUnsavedGuard.js';
 import {
   Alert,
   Badge,
@@ -95,6 +96,7 @@ function GuidebookEditor({ mine }: { mine: MyEvent }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef({ sections, version });
   latest.current = { sections, version };
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     if (q.data && sections === null) {
@@ -105,25 +107,31 @@ function GuidebookEditor({ mine }: { mine: MyEvent }) {
     }
   }, [q.data, sections]);
 
-  const save = useCallback(async () => {
-    const { sections: s, version: v } = latest.current;
-    if (!s) return false;
-    setState('saving');
-    try {
-      const r = await request<{ version: number }>(
-        'PUT',
-        `/events/${mine.eventId}/guidebook/draft`,
-        { sections: s, version: v },
-      );
-      setVersion(r.version);
-      latest.current = { sections: latest.current.sections, version: r.version };
-      setState((cur) => (cur === 'dirty' ? 'dirty' : 'saved'));
-      return true;
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'stale_version') setConflict(true);
-      setState('failed');
-      return false;
-    }
+  /** Saves run one at a time, so an unmount flush never races a save already in flight. */
+  const save = useCallback(() => {
+    const run = async () => {
+      const { sections: s, version: v } = latest.current;
+      if (!s) return false;
+      setState('saving');
+      try {
+        const r = await request<{ version: number }>(
+          'PUT',
+          `/events/${mine.eventId}/guidebook/draft`,
+          { sections: s, version: v },
+        );
+        setVersion(r.version);
+        latest.current = { sections: latest.current.sections, version: r.version };
+        setState((cur) => (cur === 'dirty' ? 'dirty' : 'saved'));
+        return true;
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'stale_version') setConflict(true);
+        setState('failed');
+        return false;
+      }
+    };
+    const next = chain.current.then(run, run);
+    chain.current = next;
+    return next;
   }, [mine.eventId]);
 
   // Autosave 10 seconds after the last change (PRD FR-021); failures keep the text in the tab and retry.
@@ -151,6 +159,13 @@ function GuidebookEditor({ mine }: { mine: MyEvent }) {
     },
     [],
   );
+  // Never lose an edit on in-app navigation (audit P0-07): save now instead of waiting for the timer.
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    return save();
+  }, [save]);
+  const guard = useUnsavedGuard({ dirty: state !== 'saved', flush });
 
   const publish = useMutation({
     mutationFn: async () => {
@@ -372,6 +387,7 @@ function GuidebookEditor({ mine }: { mine: MyEvent }) {
         </div>
         {publishError && <Alert className="mt-3" tone="error" title={publishError} />}
       </Dialog>
+      {guard.dialog}
     </div>
   );
 }

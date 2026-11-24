@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { Link, useOutletContext } from 'react-router';
+import { Link, useLocation, useOutletContext } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { eventApi } from '../../lib/events.js';
@@ -11,7 +9,6 @@ import {
   Badge,
   Card,
   EmptyState,
-  Input,
   Pagination,
   Select,
   SortHeader,
@@ -35,6 +32,7 @@ interface TeamRow {
   problemTitle: string;
   submissionStatus: string;
   submissionLabel: string;
+  members: string[];
 }
 const subTone: Record<string, 'info' | 'warning' | 'success' | 'error'> = {
   NOT_STARTED: 'info',
@@ -45,10 +43,11 @@ const subTone: Record<string, 'info' | 'warning' | 'success' | 'error'> = {
   NOT_SUBMITTED: 'error',
 };
 
-export function TeamsPage() {
+/** Teams view of Teams & participants: filters, sortable table with member names. Search lives on the page. */
+export function TeamsView() {
   const mine = useOutletContext<MyEvent>();
+  const location = useLocation();
   const list = useListState({ sort: 'teamCode' });
-  const [q, setQ] = useState(list.get('q'));
   const tracks = useQuery({
     queryKey: ['tracks', mine.eventId],
     queryFn: () => eventApi.tracks(mine.eventId),
@@ -64,6 +63,7 @@ export function TeamsPage() {
     page: String(list.page),
     pageSize: '25',
   });
+  const hasFilter = ['q', 'complete', 'trackId', 'status', 'submission'].some((k) => list.get(k));
   const res = useQuery({
     queryKey: ['teams', mine.eventId, qs.toString()],
     queryFn: () =>
@@ -78,31 +78,12 @@ export function TeamsPage() {
   });
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Teams</h2>
-        <a
-          href={`/api/v1/events/${mine.eventId}/exports/teams.csv`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Export CSV
-        </a>
-      </div>
       <Card>
         <form
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            list.set({ q });
-          }}
+          aria-label="Team filters"
+          onSubmit={(e) => e.preventDefault()}
         >
-          <Input
-            label="Search"
-            hint="Team name or ID, member name, email or phone"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onBlur={() => q !== list.get('q') && list.set({ q })}
-          />
           <Select
             label="Completeness"
             value={list.get('complete')}
@@ -154,9 +135,9 @@ export function TeamsPage() {
       {res.isPending && <Spinner label="Loading teams" />}
       {res.isError && <Alert tone="error" title="We couldn't load teams" />}
       {res.data && res.data.rows.length === 0 && (
-        <EmptyState title={list.queryString() ? 'No matches' : 'No teams yet'}>
-          {list.queryString()
-            ? 'Try clearing the filters.'
+        <EmptyState title={hasFilter ? 'No teams match' : 'No teams yet'}>
+          {hasFilter
+            ? 'Try another search or clear the filters.'
             : 'Teams appear here as participants create them.'}
         </EmptyState>
       )}
@@ -214,8 +195,20 @@ export function TeamsPage() {
                 <Tr key={t.id}>
                   <Td>{t.teamCode}</Td>
                   <Td>
-                    <Link to={t.id}>{t.name}</Link>{' '}
+                    <Link
+                      to={`/events/${mine.eventId}/teams/${t.id}`}
+                      state={{ from: `${location.pathname}${location.search}` }}
+                    >
+                      {t.name}
+                    </Link>{' '}
                     {t.status === 'DISQUALIFIED' && <Badge tone="error">Disqualified</Badge>}
+                    {t.status === 'DISSOLVED' && <Badge tone="info">Dissolved</Badge>}
+                    {t.members.length > 0 && (
+                      <span className="mt-1 block text-sm">{t.members.join(', ')}</span>
+                    )}
+                    {t.problemTitle && (
+                      <span className="block text-sm">Problem: {t.problemTitle}</span>
+                    )}
                   </Td>
                   <Td>{t.leader}</Td>
                   <Td>

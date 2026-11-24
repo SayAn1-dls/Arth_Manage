@@ -6,6 +6,8 @@ import { MAX_QUESTIONS, type FeedbackQuestion, type MyEvent } from '@arthakram/s
 import { eventApi, useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { engageApi, type Audience, type FeedbackFormDto } from '../../lib/engage.js';
+import { useListState } from '../../lib/useListState.js';
+import { cn } from '../../ui/cn.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
 import {
   Alert,
@@ -35,31 +37,85 @@ const TYPE_LABEL: Record<FeedbackQuestion['type'], string> = {
 const STATE_TONE = { DRAFT: 'info', OPEN: 'success', CLOSED: 'warning' } as const;
 
 /** Feedback forms, their results and the controlled release of judges' comments (PRD Module H). */
+const TABS = [
+  {
+    key: 'participants',
+    label: 'Participant feedback',
+    intro:
+      'The participant survey: participants → organisers. Each participant answers once. A confidential survey never shows who wrote what, even in the CSV.',
+  },
+  {
+    key: 'judges',
+    label: 'Judge feedback',
+    intro:
+      'The judge survey: judges → organisers, about how the event and judging went. Each judge answers once.',
+  },
+  {
+    key: 'comments',
+    label: 'Team feedback / comments',
+    intro:
+      'Comments judges wrote about each team (judge → team). Teams see them only after the round’s results are published and you release them, labelled Judge 1, Judge 2 with no names. Hidden comments never reach the team. Judges’ private notes to organisers are never shown here or to teams.',
+  },
+] as const;
+
+/**
+ * Feedback & reviews (navigation audit consolidation 4): the participant survey, the judge survey and judges'
+ * comments about teams, each in its own tab with its direction and visibility stated. Records stay separate;
+ * only the page is shared.
+ */
 export function FeedbackAdminPage() {
   const mine = useOutletContext<MyEvent>();
+  const list = useListState({ sort: 'date' });
+  const tab = TABS.find((t) => t.key === list.get('tab')) ?? TABS[0];
   const forms = useQuery({
     queryKey: ['feedback-forms', mine.eventId],
     queryFn: () => engageApi.forms(mine.eventId),
   });
   const event = useEvent(mine.eventId);
+  const audience = tab.key === 'judges' ? 'JUDGE' : 'PARTICIPANT';
   return (
     <div className="flex flex-col gap-6">
-      <h2>Feedback</h2>
-      <p>
-        Each event has one form for participants and one for judges. Participants and judges answer
-        once. Confidential forms never show who wrote what.
-      </p>
-      {forms.isPending && <Spinner label="Loading forms" />}
-      {forms.isError && <Alert tone="error" title="We couldn't load the feedback forms" />}
-      {forms.data?.forms.map((f) => (
-        <FormCard
-          key={`${f.audience}-${f.version}-${f.state}`}
-          eventId={mine.eventId}
-          form={f}
-          timeZone={event.data?.timeZone ?? 'Asia/Kolkata'}
-        />
-      ))}
-      <CommentsCard eventId={mine.eventId} />
+      <h2>Feedback &amp; reviews</h2>
+      <div role="tablist" aria-label="Feedback source" className="flex flex-wrap gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab.key === t.key}
+            onClick={() => list.set({ tab: t.key === 'participants' ? null : t.key })}
+            className={cn(
+              'min-h-11 rounded-pill border px-5 font-bold text-ink',
+              tab.key === t.key
+                ? 'border-ink bg-blush'
+                : 'border-line-strong bg-white hover:bg-blush',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p role="note">{tab.intro}</p>
+      <div role="tabpanel" aria-label={tab.label} className="flex flex-col gap-6">
+        {tab.key === 'comments' ? (
+          <CommentsCard eventId={mine.eventId} />
+        ) : (
+          <>
+            {forms.isPending && <Spinner label="Loading the survey" />}
+            {forms.isError && <Alert tone="error" title="We couldn't load the survey" />}
+            {forms.data?.forms
+              .filter((f) => f.audience === audience)
+              .map((f) => (
+                <FormCard
+                  key={`${f.audience}-${f.version}-${f.state}`}
+                  eventId={mine.eventId}
+                  form={f}
+                  timeZone={event.data?.timeZone ?? 'Asia/Kolkata'}
+                />
+              ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -402,6 +458,9 @@ function CommentsCard({ eventId }: { eventId: string }) {
   });
   const [hiding, setHiding] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [confirm, setConfirm] = useState<null | 'release' | 'withdraw'>(null);
+  const [find, setFind] = useState('');
+  const [shown, setShown] = useState<'all' | 'visible' | 'hidden'>('all');
   const refresh = () => qc.invalidateQueries({ queryKey: ['round-comments', eventId, roundId] });
   const toggle = useMutation({
     mutationFn: (release: boolean) =>
@@ -410,9 +469,13 @@ function CommentsCard({ eventId }: { eventId: string }) {
         : engageApi.withdrawComments(eventId, roundId),
     onSuccess: async () => {
       errors.clear();
+      setConfirm(null);
       await refresh();
     },
-    onError: errors.capture,
+    onError: (e) => {
+      setConfirm(null);
+      errors.capture(e);
+    },
   });
   const visibility = useMutation({
     mutationFn: (v: { id: string; hidden: boolean }) =>
@@ -427,12 +490,8 @@ function CommentsCard({ eventId }: { eventId: string }) {
   });
   if (!rounds.data?.length) return null;
   return (
-    <Card footerLabel="Judges' comments for teams">
-      <h3>Comments for teams</h3>
-      <p className="mt-2">
-        Judges write a comment for each team. Teams see it, as “Judge 1”, “Judge 2” with no names,
-        only after you release it for a round whose results are published.
-      </p>
+    <Card>
+      <h3>Judges’ comments about teams</h3>
       {rounds.data.length > 1 && (
         <div className="mt-3 w-60">
           <Select label="Round" value={roundId} onChange={(e) => setPicked(e.target.value)}>
@@ -453,53 +512,117 @@ function CommentsCard({ eventId }: { eventId: string }) {
             </Badge>
             {!q.data.released && (
               <Button
-                onClick={() => toggle.mutate(true)}
-                loading={toggle.isPending}
-                disabled={!q.data.resultsPublished}
+                onClick={() => setConfirm('release')}
+                disabled={!q.data.resultsPublished || q.data.comments.length === 0}
               >
-                Release comments
+                Release comments…
               </Button>
             )}
             {q.data.released && (
-              <Button variant="secondary" onClick={() => toggle.mutate(false)}>
-                Withdraw comments
+              <Button variant="secondary" onClick={() => setConfirm('withdraw')}>
+                Withdraw comments…
               </Button>
             )}
             {!q.data.resultsPublished && !q.data.released && (
               <span className="text-sm">Publish this round's results first.</span>
             )}
           </div>
+          {q.data.comments.length > 0 && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Input
+                label="Find a team or judge"
+                value={find}
+                onChange={(e) => setFind(e.target.value)}
+              />
+              <Select
+                label="Visibility"
+                value={shown}
+                onChange={(e) => setShown(e.target.value as typeof shown)}
+              >
+                <option value="all">All comments</option>
+                <option value="visible">
+                  {q.data.released ? 'Visible to teams' : 'Will be visible when released'}
+                </option>
+                <option value="hidden">Hidden from teams</option>
+              </Select>
+            </div>
+          )}
           <ul className="mt-4 flex flex-col gap-3">
-            {q.data.comments.map((c) => (
-              <li key={c.evaluationId} className="rounded-card border border-line bg-paper p-3">
-                <p className="text-sm font-bold text-ink">
-                  {c.teamCode} {c.teamName} · {c.judgeName}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-ink">{c.comment}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  {c.hiddenReason ? (
-                    <>
-                      <Badge tone="warning">Hidden</Badge>
-                      <span className="text-sm">{c.hiddenReason}</span>
-                      <Button
-                        variant="secondary"
-                        onClick={() => visibility.mutate({ id: c.evaluationId, hidden: false })}
-                      >
-                        Show again
+            {q.data.comments
+              .filter(
+                (c) =>
+                  (shown === 'all' || (shown === 'hidden') === Boolean(c.hiddenReason)) &&
+                  `${c.teamCode} ${c.teamName} ${c.judgeName}`
+                    .toLowerCase()
+                    .includes(find.trim().toLowerCase()),
+              )
+              .map((c) => (
+                <li key={c.evaluationId} className="rounded-card border border-line bg-paper p-3">
+                  <p className="text-sm font-bold text-ink">
+                    About {c.teamCode} {c.teamName} · written by {c.judgeName} (name never shown to
+                    the team)
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-ink">{c.comment}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {c.hiddenReason ? (
+                      <>
+                        <Badge tone="warning">Hidden</Badge>
+                        <span className="text-sm">{c.hiddenReason}</span>
+                        <Button
+                          variant="secondary"
+                          onClick={() => visibility.mutate({ id: c.evaluationId, hidden: false })}
+                        >
+                          Show again
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="secondary" onClick={() => setHiding(c.evaluationId)}>
+                        Hide from team
                       </Button>
-                    </>
-                  ) : (
-                    <Button variant="secondary" onClick={() => setHiding(c.evaluationId)}>
-                      Hide from team
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
+                    )}
+                  </div>
+                </li>
+              ))}
             {q.data.comments.length === 0 && <li>No team comments were written for this round.</li>}
           </ul>
         </>
       )}
+      <Dialog
+        open={confirm !== null}
+        title={confirm === 'release' ? 'Release comments to teams?' : 'Withdraw released comments?'}
+        onClose={() => setConfirm(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={confirm === 'withdraw' ? 'danger' : 'primary'}
+              loading={toggle.isPending}
+              onClick={() => toggle.mutate(confirm === 'release')}
+            >
+              {confirm === 'release' ? 'Release to teams' : 'Withdraw from teams'}
+            </Button>
+          </>
+        }
+      >
+        {q.data && confirm === 'release' && (
+          <p>
+            {q.data.comments.filter((c) => !c.hiddenReason).length} comment
+            {q.data.comments.filter((c) => !c.hiddenReason).length === 1 ? '' : 's'} become visible
+            to the teams they are about, right away, labelled Judge 1, Judge 2 with no names.{' '}
+            {q.data.comments.filter((c) => c.hiddenReason).length} hidden comment
+            {q.data.comments.filter((c) => c.hiddenReason).length === 1 ? ' stays' : 's stay'}{' '}
+            hidden. Read them first: teams may already have seen them before you withdraw.
+          </p>
+        )}
+        {confirm === 'withdraw' && (
+          <p>
+            Teams stop seeing this round’s comments immediately. Anyone who already read them may
+            remember them; nothing is deleted.
+          </p>
+        )}
+      </Dialog>
       <Dialog
         open={hiding !== null}
         title="Hide this comment from the team"

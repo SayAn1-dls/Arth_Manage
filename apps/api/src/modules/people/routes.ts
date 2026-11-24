@@ -332,10 +332,11 @@ export function peopleRouter(deps: Deps) {
 
     let rows = await participantRows(ctx);
     if (q)
-      rows = rows.filter((r) =>
-        [r.name, r.email, r.phone, r.teamName, r.teamCode, r.institution].some((v) =>
-          v.toLowerCase().includes(q),
-        ),
+      rows = rows.filter(
+        (r) =>
+          [r.name, r.email, r.phone, r.teamName, r.teamCode, r.institution].some((v) =>
+            v.toLowerCase().includes(q),
+          ) || r.membershipId.toLowerCase() === q,
       );
     if (status) rows = rows.filter((r) => r.status === status);
     if (team === 'none') rows = rows.filter((r) => !r.teamId);
@@ -588,13 +589,21 @@ export function peopleRouter(deps: Deps) {
         problemTitle: t.problem?.title ?? '',
         submissionStatus: sub,
         submissionLabel: STATUS_LABEL[sub],
+        // Member names for the combined Teams & participants list (leader first).
+        members: [...t.members]
+          .sort((a, b) => (a.role === 'LEADER' ? -1 : b.role === 'LEADER' ? 1 : 0))
+          .map((m) => m.membership.registration?.fullName ?? m.membership.user.name),
         search: [
           t.name,
           t.teamCode,
+          t.id,
           ...t.members.flatMap((m) => [
+            m.membership.id,
             m.membership.user.email,
+            m.membership.user.name,
             m.membership.registration?.fullName ?? '',
             m.membership.registration?.phone ?? '',
+            m.membership.registration?.institution ?? '',
           ]),
         ]
           .join(' ')
@@ -649,8 +658,50 @@ export function peopleRouter(deps: Deps) {
       orderBy: { at: 'desc' },
       take: 50,
     });
+    // Submission state per round, so the team record shows its whole timeline in one place.
+    const rounds = await db.round.findMany({
+      where: { eventId: ctx.event.id },
+      orderBy: { order: 'asc' },
+      include: {
+        submissions: {
+          where: { teamId: team.id },
+          include: { versions: { orderBy: { versionNo: 'desc' }, take: 1 } },
+        },
+      },
+    });
+    const now = new Date();
+    const submissions = rounds.map((r) => {
+      const s = r.submissions[0];
+      const last = s?.versions[0];
+      const st = submissionStatus(
+        roundTiming(r),
+        s?.extensionDeadline ?? null,
+        s
+          ? {
+              hasDraftContent: hasDraftContent(s),
+              lastVersionNo: s.lastVersionNo,
+              lastVersionLateMinutes: last?.lateMinutes ?? 0,
+            }
+          : null,
+        now,
+      );
+      return {
+        roundId: r.id,
+        roundName: r.name,
+        deadline: r.submissionDeadline,
+        extensionDeadline: s?.extensionDeadline ?? null,
+        status: st,
+        statusLabel: STATUS_LABEL[st],
+        versions: s?.lastVersionNo ?? 0,
+        lastSubmittedAt: last?.submittedAt ?? null,
+        lateMinutes: last?.lateMinutes ?? 0,
+        title: last?.title ?? null,
+      };
+    });
     res.json({
       ...dto,
+      createdAt: team.createdAt,
+      submissions,
       joinCode: team.joinCode,
       members: dto.members.map((m) => ({ ...m, phone: phones.get(m.membershipId) ?? null })),
       history: history.map((h) => ({

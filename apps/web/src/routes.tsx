@@ -9,6 +9,17 @@ const ProjectReviewPage = lazy(() =>
 const SandboxPage = lazy(() =>
   import('./features/workspace/SandboxPage.js').then((m) => ({ default: m.SandboxPage })),
 );
+const CommunicationPage = lazy(() =>
+  import('./features/workspace/CommunicationPage.js').then((m) => ({
+    default: m.CommunicationPage,
+  })),
+);
+const UpdatesPage = lazy(() =>
+  import('./features/workspace/CommunicationPage.js').then((m) => ({ default: m.UpdatesPage })),
+);
+const SupportPage = lazy(() =>
+  import('./features/workspace/SupportPage.js').then((m) => ({ default: m.SupportPage })),
+);
 const VerifyCertificatePage = lazy(() =>
   import('./features/workspace/VerifyCertificatePage.js').then((m) => ({
     default: m.VerifyCertificatePage,
@@ -18,6 +29,7 @@ const WorkspacePage = lazy(() =>
   import('./features/workspace/WorkspacePage.js').then((m) => ({ default: m.WorkspacePage })),
 );
 import { HomePage } from './pages/HomePage.js';
+import { Spinner } from './ui/index.js';
 import { DesignGalleryPage } from './pages/DesignGalleryPage.js';
 import { AppShell } from './shell/AppShell.js';
 import { EventLayout } from './shell/EventLayout.js';
@@ -33,16 +45,15 @@ import { MyEventsPage } from './features/events/MyEventsPage.js';
 import { EventOverviewPage } from './features/events/EventOverviewPage.js';
 import { CreateEventPage } from './features/events/CreateEventPage.js';
 import { SetupPage } from './features/events/SetupPage.js';
+import { AreasPage, DivisionPage } from './features/events/AreasPage.js';
 import { RoundsPage } from './features/events/RoundsPage.js';
 import { StructurePage } from './features/events/StructurePage.js';
 import { GuidebookPage } from './features/events/GuidebookPages.js';
-import { AnnouncementsPage } from './features/events/AnnouncementsPage.js';
 import { PublicEventPage } from './features/events/PublicEventPage.js';
 import { RegisterForEventPage } from './features/participant/RegisterPage.js';
 import { TeamPage } from './features/participant/TeamPage.js';
-import { ParticipantsPage } from './features/admin/ParticipantsPage.js';
 import { ParticipantDetailPage } from './features/admin/ParticipantDetailPage.js';
-import { TeamsPage } from './features/admin/TeamsPage.js';
+import { TeamsAndParticipantsPage } from './features/admin/TeamsAndParticipantsPage.js';
 import { TeamDetailPage } from './features/admin/TeamDetailPage.js';
 import {
   SubmissionsMonitorPage,
@@ -132,14 +143,10 @@ const routes: RouteObject[] = [
                 ),
               },
               ...[
-                'messages',
-                'helpdesk',
-                'exceptions',
                 'applications',
                 'advancement',
                 'calibration',
                 'engagement',
-                'communications',
                 'discovery',
                 'access',
                 'report',
@@ -151,11 +158,36 @@ const routes: RouteObject[] = [
                   </Suspense>
                 ),
               })),
+              {
+                path: 'support',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading requests" />}>
+                    <SupportPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'communication',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading communication" />}>
+                    <CommunicationPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'updates',
+                element: (
+                  <Suspense fallback={<Spinner label="Loading updates" />}>
+                    <UpdatesPage />
+                  </Suspense>
+                ),
+              },
+              { path: 'areas', element: <AreasPage /> },
+              { path: 'area/:groupId', element: <DivisionPage /> },
               { path: 'setup', element: <SetupPage /> },
               { path: 'rounds', element: <RoundsPage /> },
               { path: 'structure', element: <StructurePage /> },
               { path: 'guidebook', element: <GuidebookPage /> },
-              { path: 'announcements', element: <AnnouncementsPage /> },
               { path: 'results', element: <ResultsPage /> },
               { path: 'tasks', element: <TasksPage /> },
               { path: 'checkin', element: <CheckInPage /> },
@@ -172,9 +204,8 @@ const routes: RouteObject[] = [
               { path: 'judge', element: <JudgeIndexPage /> },
               { path: 'judge/:roundId', element: <JudgeTeamsPage /> },
               { path: 'judge/:roundId/:teamId', element: <EvaluationPage /> },
-              { path: 'participants', element: <ParticipantsPage /> },
               { path: 'participants/:membershipId', element: <ParticipantDetailPage /> },
-              { path: 'teams', element: <TeamsPage /> },
+              { path: 'teams', element: <TeamsAndParticipantsPage /> },
               { path: 'teams/:teamId', element: <TeamDetailPage /> },
               { path: 'submissions', element: <SubmissionsMonitorPage /> },
               { path: 'submissions/:roundId/:teamId', element: <SubmissionDetailPage /> },
@@ -183,6 +214,9 @@ const routes: RouteObject[] = [
               { path: 'profile', element: <ProfilePage /> },
               { path: 'submission', element: <SubmissionIndexPage /> },
               { path: 'submission/:roundId', element: <SubmissionPage /> },
+              // Old and unknown paths stay inside the event: EventLayout redirects merged pages
+              // (for example participants → teams?view=participants) and explains anything else.
+              { path: '*', element: null },
             ],
           },
         ],

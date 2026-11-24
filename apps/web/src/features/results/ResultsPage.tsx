@@ -3,7 +3,8 @@ import { Link, useOutletContext } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Circle, Download } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
-import { eventApi } from '../../lib/events.js';
+import { request } from '../../lib/api.js';
+import { eventApi, useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import {
   opsApi,
@@ -149,6 +150,9 @@ type Dialogs =
   | { kind: 'tie'; group: string; rank: number; teams: { teamId: string; name: string }[] }
   | { kind: 'notRanked'; teamId: string; name: string }
   | { kind: 'unpublish' }
+  | { kind: 'publish' }
+  | { kind: 'rankAgain'; teamId: string; name: string }
+  | { kind: 'clearTie'; id: string; group: string; rank: number }
   | null;
 
 function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
@@ -165,6 +169,17 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [openRow, setOpenRow] = useState<string | null>(null);
+  // The round's scoring method lives with the workspace options (same cache entry as Judge calibration).
+  const options = useQuery({
+    queryKey: ['workspace-options', ev],
+    queryFn: () =>
+      request<{ rounds: { id: string; normalisation: boolean }[] }>(
+        'GET',
+        `/events/${ev}/workspace/options`,
+      ),
+  });
+  const normalised = options.data?.rounds.find((x) => x.id === roundId)?.normalisation;
+  const event = useEvent(ev);
   const refresh = () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: ['results-review', ev, roundId] }),
@@ -186,7 +201,10 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
   const publish = useMutation({
     mutationFn: () => opsApi.publish(ev, roundId),
     onSuccess: (r) => done(`Version ${r.versionNo} is now visible to participants.`)(),
-    onError: errors.capture,
+    onError: (e) => {
+      setDialog(null);
+      errors.capture(e);
+    },
   });
   const unpublish = useMutation({
     mutationFn: () => opsApi.unpublish(ev, roundId, reason),
@@ -228,13 +246,19 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
   });
   const clearTie = useMutation({
     mutationFn: (id: string) => opsApi.deleteTie(ev, roundId, id),
-    onSuccess: done(),
-    onError: errors.capture,
+    onSuccess: done('Tie decision cleared.'),
+    onError: (e) => {
+      setDialog(null);
+      errors.capture(e);
+    },
   });
   const clearMark = useMutation({
     mutationFn: (id: string) => opsApi.deleteNotRanked(ev, roundId, id),
-    onSuccess: done(),
-    onError: errors.capture,
+    onSuccess: done('The team is ranked again.'),
+    onError: (e) => {
+      setDialog(null);
+      errors.capture(e);
+    },
   });
 
   if (q.isPending) return <Spinner label="Calculating results" />;
@@ -268,9 +292,34 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
         : 'No unresolved ties inside the award positions',
     },
   ];
+  // Award positions per ranking group, as they stand in the approved version (D-41 keeps it in step).
+  const awards = r.results
+    .filter((t) => t.rank !== null && t.rank <= r.round.awardPositions)
+    .sort((a, b) => a.group.localeCompare(b.group) || a.rank! - b.rank!);
+  const awardGroups = [...new Set(awards.map((a) => a.group))];
+  const visibility = event.data && [
+    {
+      on: event.data.showWinners,
+      label: 'Winners list: award positions with team names and codes',
+    },
+    { on: event.data.showOwnRank, label: 'Each team’s own position' },
+    { on: event.data.showOwnScores, label: 'Each team’s own score' },
+  ];
 
   return (
     <div className="flex flex-col gap-6">
+      {options.data && (
+        <p>
+          <strong>Scoring method:</strong>{' '}
+          {normalised ? (
+            <>
+              Normalised – see <Link to={`/events/${ev}/calibration`}>Judge calibration</Link>
+            </>
+          ) : (
+            'Raw average'
+          )}
+        </p>
+      )}
       {errors.formError && <Alert tone="error" title={errors.formError} />}
       {notice && <Alert tone="success" title={notice} />}
       {stale && (
@@ -302,6 +351,7 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
         </ul>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
+            variant={r.approvedVersion ? 'secondary' : 'primary'}
             onClick={() => approve.mutate()}
             loading={approve.isPending}
             disabled={!r.canApprove}
@@ -311,8 +361,10 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
           {r.approvedVersion && <Badge tone="success">Version {r.approvedVersion} approved</Badge>}
           {r.approvedVersion && !(published && published.versionNo === r.approvedVersion) && (
             <Button
-              variant="secondary"
-              onClick={() => publish.mutate()}
+              onClick={() => {
+                errors.clear();
+                setDialog({ kind: 'publish' });
+              }}
               loading={publish.isPending}
             >
               Publish version {r.approvedVersion}
@@ -385,7 +437,11 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
                   setDialog({ kind: 'tie', ...g });
                 }}
                 onNotRanked={() => setDialog({ kind: 'notRanked', teamId: t.teamId, name: t.name })}
-                onClearMark={() => clearMark.mutate(t.teamId)}
+                onClearMark={() =>
+                  r.approvedVersion
+                    ? setDialog({ kind: 'rankAgain', teamId: t.teamId, name: t.name })
+                    : clearMark.mutate(t.teamId)
+                }
               />
             ))}
           </TBody>
@@ -403,7 +459,15 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
                   </strong>{' '}
                   {t.mode === 'SHARE' ? 'shared' : 'ordered manually'}. “{t.reason}”
                 </span>
-                <Button variant="ghost" onClick={() => clearTie.mutate(t.id)}>
+                <Button
+                  variant="ghost"
+                  loading={clearTie.isPending && clearTie.variables === t.id}
+                  onClick={() =>
+                    r.approvedVersion
+                      ? setDialog({ kind: 'clearTie', id: t.id, group: t.group, rank: t.rank })
+                      : clearTie.mutate(t.id)
+                  }
+                >
                   Clear
                 </Button>
               </li>
@@ -553,6 +617,125 @@ function ReviewRound({ mine, roundId }: { mine: MyEvent; roundId: string }) {
         <p>Participants stop seeing results immediately.</p>
         <div className="mt-3">
           <Textarea label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+      </Dialog>
+      <Dialog
+        open={dialog?.kind === 'publish'}
+        title={`Publish version ${r.approvedVersion ?? ''} to participants?`}
+        onClose={() => setDialog(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setDialog(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => publish.mutate()} loading={publish.isPending}>
+              Publish version {r.approvedVersion} to participants
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p>
+            <strong>Participants see this immediately.</strong> You can unpublish later, but people
+            may already have seen it.
+          </p>
+          {published && published.versionNo !== r.approvedVersion && (
+            <p>This replaces version {published.versionNo}, which participants see now.</p>
+          )}
+          <div>
+            <h3 className="text-base font-bold">What participants will see</h3>
+            {event.isPending ? (
+              <Spinner label="Loading visibility settings" />
+            ) : visibility ? (
+              <ul className="mt-2 flex flex-col gap-2">
+                {visibility.map((v) => (
+                  <li key={v.label} className="flex flex-wrap items-center gap-2">
+                    <Badge tone={v.on ? 'success' : 'info'}>{v.on ? 'Shown' : 'Hidden'}</Badge>
+                    {v.label}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Alert tone="warning" title="We couldn't load the visibility settings" />
+            )}
+            <p className="mt-2 text-sm">
+              <Link to={`/events/${ev}/setup`}>Change what participants see</Link> in the event
+              setup.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-base font-bold">
+              Award positions in version {r.approvedVersion}
+              {event.data && !event.data.showWinners ? ' (not shown to participants)' : ''}
+            </h3>
+            {awards.length === 0 && <p className="mt-2">No team holds an award position.</p>}
+            {awardGroups.map((g) => (
+              <div key={g} className="mt-2">
+                {r.round.rankingScope === 'PER_TRACK' && <p className="font-semibold">{g}</p>}
+                <ol className="flex flex-col gap-1">
+                  {awards
+                    .filter((a) => a.group === g)
+                    .map((a) => (
+                      <li key={a.teamId} className="flex flex-wrap items-center gap-2">
+                        <Badge>{ordinal(a.rank!)}</Badge>
+                        <strong>{a.name}</strong>
+                        <span className="text-sm">{a.teamCode}</span>
+                      </li>
+                    ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Dialog>
+      <Dialog
+        open={dialog?.kind === 'rankAgain' || dialog?.kind === 'clearTie'}
+        title={
+          dialog?.kind === 'rankAgain'
+            ? `Rank ${dialog.name} again?`
+            : dialog?.kind === 'clearTie'
+              ? `Clear the tie decision for ${dialog.group}, position ${dialog.rank}?`
+              : ''
+        }
+        onClose={() => setDialog(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={clearMark.isPending || clearTie.isPending}
+              onClick={() => {
+                if (dialog?.kind === 'rankAgain') clearMark.mutate(dialog.teamId);
+                if (dialog?.kind === 'clearTie') clearTie.mutate(dialog.id);
+              }}
+            >
+              {dialog?.kind === 'rankAgain' ? 'Rank again' : 'Clear decision'} and withdraw version{' '}
+              {r.approvedVersion}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p>
+            {dialog?.kind === 'rankAgain'
+              ? `${dialog.name} returns to the ranking with its counted evaluations.`
+              : 'The tied teams return to undecided. A tie inside the award positions needs a new decision before you can approve.'}
+          </p>
+          <p>
+            <strong>
+              Approved version {r.approvedVersion} will be withdrawn because the ranking inputs
+              change.
+            </strong>{' '}
+            It stays in the snapshot history, and you need to approve again before publishing.
+          </p>
+          {published && (
+            <p>
+              Participants keep seeing version {published.versionNo} until you approve and publish a
+              corrected version.
+            </p>
+          )}
         </div>
       </Dialog>
     </div>

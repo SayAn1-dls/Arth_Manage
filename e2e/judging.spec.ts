@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { buildJudgingScenario } from './scenario.js';
-import { signInUi } from './helpers.js';
+import { goToNav, signInUi } from './helpers.js';
 
 test('judging: assignment, scoring with live weighted score, submit, and admin progress (AT-10, AT-13, AT-14)', async ({
   playwright,
@@ -24,7 +24,7 @@ test('judging: assignment, scoring with live weighted score, submit, and admin p
   await signInUi(page, judge.email, judge.password);
   await page.getByRole('link', { name: /Scenario Cup/ }).click();
   await expect(page.getByText('2 teams left to evaluate')).toBeVisible();
-  await page.getByRole('link', { name: 'My teams' }).click();
+  await goToNav(page, 'My teams', true);
   await expect(page.getByRole('heading', { name: 'Round 1' })).toBeVisible();
   await page.getByRole('link', { name: 'Alpha Squad' }).click();
   await expect(page.getByRole('heading', { name: 'Alpha Squad project' })).toBeVisible();
@@ -40,7 +40,8 @@ test('judging: assignment, scoring with live weighted score, submit, and admin p
   await expect(page.getByText('Weighted score appears')).toBeVisible();
   for (const [i, v] of scores.entries()) await inputs.nth(i).fill(String(v));
   await expect(page.getByText('Weighted score: 76.50 / 100')).toBeVisible();
-  await expect(page.getByText('All changes saved')).toBeVisible({ timeout: 10_000 });
+  // the save state is shown in the card footer and next to Submit
+  await expect(page.getByText('All changes saved').first()).toBeVisible({ timeout: 10_000 });
 
   await page.getByLabel('Feedback for the team (optional)').fill('Strong problem framing.');
   await page.getByRole('button', { name: 'Submit evaluation' }).click();

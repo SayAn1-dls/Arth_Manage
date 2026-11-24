@@ -67,9 +67,22 @@ export function judgeRouter(deps: Deps) {
     const rows = await Promise.all(
       [...byRound.entries()].map(async ([roundId, list]) => {
         const round = list[0]!.round;
-        const rubric = await db.rubric.findUnique({ where: { roundId } });
+        const [rubric, judged] = await Promise.all([
+          db.rubric.findUnique({ where: { roundId } }),
+          judgedVersions(db, roundId),
+        ]);
         const counted = list.filter((a) => a.status === 'ACTIVE');
+        // A team with no submitted version once judging has opened needs no evaluation (D-40), so it
+        // must not keep a judge's "teams left" above zero forever (audit P1-18).
+        const notRequired = counted.filter(
+          (a) =>
+            round.judgingStatus !== 'NOT_OPEN' &&
+            !judged.has(a.teamId) &&
+            a.evaluation?.status !== 'SUBMITTED',
+        ).length;
         return {
+          notRequired,
+          toEvaluate: counted.length - notRequired,
           roundId,
           name: round.name,
           order: round.order,

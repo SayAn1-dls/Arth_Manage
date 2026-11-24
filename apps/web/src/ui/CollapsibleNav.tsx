@@ -7,6 +7,8 @@ export interface CollapsibleNavItem {
   to: string;
   label: string;
   end?: boolean;
+  /** Optional sub-heading inside a group; consecutive items with the same section share one heading. */
+  section?: string;
 }
 
 export interface CollapsibleNavGroup {
@@ -16,6 +18,8 @@ export interface CollapsibleNavGroup {
   items: CollapsibleNavItem[];
   /** Render the links directly, without a heading (single-destination menus). */
   flat?: boolean;
+  /** One-line summary, used by dashboards that link to each group. */
+  description?: string;
 }
 
 export interface CollapsibleNavProps {
@@ -29,6 +33,11 @@ export interface CollapsibleNavProps {
   scope: string;
   /** Name of the current page, shown on the small-screen menu button. */
   currentLabel?: string;
+  /** Optional control of the small-screen menu, so another control (the bottom bar) can open it. */
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
+  /** Id for the folding menu panel, so an outside control can point at it with aria-controls. */
+  menuId?: string;
 }
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -45,12 +54,20 @@ export function CollapsibleNav({
   pageKey,
   scope,
   currentLabel,
+  menuOpen: controlledOpen,
+  onMenuOpenChange,
+  menuId: givenMenuId,
 }: CollapsibleNavProps) {
   const base = useId();
   // Below lg the whole menu folds behind one button so it never pushes the page out of view.
-  const [menu, setMenu] = useState({ open: false, pageKey });
-  const menuOpen = menu.open && menu.pageKey === pageKey; // choosing a page closes it
-  const menuId = `${base}-menu`;
+  const [menu, setMenuState] = useState({ open: false, pageKey });
+  const menuOpen =
+    controlledOpen !== undefined ? controlledOpen : menu.open && menu.pageKey === pageKey; // choosing a page closes it
+  const setMenu = (next: { open: boolean; pageKey: string }) => {
+    if (onMenuOpenChange) onMenuOpenChange(next.open);
+    else setMenuState(next);
+  };
+  const menuId = givenMenuId ?? `${base}-menu`;
   const { choices, toggle } = useNavChoices(
     scope,
     groups.map((g) => g.id),
@@ -117,10 +134,17 @@ export function CollapsibleNav({
               </button>
               {/* `hidden` removes collapsed links from the tab order and the accessibility tree. */}
               <div id={panelId} role="group" aria-label={g.label} hidden={!open}>
-                {g.items.map((i) => (
-                  <NavLink key={i.to} to={i.to} end={i.end} className={linkClass}>
-                    {i.label}
-                  </NavLink>
+                {g.items.map((i, n) => (
+                  <div key={i.to}>
+                    {i.section && i.section !== g.items[n - 1]?.section && (
+                      <p className="px-7 pb-1 pt-3 text-xs font-semibold text-graphite">
+                        {i.section}
+                      </p>
+                    )}
+                    <NavLink to={i.to} end={i.end} className={linkClass}>
+                      {i.label}
+                    </NavLink>
+                  </div>
                 ))}
               </div>
             </div>

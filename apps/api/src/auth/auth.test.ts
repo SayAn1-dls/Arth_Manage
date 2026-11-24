@@ -224,3 +224,34 @@ describe('rate limiting', () => {
     await kit.db.$disconnect();
   });
 });
+
+describe('return path through sign-up (audit P0-01)', () => {
+  const csrf = { 'x-requested-with': 'arthakram' };
+  it('carries a same-site return path into the verification link and refuses anything else', async () => {
+    const ok = await request(app).post('/api/v1/auth/register').set(csrf).send({
+      name: 'New Student',
+      email: 'new.student@example.test',
+      password: 'Correct-horse-9',
+      returnTo: '/e/hacksonipat-2026/register',
+    });
+    expect(ok.status).toBe(202);
+    const link = new URL(await lastLink('new.student@example.test'));
+    expect(link.pathname).toBe('/verify-email');
+    expect(link.searchParams.get('next')).toBe('/e/hacksonipat-2026/register');
+
+    for (const returnTo of [
+      'https://evil.example/x',
+      '//evil.example',
+      '/\\evil.example',
+      'javascript:alert(1)',
+    ])
+      expect(
+        (
+          await request(app)
+            .post('/api/v1/auth/register')
+            .set(csrf)
+            .send({ name: 'X', email: 'x@example.test', password: 'Correct-horse-9', returnTo })
+        ).status,
+      ).toBe(422);
+  });
+});

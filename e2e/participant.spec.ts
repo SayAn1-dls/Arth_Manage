@@ -66,7 +66,7 @@ test('registration, team formation, submission and admin monitoring (AT-02, AT-0
   await a.getByLabel('Repository URL').fill('github.com/not-valid');
   await expect(a.getByText(/https link to a repository/).first()).toBeVisible();
   await a.getByLabel('Repository URL').fill('https://github.com/owner/fraud-radar');
-  await expect(a.getByText('All changes saved')).toBeVisible();
+  await expect(a.getByText('All changes saved').first()).toBeVisible();
   await a.getByRole('button', { name: 'Submit', exact: true }).click();
   await a.getByRole('dialog').getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(a.getByText(/Submitted version 1/)).toBeVisible();

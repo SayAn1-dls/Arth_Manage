@@ -293,6 +293,8 @@ describe('releasing judge comments (FR-216)', () => {
       evaluationId: string;
       teamName: string;
     }[];
+    // the Feedback & reviews moderation list carries team comments only, never judges' private notes
+    expect(JSON.stringify((await s.w.admin.get(url(s))).body)).not.toContain('SECRET NOTE');
     const target = comments.find((c) => c.teamName === 'Zeta')!;
     expect(
       (

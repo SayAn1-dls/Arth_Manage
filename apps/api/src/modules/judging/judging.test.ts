@@ -338,3 +338,22 @@ describe('judging status and assignments (FR-026..031)', () => {
     ]);
   });
 });
+
+describe('judge progress counts only teams that need evaluating (audit P1-18)', () => {
+  it('an assigned team that never submitted is reported as not required, so progress can finish', async () => {
+    const w = await openEvent(kit);
+    const a = await teamOfTwo(w, 'Alpha');
+    const b = await teamOfTwo(w, 'Beta');
+    await submitProject(w, a);
+    await closeSubmissions(kit, w);
+    await workedExampleRubric(w);
+    const judge = await addJudge(kit, w, 'Judge J');
+    await w.admin.post(`${w.base}/rounds/${w.roundId}/assignments`).send({
+      judgeMembershipIds: [judge.membershipId],
+      teamIds: [a.teamId, b.teamId],
+    });
+    await openJudging(w);
+    const [r] = (await judge.agent.get(`${w.base}/judge/rounds`)).body.rounds;
+    expect(r).toMatchObject({ assigned: 2, toEvaluate: 1, notRequired: 1, submitted: 0 });
+  });
+});

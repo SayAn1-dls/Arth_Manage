@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router';
+import { Link, useLocation, useOutletContext, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent, TeamDto } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
@@ -22,10 +22,34 @@ import { useFormErrors } from '../auth/useFormErrors.js';
 type TeamDetail = Omit<TeamDto, 'members'> & {
   members: (TeamDto['members'][number] & { phone: string | null })[];
   history: { action: string; at: string; before: unknown; after: unknown; reason: string | null }[];
+  createdAt: string;
+  submissions: {
+    roundId: string;
+    roundName: string;
+    deadline: string | null;
+    extensionDeadline: string | null;
+    status: string;
+    statusLabel: string;
+    versions: number;
+    lastSubmittedAt: string | null;
+    lateMinutes: number;
+    title: string | null;
+  }[];
+};
+
+const SUBMISSION_TONE: Record<string, 'info' | 'warning' | 'success' | 'error'> = {
+  NOT_STARTED: 'info',
+  DRAFT: 'warning',
+  SUBMITTED: 'success',
+  SUBMITTED_LATE: 'warning',
+  LOCKED: 'success',
+  NOT_SUBMITTED: 'error',
 };
 
 export function TeamDetailPage() {
   const mine = useOutletContext<MyEvent>();
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const backTo = from ?? `/events/${mine.eventId}/teams`;
   const { teamId = '' } = useParams();
   const qc = useQueryClient();
   const errors = useFormErrors();
@@ -113,8 +137,8 @@ export function TeamDetailPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to=".." className="text-sm">
-        Back to teams
+      <Link to={backTo} className="text-sm">
+        Back to teams & participants
       </Link>
       <div className="flex flex-wrap items-center gap-2">
         <h2>{t.name}</h2>
@@ -153,7 +177,9 @@ export function TeamDetailPage() {
             >
               <div>
                 <p className="font-bold text-ink">
-                  <Link to={`../../participants/${m.membershipId}`}>{m.name}</Link>{' '}
+                  <Link to={`/events/${mine.eventId}/participants/${m.membershipId}`}>
+                    {m.name}
+                  </Link>{' '}
                   {m.role === 'LEADER' && <Badge>Leader</Badge>}
                 </p>
                 <p className="text-sm">
@@ -267,6 +293,42 @@ export function TeamDetailPage() {
             </Button>
           )}
         </div>
+      </Card>
+
+      <Card>
+        <h3>Submissions</h3>
+        {t.submissions.length === 0 ? (
+          <p className="mt-2">This event has no rounds yet.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col divide-y divide-line">
+            {t.submissions.map((sub) => (
+              <li key={sub.roundId} className="py-3 first:pt-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <strong>{sub.roundName}</strong>
+                  <Badge tone={SUBMISSION_TONE[sub.status] ?? 'info'}>{sub.statusLabel}</Badge>
+                </div>
+                {sub.title && <p className="mt-1">“{sub.title}”</p>}
+                <p className="mt-1 text-sm">
+                  {sub.deadline
+                    ? `Deadline ${formatDateTime(sub.deadline, mine.timeZone)}`
+                    : 'No deadline set'}
+                  {sub.extensionDeadline &&
+                    ` · Extended for this team until ${formatDateTime(sub.extensionDeadline, mine.timeZone)}`}
+                  {sub.lastSubmittedAt &&
+                    ` · Version ${sub.versions} submitted ${formatDateTime(sub.lastSubmittedAt, mine.timeZone)}`}
+                  {sub.lateMinutes > 0 && ` (${sub.lateMinutes} min late)`}
+                </p>
+                <Link
+                  className="text-sm"
+                  to={`/events/${mine.eventId}/submissions/${sub.roundId}/${t.id}`}
+                >
+                  Open submission
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-sm">Team created {formatDateTime(t.createdAt, mine.timeZone)}.</p>
       </Card>
 
       <Card footerLabel="History">

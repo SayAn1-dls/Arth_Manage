@@ -49,15 +49,16 @@ beforeEach(() => window.localStorage.clear());
 describe('CollapsibleNav', () => {
   it('opens only the group holding the current page and marks the page', () => {
     renderAt('/events/e1/checkin');
-    expect(heading('Event day')).toHaveAttribute('aria-expanded', 'true');
+    expect(heading('Event operations')).toHaveAttribute('aria-expanded', 'true');
     for (const other of [
-      'Run the event',
-      'Judging and results',
-      'Set up',
-      'After the event',
-      'Records',
+      'Setup',
+      'Registrations & people',
+      'Administration',
+      'Submissions & evaluation',
+      'Results & insights',
     ])
       expect(heading(other)).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Event-day management')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Check-in' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Rubric' })).not.toBeInTheDocument();
   });
@@ -65,19 +66,19 @@ describe('CollapsibleNav', () => {
   it('expands the group of a deep link with nested segments', () => {
     renderAt('/events/e1/judge/round-1/team-9', 'JUDGE');
     expect(heading('Judging')).toHaveAttribute('aria-expanded', 'true');
-    expect(heading('Resources')).toHaveAttribute('aria-expanded', 'false');
+    expect(heading('Help & updates')).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('link', { name: 'My teams' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('expands and collapses with the mouse and with the keyboard', async () => {
     const user = userEvent.setup();
     renderAt('/events/e1');
-    await user.click(heading('Set up'));
+    await user.click(heading('Setup'));
     expect(screen.getByRole('link', { name: 'Guidebook' })).toBeVisible();
-    await user.click(heading('Set up'));
+    await user.click(heading('Setup'));
     expect(screen.queryByRole('link', { name: 'Guidebook' })).not.toBeInTheDocument();
 
-    heading('Records').focus();
+    heading('Administration').focus();
     await user.keyboard('{Enter}');
     expect(screen.getByRole('link', { name: 'Audit history' })).toBeVisible();
     await user.keyboard(' ');
@@ -99,27 +100,30 @@ describe('CollapsibleNav', () => {
 
   it('moving to another page in a collapsed-by-user group reveals it again', async () => {
     const user = userEvent.setup();
-    renderAt('/events/e1');
-    await user.click(heading('Run the event'));
-    expect(heading('Run the event')).toHaveAttribute('aria-expanded', 'false');
-    await user.click(heading('Set up'));
+    renderAt('/events/e1/teams');
+    await user.click(heading('Registrations & people'));
+    expect(heading('Registrations & people')).toHaveAttribute('aria-expanded', 'false');
+    await user.click(heading('Setup'));
     await user.click(screen.getByRole('link', { name: 'Guidebook' }));
     expect(screen.getByRole('link', { name: 'Guidebook' })).toHaveAttribute('aria-current', 'page');
-    await user.click(heading('Set up')); // user collapses the active group
+    await user.click(heading('Setup')); // user collapses the active group
     expect(screen.queryByRole('link', { name: 'Guidebook' })).not.toBeInTheDocument();
-    await user.click(heading('Set up'));
-    await user.click(screen.getByRole('link', { name: 'Setup' }));
-    expect(heading('Set up')).toHaveAttribute('aria-expanded', 'true');
+    await user.click(heading('Setup'));
+    await user.click(screen.getByRole('link', { name: 'Event details & publishing' }));
+    expect(heading('Setup')).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('follows browser back and forward across groups', async () => {
     const user = userEvent.setup();
     renderAt('/events/e1/teams');
-    await user.click(heading('Judging and results'));
+    await user.click(heading('Submissions & evaluation'));
     await user.click(screen.getByRole('link', { name: 'Rubric' }));
     expect(screen.getByRole('link', { name: 'Rubric' })).toHaveAttribute('aria-current', 'page');
     await user.click(screen.getByText('history-back'));
-    expect(screen.getByRole('link', { name: 'Teams' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Teams & participants' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     await user.click(screen.getByText('history-forward'));
     expect(screen.getByRole('link', { name: 'Rubric' })).toHaveAttribute('aria-current', 'page');
   });
@@ -127,32 +131,32 @@ describe('CollapsibleNav', () => {
   it('remembers manual choices across a reload, scoped to role and event', async () => {
     const user = userEvent.setup();
     const first = renderAt('/events/e1');
-    await user.click(heading('Records'));
+    await user.click(heading('Administration'));
     expect(JSON.parse(window.localStorage.getItem(navStorageKey('ADMIN:e1'))!)).toEqual({
-      records: true,
+      administration: true,
     });
     first.unmount();
 
     renderAt('/events/e1'); // "refresh"
-    expect(heading('Records')).toHaveAttribute('aria-expanded', 'true');
-    expect(heading('Run the event')).toHaveAttribute('aria-expanded', 'true'); // current page
-    expect(heading('Set up')).toHaveAttribute('aria-expanded', 'false');
+    expect(heading('Administration')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+    expect(heading('Setup')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('does not leak preferences to another event or role', async () => {
     const user = userEvent.setup();
     const first = renderAt('/events/e1');
-    await user.click(heading('Records'));
+    await user.click(heading('Administration'));
     first.unmount();
     renderAt('/events/e2');
-    expect(heading('Records')).toHaveAttribute('aria-expanded', 'false');
+    expect(heading('Administration')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('ignores malformed or outdated stored state', () => {
     window.localStorage.setItem(navStorageKey('ADMIN:e1'), '{not json');
     renderAt('/events/e1');
-    expect(heading('Run the event')).toHaveAttribute('aria-expanded', 'true');
-    expect(heading('Records')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+    expect(heading('Administration')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('renders role-specific groups for participants, judges and staff', () => {
@@ -165,14 +169,9 @@ describe('CollapsibleNav', () => {
       unmount();
       return names;
     };
-    expect(labels('PARTICIPANT')).toEqual([
-      'My workspace',
-      'Participation',
-      'Information',
-      'Communication',
-    ]);
-    expect(labels('JUDGE')).toEqual(['Judging', 'Resources', 'Communication']);
-    expect(labels('STAFF')).toEqual(['My tasks', 'Event operations', 'Help and information']);
+    expect(labels('PARTICIPANT')).toEqual(['My event', 'Results & certificates', 'Help', 'More']);
+    expect(labels('JUDGE')).toEqual(['Judging', 'Help & updates']);
+    expect(labels('STAFF')).toEqual(['Event day', 'Help & updates']);
   });
 });
 

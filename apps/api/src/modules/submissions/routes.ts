@@ -208,26 +208,46 @@ export function submissionsRouter(deps: Deps) {
 
   // ─────────── Participant: own team's submission ───────────
 
-  router.get('/rounds/:roundId/submission', requireAction('submission.view'), async (req, res) => {
-    const ctx = requireCtx(req);
-    const round = await loadRound(ctx, String(req.params.roundId));
-    const team = await ownTeam(ctx);
-    res.json(await view(ctx, round, team.id, 'team'));
-  });
-
-  async function writableSubmission(ctx: EventContext, roundId: string) {
-    assertWritable(ctx);
-    const round = await loadRound(ctx, roundId);
-    const team = await ownTeam(ctx);
+  /**
+   * Why this team may not submit in this round at all (application screening, round shortlist), or null.
+   * The view and every write use this one rule, so the page can explain the block before anyone types.
+   */
+  async function eligibilityBlock(
+    ctx: EventContext,
+    round: { id: string; shortlistEnabled: boolean },
+    team: { id: string; applicationStatus: string },
+  ): Promise<string | null> {
     if (ctx.event.applicationReview && team.applicationStatus !== 'ACCEPTED')
-      throw AppError.forbidden('Your team application must be accepted before submitting');
+      return team.applicationStatus === 'REJECTED'
+        ? 'Your team application was not accepted, so your team cannot submit.'
+        : team.applicationStatus === 'WAITLISTED'
+          ? 'Your team is on the waitlist. You can submit once the organisers accept your application.'
+          : 'Your team application must be accepted before submitting. The organisers have not decided yet.';
     if (
       round.shortlistEnabled &&
       !(await db.roundEntry.findUnique({
         where: { roundId_teamId: { roundId: round.id, teamId: team.id } },
       }))
     )
-      throw AppError.forbidden('Your team has not been shortlisted for this round');
+      return 'Your team has not been shortlisted for this round, so you cannot submit for it.';
+    return null;
+  }
+
+  router.get('/rounds/:roundId/submission', requireAction('submission.view'), async (req, res) => {
+    const ctx = requireCtx(req);
+    const round = await loadRound(ctx, String(req.params.roundId));
+    const team = await ownTeam(ctx);
+    const v = await view(ctx, round, team.id, 'team');
+    const blockedReason = await eligibilityBlock(ctx, round, team);
+    res.json({ ...v, editable: v.editable && !blockedReason, blockedReason });
+  });
+
+  async function writableSubmission(ctx: EventContext, roundId: string) {
+    assertWritable(ctx);
+    const round = await loadRound(ctx, roundId);
+    const team = await ownTeam(ctx);
+    const blocked = await eligibilityBlock(ctx, round, team);
+    if (blocked) throw AppError.forbidden(blocked);
     const submission = await db.submission.findUnique({
       where: { roundId_teamId: { roundId, teamId: team.id } },
     });

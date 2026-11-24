@@ -59,12 +59,16 @@ test('results: review, tie decision, approval, publication and what participants
   await goToNav(p, 'Results', true);
   await expect(p.getByText('Results will appear here once published')).toBeVisible();
 
+  // Publishing shows what participants will see and asks first
   await admin.getByRole('button', { name: /Publish version 1/ }).click();
+  const publish = admin.getByRole('dialog');
+  await expect(publish.getByText(/Participants see this immediately/)).toBeVisible();
+  await publish.getByRole('button', { name: 'Publish version 1 to participants' }).click();
   await expect(admin.getByText(/Version 1 is now visible to participants/)).toBeVisible();
   await p.reload();
   await expect(p.getByRole('heading', { name: 'Round 1' })).toBeVisible();
-  await expect(p.locator('ol li').first()).toContainText('Alpha Squad');
-  await expect(p.locator('ol li').nth(1)).toContainText('Beta Brigade');
+  await expect(p.getByRole('main').locator('ol li').first()).toContainText('Alpha Squad');
+  await expect(p.getByRole('main').locator('ol li').nth(1)).toContainText('Beta Brigade');
   await expect(p.getByText(/\d{2,3}\.\d{2}/)).toHaveCount(0); // no scores for participants by default
 
   // A later disqualification withdraws the approval; participants keep seeing version 1
@@ -75,7 +79,7 @@ test('results: review, tie decision, approval, publication and what participants
   await expect(admin.getByText('The previous approval was withdrawn')).toBeVisible();
   await expect(admin.getByRole('button', { name: /Publish version/ })).toHaveCount(0);
   await p.reload();
-  await expect(p.locator('ol li').first()).toContainText('Alpha Squad');
+  await expect(p.getByRole('main').locator('ol li').first()).toContainText('Alpha Squad');
 
   // The audit history shows who decided what
   await admin.goto(`/events/${s.eventId}/audit?action=results`);

@@ -5,7 +5,7 @@ import type { Deps } from '../../http/deps.js';
 import { requireCtx } from '../../http/context.js';
 import { AppError } from '../../http/errors.js';
 import { parse } from '../../http/validate.js';
-import { adminOnly, loadRound } from '../judging/common.js';
+import { adminOnly, judgedVersions, loadRound } from '../judging/common.js';
 import { assertWritable } from '../events/service.js';
 import { writeAudit } from '../../audit/audit.js';
 import { calibration, engagement } from './analytics.js';
@@ -143,7 +143,7 @@ export function workspaceRouter({ db }: Deps) {
     const tickets = await db.supportTicket.findMany({
       where: { eventId: c.event.id, ...(manager ? {} : { authorId: c.membership.id }) },
       orderBy: { updatedAt: 'desc' },
-      take: 100,
+      take: 500,
       include: { messages: { orderBy: { createdAt: 'asc' } } },
     });
     // Name each author and their role in this event, so the screen never has to guess (it used to print
@@ -158,12 +158,91 @@ export function workspaceRouter({ db }: Deps) {
       const p = people.find((x) => x.id === id);
       return { authorName: p?.user.name ?? 'Former member', authorRole: p?.role ?? null };
     };
+    // Context for the Support & requests inbox: team, round, assignee, what an approval would change,
+    // who decided and the activity trail. Participants only see their own tickets, so this adds nothing
+    // they could not already see about themselves; the decision maker is named only to managers.
+    const teamIds = [...new Set(tickets.flatMap((t) => (t.teamId ? [t.teamId] : [])))];
+    const roundIds = [...new Set(tickets.flatMap((t) => (t.roundId ? [t.roundId] : [])))];
+    const [teams, rounds, subs, staffList, trail] = await Promise.all([
+      db.team.findMany({
+        where: { eventId: c.event.id, id: { in: teamIds } },
+        select: { id: true, teamCode: true, name: true },
+      }),
+      db.round.findMany({
+        where: { eventId: c.event.id, id: { in: roundIds } },
+        select: { id: true, name: true, submissionDeadline: true, graceMinutes: true },
+      }),
+      db.submission.findMany({
+        where: { eventId: c.event.id, roundId: { in: roundIds }, teamId: { in: teamIds } },
+        select: { roundId: true, teamId: true, extensionDeadline: true },
+      }),
+      manager
+        ? db.eventMembership.findMany({
+            where: { eventId: c.event.id, status: 'ACTIVE', role: { in: ['ADMIN', 'STAFF'] } },
+            select: { id: true, role: true, user: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+      manager
+        ? db.auditLog.findMany({
+            where: {
+              eventId: c.event.id,
+              entityId: { in: tickets.map((t) => t.id) },
+              entityType: { in: ['Workspace', 'SupportTicket'] },
+            },
+            orderBy: { at: 'asc' },
+            select: { entityId: true, action: true, at: true, actorId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const actors = manager
+      ? await db.user.findMany({
+          where: { id: { in: [...new Set(trail.flatMap((a) => (a.actorId ? [a.actorId] : [])))] } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const actorName = (id: string | null) => actors.find((a) => a.id === id)?.name ?? 'System';
+    const now = Date.now();
     res.json({
-      tickets: tickets.map((t) => ({
-        ...t,
-        ...who(t.authorId),
-        messages: t.messages.map((m) => ({ ...m, ...who(m.authorId) })),
-      })),
+      assignees: staffList.map((m) => ({ id: m.id, name: m.user.name, role: m.role })),
+      tickets: tickets.map((t) => {
+        const team = teams.find((x) => x.id === t.teamId);
+        const round = rounds.find((x) => x.id === t.roundId);
+        const sub = subs.find((x) => x.roundId === t.roundId && x.teamId === t.teamId);
+        // Same arithmetic as the decision endpoint, so the organiser sees the real outcome before deciding.
+        const currentCutoff =
+          sub?.extensionDeadline ??
+          (round?.submissionDeadline
+            ? new Date(+round.submissionDeadline + round.graceMinutes * 60000)
+            : null);
+        const proposedCutoff =
+          ['EXTENSION', 'UNLOCK'].includes(t.kind) && round
+            ? new Date(Math.max(now, +(currentCutoff ?? new Date(now))) + t.minutes * 60000)
+            : null;
+        const activity = trail.filter((a) => a.entityId === t.id);
+        const decided = activity.findLast((a) => a.action === 'exception.decided');
+        return {
+          ...t,
+          ...who(t.authorId),
+          teamCode: team?.teamCode ?? null,
+          teamName: team?.name ?? null,
+          roundName: round?.name ?? null,
+          currentCutoff,
+          proposedCutoff,
+          assigneeName: staffList.find((m) => m.id === t.assignedToId)?.user.name ?? null,
+          ...(manager
+            ? {
+                decidedBy: decided ? actorName(decided.actorId) : null,
+                decidedAt: decided?.at ?? null,
+                activity: activity.map((a) => ({
+                  action: a.action,
+                  at: a.at,
+                  actor: actorName(a.actorId),
+                })),
+              }
+            : {}),
+          messages: t.messages.map((m) => ({ ...m, ...who(m.authorId) })),
+        };
+      }),
     });
   });
   router.post('/workspace/tickets', async (req, res) => {
@@ -420,6 +499,92 @@ export function workspaceRouter({ db }: Deps) {
         : null,
     });
   });
+  /** Whether destination judging or submissions have begun; a shortlist can no longer change then. */
+  const destinationStarted = async (to: { id: string; judgingStatus: string }) =>
+    to.judgingStatus !== 'NOT_OPEN' ||
+    (await db.submission.count({ where: { roundId: to.id, lastVersionNo: { gt: 0 } } })) > 0;
+  /**
+   * What an organiser needs before shortlisting: every active team with its source-round submission,
+   * its rank and score from the source round's latest approved snapshot (if any) and whether it is on
+   * the destination shortlist now, plus who would be emailed.
+   */
+  router.get('/workspace/shortlist/:toRoundId', async (req, res) => {
+    const c = requireCtx(req);
+    adminOnly(c);
+    const to = await loadRound(db, c, String(req.params.toRoundId));
+    const { fromRoundId } = parse(
+      z.object({ fromRoundId: z.string().min(1).optional() }),
+      req.query,
+    );
+    const from = fromRoundId
+      ? await loadRound(db, c, fromRoundId)
+      : await db.round.findFirst({
+          where: { eventId: c.event.id, order: { lt: to.order } },
+          orderBy: { order: 'desc' },
+        });
+    if (!from) throw AppError.invalid('Choose the round teams advance from');
+    if (from.id === to.id)
+      throw AppError.invalid('Choose a destination round different from the source round', {
+        toRoundId: 'Choose a different round',
+      });
+    const [teams, submitted, snapshot, entries, recipients] = await Promise.all([
+      db.team.findMany({
+        where: { eventId: c.event.id, status: 'ACTIVE' },
+        select: { id: true, teamCode: true, name: true },
+        orderBy: { teamCode: 'asc' },
+      }),
+      judgedVersions(db, from.id),
+      db.resultSnapshot.findFirst({
+        where: { roundId: from.id, status: 'APPROVED' },
+        orderBy: { versionNo: 'desc' },
+      }),
+      db.roundEntry.findMany({ where: { roundId: to.id, eventId: c.event.id } }),
+      db.teamMember.count({
+        where: { eventId: c.event.id, leftAt: null, team: { status: 'ACTIVE' } },
+      }),
+    ]);
+    const ranked = new Map(
+      (
+        (snapshot?.entries ?? []) as unknown as {
+          teamId: string;
+          rank: number;
+          score: string;
+          group: string;
+        }[]
+      ).map((e) => [e.teamId, e]),
+    );
+    const shortlisted = new Set(entries.map((e) => e.teamId));
+    res.json({
+      fromRound: { id: from.id, name: from.name, order: from.order },
+      toRound: {
+        id: to.id,
+        name: to.name,
+        order: to.order,
+        shortlistEnabled: to.shortlistEnabled,
+        started: await destinationStarted(to),
+      },
+      results: snapshot
+        ? {
+            versionNo: snapshot.versionNo,
+            published: Boolean(snapshot.publishedAt && !snapshot.unpublishedAt),
+            rankingScope: from.rankingScope,
+          }
+        : null,
+      currentShortlist: entries.length,
+      recipients,
+      teams: teams.map((t) => {
+        const r = ranked.get(t.id);
+        return {
+          ...t,
+          submitted: submitted.has(t.id),
+          rank: r?.rank ?? null,
+          score: r?.score ?? null,
+          group: r?.group ?? null,
+          shortlisted: shortlisted.has(t.id),
+        };
+      }),
+    });
+  });
   router.post('/workspace/shortlist', async (req, res) => {
     const c = requireCtx(req);
     adminOnly(c);
@@ -433,13 +598,19 @@ export function workspaceRouter({ db }: Deps) {
         .strict(),
       req.body,
     );
+    if (input.fromRoundId === input.toRoundId)
+      throw AppError.invalid('Choose a destination round different from the source round', {
+        toRoundId: 'Choose a different round',
+      });
+    // An empty shortlist would tell every active team it was not shortlisted.
+    if (!input.teamIds.length)
+      throw AppError.invalid('Choose at least one team to advance', {
+        teamIds: 'Choose at least one team',
+      });
     const from = await loadRound(db, c, input.fromRoundId),
       to = await loadRound(db, c, input.toRoundId);
     if (to.order <= from.order) throw AppError.invalid('Choose a later destination round');
-    if (
-      to.judgingStatus !== 'NOT_OPEN' ||
-      (await db.submission.count({ where: { roundId: to.id, lastVersionNo: { gt: 0 } } }))
-    )
+    if (await destinationStarted(to))
       throw AppError.conflict(
         'round_started',
         'Shortlist before destination judging or submissions begin',
@@ -647,21 +818,18 @@ export function workspaceRouter({ db }: Deps) {
       }),
     });
   });
-  router.post('/workspace/broadcast', async (req, res) => {
-    const c = requireCtx(req);
-    adminOnly(c);
-    const input = parse(
-      z
-        .object({
-          subject: text.max(200),
-          body: text,
-          trackId: z.string().optional(),
-          roundId: z.string().optional(),
-          shortlistedOnly: z.boolean().default(false),
-        })
-        .strict(),
-      req.body,
-    );
+  // Targeted messages: the same recipient rule serves the preview (count before sending) and the send.
+  const targetSchema = z
+    .object({
+      trackId: z.string().optional(),
+      roundId: z.string().optional(),
+      shortlistedOnly: z.boolean().default(false),
+    })
+    .strict();
+  async function targetRecipients(
+    c: ReturnType<typeof requireCtx>,
+    input: z.infer<typeof targetSchema>,
+  ): Promise<Set<string>> {
     if (input.roundId) await loadRound(db, c, input.roundId);
     if (input.shortlistedOnly && !input.roundId)
       throw AppError.invalid('Choose the shortlist round');
@@ -690,23 +858,127 @@ export function workspaceRouter({ db }: Deps) {
     const all = await db.eventMembership.findMany({
       where: { eventId: c.event.id, status: 'ACTIVE', role: 'PARTICIPANT' },
     });
-    const ids =
-      input.trackId || input.shortlistedOnly || roundFilter?.shortlistEnabled
-        ? new Set(teamMembers.map((m) => m.membershipId))
-        : new Set(all.map((m) => m.id));
-    const key = `broadcast:${crypto.randomUUID()}`;
-    await db.messageDelivery.createMany({
+    return input.trackId || input.shortlistedOnly || roundFilter?.shortlistEnabled
+      ? new Set(teamMembers.map((m) => m.membershipId))
+      : new Set(all.map((m) => m.id));
+  }
+  const ANNOUNCEMENT_ROLES = {
+    EVERYONE: ['ADMIN', 'PARTICIPANT', 'JUDGE', 'STAFF'],
+    PARTICIPANTS: ['PARTICIPANT'],
+    JUDGES: ['JUDGE'],
+    STAFF: ['STAFF'],
+  } as const;
+
+  /** Recipient count for the Communication composer, before anything is sent (admin only). */
+  router.post('/workspace/audience-preview', async (req, res) => {
+    const c = requireCtx(req);
+    adminOnly(c);
+    const input = parse(
+      z.discriminatedUnion('channel', [
+        z
+          .object({
+            channel: z.literal('announcement'),
+            audience: z.enum(['EVERYONE', 'PARTICIPANTS', 'JUDGES', 'STAFF']),
+          })
+          .strict(),
+        targetSchema.extend({ channel: z.literal('email') }).strict(),
+      ]),
+      req.body,
+    );
+    if (input.channel === 'announcement') {
+      const recipients = await db.eventMembership.count({
+        where: {
+          eventId: c.event.id,
+          status: 'ACTIVE',
+          role: { in: [...ANNOUNCEMENT_ROLES[input.audience]] },
+        },
+      });
+      return res.json({ channel: 'announcement', recipients });
+    }
+    res.json({
+      channel: 'email',
+      recipients: (
+        await targetRecipients(c, {
+          trackId: input.trackId,
+          roundId: input.roundId,
+          shortlistedOnly: input.shortlistedOnly,
+        })
+      ).size,
+    });
+  });
+
+  router.post('/workspace/broadcast', async (req, res) => {
+    const c = requireCtx(req);
+    adminOnly(c);
+    const input = parse(
+      targetSchema
+        .extend({
+          subject: text.max(200),
+          body: text,
+          // One id per composed message: a double click or retry re-uses it, so nobody is emailed twice.
+          requestId: z.string().uuid().optional(),
+        })
+        .strict(),
+      req.body,
+    );
+    const { subject, body, requestId, ...target } = input;
+    const ids = await targetRecipients(c, target);
+    const key = `broadcast:${requestId ?? crypto.randomUUID()}`;
+    const created = await db.messageDelivery.createMany({
       data: [...ids].map((membershipId) => ({
         eventId: c.event.id,
         membershipId,
         key,
-        subject: input.subject,
-        body: input.body,
+        subject,
+        body,
       })),
+      skipDuplicates: true,
     });
-    await audit(c, 'announcement.broadcast_queued', key);
-    res.json({ queued: ids.size });
+    if (created.count > 0) await audit(c, 'announcement.broadcast_queued', key);
+    res.json({
+      queued: created.count,
+      recipients: ids.size,
+      duplicate: created.count === 0 && ids.size > 0,
+    });
   });
+
+  /** Delivery history grouped per send, with counts per status (admin only). */
+  router.get('/workspace/deliveries/summary', async (req, res) => {
+    const c = requireCtx(req);
+    adminOnly(c);
+    const groups = await db.messageDelivery.groupBy({
+      by: ['key', 'subject', 'status'],
+      where: { eventId: c.event.id },
+      _count: true,
+      _min: { createdAt: true },
+    });
+    const sends = new Map<
+      string,
+      {
+        key: string;
+        subject: string;
+        source: string;
+        createdAt: Date;
+        counts: Record<string, number>;
+      }
+    >();
+    for (const g of groups) {
+      const s = sends.get(g.key) ?? {
+        key: g.key,
+        subject: g.subject,
+        source: g.key.split(':')[0] ?? 'broadcast',
+        createdAt: g._min.createdAt ?? new Date(0),
+        counts: {},
+      };
+      s.counts[g.status] = (s.counts[g.status] ?? 0) + g._count;
+      if (g._min.createdAt && g._min.createdAt < s.createdAt) s.createdAt = g._min.createdAt;
+      sends.set(g.key, s);
+    }
+    res.json({
+      sends: [...sends.values()].sort((a, b) => +b.createdAt - +a.createdAt).slice(0, 200),
+    });
+  });
+
   router.get('/workspace/report.pdf', async (req, res) => {
     const c = requireCtx(req);
     adminOnly(c);

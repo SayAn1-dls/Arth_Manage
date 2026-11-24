@@ -1,13 +1,31 @@
+import { useLayoutEffect, useRef } from 'react';
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import { cn } from './cn.js';
 
-/** White card on Paper with a scrollable region so wide admin tables never break the page on mobile. */
+/**
+ * White card on Paper. Below 640 px each row becomes a stacked card with every value labelled by its
+ * column heading (brand §8, audit P1-31), so phones never need sideways scrolling. Wider screens keep the
+ * table, with a scrollable region as a fallback.
+ */
 export function Table({
   className,
   children,
   caption,
   ...rest
 }: HTMLAttributes<HTMLTableElement> & { caption?: string }) {
+  const ref = useRef<HTMLTableElement>(null);
+  // Label each cell with its column heading for the stacked layout (read from the rendered headings, so
+  // every table gets it without changing its markup). Runs after each render because rows change.
+  useLayoutEffect(() => {
+    const table = ref.current;
+    if (!table) return;
+    const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '');
+    table.querySelectorAll('tbody tr').forEach((tr) =>
+      [...tr.children].forEach((td, i) => {
+        if (heads[i]) td.setAttribute('data-label', heads[i]!);
+      }),
+    );
+  });
   return (
     <div
       className="relative overflow-x-auto rounded-card bg-white shadow-card"
@@ -15,7 +33,11 @@ export function Table({
       role="region"
       aria-label={caption}
     >
-      <table className={cn('w-full border-collapse text-left text-sm', className)} {...rest}>
+      <table
+        ref={ref}
+        className={cn('ak-stack w-full border-collapse text-left text-sm', className)}
+        {...rest}
+      >
         {caption && <caption className="sr-only">{caption}</caption>}
         {children}
       </table>

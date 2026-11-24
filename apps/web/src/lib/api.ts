@@ -62,7 +62,7 @@ export const api = {
     }
   },
   myEvents: () => request<{ events: MyEvent[] }>('GET', '/me/events').then((r) => r.events),
-  register: (input: { name: string; email: string; password: string }) =>
+  register: (input: { name: string; email: string; password: string; returnTo?: string }) =>
     request<{ message: string }>('POST', '/auth/register', input),
   verifyEmail: (token: string) =>
     request<{ message: string }>('POST', '/auth/verify-email', { token }),

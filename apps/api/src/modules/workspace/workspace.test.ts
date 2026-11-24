@@ -82,8 +82,10 @@ describe('expanded workspace', () => {
   });
   it('enforces shortlisting on draft writes and rejects reverse progression', async () => {
     const w = await openEvent(kit),
-      team = await teamOfTwo(w);
+      team = await teamOfTwo(w),
+      advancing = await teamOfTwo(w, 'Advancing');
     await submitProject(w, team);
+    await submitProject(w, advancing);
     const next = await db.round.create({
       data: {
         eventId: w.eventId,
@@ -96,9 +98,9 @@ describe('expanded workspace', () => {
       (
         await w.admin
           .post(`${w.base}/workspace/shortlist`)
-          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [] })
+          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [advancing.teamId] })
       ).status,
-    ).toBe(200);
+    ).toBe(200); // `team` is not shortlisted, so its draft write for the next round is refused
     expect(
       (
         await team.lead.agent
@@ -333,5 +335,207 @@ describe('expanded workspace', () => {
       comparedLines: 1,
     });
     expect(() => githubRepo('https://localhost/private')).toThrow();
+  });
+});
+
+describe('Support & requests inbox', () => {
+  it('shows organisers the real outcome of an extension before deciding, then who decided', async () => {
+    const w = await openEvent(kit);
+    const t = await teamOfTwo(w, 'Alpha');
+    const created = await t.lead.agent.post(`${w.base}/workspace/tickets`).send({
+      subject: 'Laptop died',
+      body: 'We need a little more time',
+      kind: 'EXTENSION',
+      roundId: w.roundId,
+      minutes: 30,
+    });
+    expect(created.status).toBe(201);
+    const before = (await w.admin.get(`${w.base}/workspace/tickets`)).body;
+    const ticket = before.tickets[0];
+    expect(ticket).toMatchObject({
+      teamName: 'Alpha',
+      roundId: w.roundId,
+      assigneeName: null,
+      decidedBy: null,
+    });
+    expect(before.assignees.map((a: { role: string }) => a.role)).toContain('ADMIN');
+    const proposed = new Date(ticket.proposedCutoff).getTime();
+    const decided = await w.admin
+      .post(`${w.base}/workspace/tickets/${ticket.id}/decision`)
+      .send({ approve: true, note: 'Approved for 30 minutes' });
+    expect(decided.status).toBe(200);
+    const sub = await kit.db.submission.findFirstOrThrow({
+      where: { roundId: w.roundId, teamId: t.teamId },
+    });
+    // the preview and the decision use the same arithmetic (allowing for the seconds between the two calls)
+    expect(Math.abs(sub.extensionDeadline!.getTime() - proposed)).toBeLessThan(60_000);
+    const after = (await w.admin.get(`${w.base}/workspace/tickets`)).body.tickets[0];
+    expect(after.status).toBe('APPROVED');
+    expect(after.decidedBy).toBe('Owner');
+    expect(after.activity.map((a: { action: string }) => a.action)).toEqual([
+      'helpdesk.created',
+      'exception.decided',
+    ]);
+    // the participant sees their own request and decision, but not the organisers' audit trail
+    const own = (await t.lead.agent.get(`${w.base}/workspace/tickets`)).body;
+    expect(own.tickets).toHaveLength(1);
+    expect(own.tickets[0].activity).toBeUndefined();
+    expect(own.tickets[0].decidedBy).toBeUndefined();
+    expect(own.assignees).toEqual([]);
+    expect((await t.mate.agent.get(`${w.base}/workspace/tickets`)).body.tickets).toHaveLength(0);
+  });
+});
+
+describe('Communication safeguards', () => {
+  it('previews the exact recipient count, never sends the same message twice, and groups history', async () => {
+    const w = await openEvent(kit);
+    await teamOfTwo(w, 'Alpha');
+    await teamOfTwo(w, 'Beta');
+    await w.participant('Solo Sam');
+    const judge = await addJudge(kit, w, 'Judge J');
+
+    const everyone = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'announcement', audience: 'EVERYONE' });
+    expect(everyone.body).toEqual({ channel: 'announcement', recipients: 7 }); // 5 participants, admin, judge
+    const judges = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'announcement', audience: 'JUDGES' });
+    expect(judges.body.recipients).toBe(1);
+
+    const preview = await w.admin
+      .post(`${w.base}/workspace/audience-preview`)
+      .send({ channel: 'email' });
+    expect(preview.body).toEqual({ channel: 'email', recipients: 5 });
+
+    const requestId = '6f1c2f8e-6a1f-4a8e-9a55-2d3b6c7d8e9f';
+    const first = await w.admin
+      .post(`${w.base}/workspace/broadcast`)
+      .send({ subject: 'Venue change', body: 'We moved to Hall B.', requestId });
+    expect(first.body).toEqual({ queued: 5, recipients: 5, duplicate: false });
+    const again = await w.admin
+      .post(`${w.base}/workspace/broadcast`)
+      .send({ subject: 'Venue change', body: 'We moved to Hall B.', requestId });
+    expect(again.body).toMatchObject({ queued: 0, duplicate: true });
+    expect(await kit.db.messageDelivery.count({ where: { eventId: w.eventId } })).toBe(5);
+
+    const summary = (await w.admin.get(`${w.base}/workspace/deliveries/summary`)).body;
+    expect(summary.sends).toEqual([
+      expect.objectContaining({
+        key: `broadcast:${requestId}`,
+        subject: 'Venue change',
+        source: 'broadcast',
+        counts: { QUEUED: 5 },
+      }),
+    ]);
+    for (const who of [judge.agent])
+      expect(
+        (
+          await who
+            .post(`${w.base}/workspace/audience-preview`)
+            .send({ channel: 'announcement', audience: 'EVERYONE' })
+        ).status,
+      ).toBe(404);
+  });
+});
+
+describe('round shortlist safeguards (P0-04)', () => {
+  const finalRound = (eventId: string) =>
+    db.round.create({
+      data: {
+        eventId,
+        order: 2,
+        name: 'Final',
+        submissionDeadline: new Date(Date.now() + 86400000),
+      },
+    });
+  type ContextTeam = { id: string; submitted: boolean; shortlisted: boolean; rank: number | null };
+  const byId = (body: { teams: ContextTeam[] }) =>
+    Object.fromEntries(body.teams.map((t) => [t.id, t]));
+
+  it('rejects an empty selection and an identical source and destination round, saving nothing', async () => {
+    const w = await openEvent(kit),
+      team = await teamOfTwo(w);
+    await submitProject(w, team);
+    const next = await finalRound(w.eventId);
+    const empty = await w.admin
+      .post(`${w.base}/workspace/shortlist`)
+      .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [] });
+    expect(empty.status).toBe(422);
+    expect(empty.body.error.code).toBe('validation_error');
+    const same = await w.admin
+      .post(`${w.base}/workspace/shortlist`)
+      .send({ fromRoundId: w.roundId, toRoundId: w.roundId, teamIds: [team.teamId] });
+    expect(same.status).toBe(422);
+    expect(same.body.error.code).toBe('validation_error');
+    expect(await db.roundEntry.count({ where: { roundId: { in: [next.id, w.roundId] } } })).toBe(0);
+    expect((await db.round.findUniqueOrThrow({ where: { id: next.id } })).shortlistEnabled).toBe(
+      false,
+    );
+    expect(
+      await db.messageDelivery.count({
+        where: { eventId: w.eventId, key: { startsWith: 'shortlist:' } },
+      }),
+    ).toBe(0);
+  });
+
+  it('shows admins submission flags and current shortlist membership, and is not found for anyone else', async () => {
+    const w = await openEvent(kit),
+      advanced = await teamOfTwo(w, 'Advanced'),
+      idle = await teamOfTwo(w, 'Idle');
+    await submitProject(w, advanced);
+    const next = await finalRound(w.eventId);
+    const url = `${w.base}/workspace/shortlist/${next.id}?fromRoundId=${w.roundId}`;
+
+    const before = await w.admin.get(url);
+    expect(before.status).toBe(200);
+    expect(before.body.fromRound.id).toBe(w.roundId);
+    expect(before.body.toRound).toMatchObject({
+      id: next.id,
+      shortlistEnabled: false,
+      started: false,
+    });
+    expect(before.body.currentShortlist).toBe(0);
+    expect(before.body.results).toBeNull(); // nothing approved in the source round yet
+    expect(before.body.recipients).toBe(4); // every member of both active teams is emailed
+    expect(byId(before.body)[advanced.teamId]).toMatchObject({
+      submitted: true,
+      shortlisted: false,
+      rank: null,
+    });
+    expect(byId(before.body)[idle.teamId]).toMatchObject({ submitted: false, shortlisted: false });
+
+    expect(
+      (
+        await w.admin
+          .post(`${w.base}/workspace/shortlist`)
+          .send({ fromRoundId: w.roundId, toRoundId: next.id, teamIds: [advanced.teamId] })
+      ).status,
+    ).toBe(200);
+    const after = (await w.admin.get(url)).body;
+    expect(after.toRound.shortlistEnabled).toBe(true);
+    expect(after.currentShortlist).toBe(1);
+    expect(byId(after)[advanced.teamId]!.shortlisted).toBe(true);
+    expect(byId(after)[idle.teamId]!.shortlisted).toBe(false);
+
+    // Without a source round the previous round is used; the same round is refused.
+    expect((await w.admin.get(`${w.base}/workspace/shortlist/${next.id}`)).body.fromRound.id).toBe(
+      w.roundId,
+    );
+    expect(
+      (await w.admin.get(`${w.base}/workspace/shortlist/${next.id}?fromRoundId=${next.id}`)).status,
+    ).toBe(422);
+
+    const judge = await addJudge(kit, w, 'Jaya Judge');
+    for (const who of [advanced.lead.agent, idle.mate.agent, judge.agent])
+      expect((await who.get(url)).status).toBe(404);
+    const other = await openEvent(kit);
+    expect(
+      (
+        await other.admin.get(
+          `${other.base}/workspace/shortlist/${next.id}?fromRoundId=${w.roundId}`,
+        )
+      ).status,
+    ).toBe(404);
   });
 });

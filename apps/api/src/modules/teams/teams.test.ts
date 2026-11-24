@@ -495,6 +495,47 @@ describe('admin people and team management (FR-016..020)', () => {
   });
 });
 
+describe('Teams & participants consolidation', () => {
+  it('finds a team by any member detail, lists member names, and finds a participant by ID', async () => {
+    const w = await openEvent(kit);
+    const lead = await w.participant('Meera Iyer');
+    const created = await lead.agent.post(`${w.base}/teams`).send({ name: 'Quill Squad' });
+    const mate = await w.participant('Dev Malhotra');
+    await mate.agent.post(`${w.base}/teams/join`).send({ code: created.body.team.joinCode });
+
+    const byMember = (await w.admin.get(`${w.base}/teams?q=dev mal`)).body.rows;
+    expect(byMember).toHaveLength(1);
+    expect(byMember[0].members).toEqual(['Meera Iyer', 'Dev Malhotra']); // leader first
+    expect((await w.admin.get(`${w.base}/teams?q=rishihood`)).body.rows).toHaveLength(1);
+    expect((await w.admin.get(`${w.base}/teams?q=${mate.membershipId}`)).body.rows).toHaveLength(1);
+
+    const byId = (await w.admin.get(`${w.base}/participants?q=${mate.membershipId}`)).body.rows;
+    expect(byId.map((r: { name: string }) => r.name)).toEqual(['Dev Malhotra']);
+    // participant search never depends on the team name
+    expect(
+      (await w.admin.get(`${w.base}/participants?q=meera`)).body.rows.map(
+        (r: { teamName: string }) => r.teamName,
+      ),
+    ).toEqual(['Quill Squad']);
+  });
+
+  it('team detail shows the submission state for every round', async () => {
+    const w = await openEvent(kit);
+    const lead = await w.participant('Asha');
+    const created = await lead.agent.post(`${w.base}/teams`).send({ name: 'Byte Me' });
+    const d = (await w.admin.get(`${w.base}/teams/${created.body.team.id}`)).body;
+    expect(d.createdAt).toBeTruthy();
+    expect(d.submissions).toHaveLength(1);
+    expect(d.submissions[0]).toMatchObject({
+      roundId: w.roundId,
+      status: 'NOT_STARTED',
+      versions: 0,
+      lastSubmittedAt: null,
+    });
+    expect((await lead.agent.get(`${w.base}/teams/${created.body.team.id}`)).status).toBe(404);
+  });
+});
+
 describe('invitations and members', () => {
   it('invites a judge by email, accepts only for the matching account, and enforces one role per event', async () => {
     const w = await openEvent(kit);
@@ -539,5 +580,60 @@ describe('invitations and members', () => {
       where: { eventId: w.eventId, userId: w.adminUser.id },
     });
     expect((await w.admin.delete(`${w.base}/members/${owner.id}`)).body.error.code).toBe('owner');
+  });
+});
+
+describe('sponsor and access-label invitations (audit P0-10)', () => {
+  it('a sponsor viewer joins with sponsor access directly and never sees participant data', async () => {
+    const w = await openEvent(kit);
+    await w.participant('Private Person');
+    const sponsor = await createUser(db, { name: 'Sponsor Co' });
+    const inv = await w.admin
+      .post(`${w.base}/invitations`)
+      .send({ email: sponsor.email, role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    expect(inv.status).toBe(201);
+    expect(inv.body.accessLevel).toBe('SPONSOR_VIEWER');
+    const mail = await db.outboxEmail.findFirstOrThrow({ where: { toEmail: sponsor.email } });
+    expect(mail.subject).toMatch(/sponsor viewer/);
+    const token = new URL(mail.link!).searchParams.get('token')!;
+    const agent = await signedInAgent(app, sponsor.email);
+    expect((await agent.post('/api/v1/invitations/accept').send({ token })).status).toBe(200);
+    const m = await db.eventMembership.findFirstOrThrow({
+      where: { eventId: w.eventId, userId: sponsor.id },
+    });
+    expect(m).toMatchObject({ role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    // from the very first request: no participant list, no dashboard, only the aggregate report
+    expect((await agent.get(`${w.base}/participants`)).status).toBe(404);
+    expect((await agent.get(`${w.base}/dashboard`)).status).toBe(404);
+    expect((await agent.get(`${w.base}/workspace/report.pdf`)).status).toBe(200);
+    const members = (await w.admin.get(`${w.base}/members`)).body;
+    expect(members.viewerIsOwner).toBe(true);
+    expect(
+      members.members.find((x: { email: string }) => x.email === sponsor.email).accessLevel,
+    ).toBe('SPONSOR_VIEWER');
+  });
+
+  it('only the owner may invite with an access label, and the label must fit the role', async () => {
+    const w = await openEvent(kit);
+    const coUser = await createUser(db, { name: 'Co Admin' });
+    await db.eventMembership.create({
+      data: { eventId: w.eventId, userId: coUser.id, role: 'ADMIN' },
+    });
+    const co = await signedInAgent(app, coUser.email);
+    const denied = await co
+      .post(`${w.base}/invitations`)
+      .send({ email: 'sp@example.test', role: 'ADMIN', accessLevel: 'SPONSOR_VIEWER' });
+    expect(denied.status).toBe(403);
+    expect(
+      (await co.post(`${w.base}/invitations`).send({ email: 'j@example.test', role: 'JUDGE' }))
+        .status,
+    ).toBe(201); // plain roles are unchanged for any core admin
+    expect(
+      (
+        await w.admin
+          .post(`${w.base}/invitations`)
+          .send({ email: 'x@example.test', role: 'JUDGE', accessLevel: 'SPONSOR_VIEWER' })
+      ).status,
+    ).toBe(422);
   });
 });

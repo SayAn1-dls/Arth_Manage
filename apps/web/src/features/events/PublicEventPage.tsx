@@ -6,6 +6,7 @@ import { ApiError, request } from '../../lib/api.js';
 import { MODE_LABEL, TYPE_LABEL } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { Alert, Arc, Badge, Card, Eyebrow, Logo, Spinner } from '../../ui/index.js';
+import { DeadlineLines } from '../participant/Deadline.js';
 
 interface PublicEvent {
   event: {
@@ -28,7 +29,8 @@ interface PublicEvent {
     teamMax: number;
     contactEmail: string;
   };
-  rounds: { name: string; submissionDeadline: string | null }[];
+  /** `graceMinutes` is optional until the public endpoint sends it; without it no grace line shows. */
+  rounds: { name: string; submissionDeadline: string | null; graceMinutes?: number }[];
   tracks: { name: string; description: string | null }[];
 }
 
@@ -93,6 +95,12 @@ export function PublicEventPage() {
           <Badge tone={e.registrationStatus === 'OPEN' ? 'success' : 'info'}>{regText}</Badge>
           <PrimaryAction slug={slug} registration={e.registrationStatus} />
         </div>
+        {e.registrationStatus === 'OPEN' && e.registrationClosesAt && (
+          <p className="mt-2 text-sm">
+            Registration open until{' '}
+            <strong>{formatDateTime(e.registrationClosesAt, e.timeZone)}</strong>
+          </p>
+        )}
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
           <Card footerLabel="When and where">
@@ -125,12 +133,18 @@ export function PublicEventPage() {
           )}
           {rounds.some((r) => r.submissionDeadline) && (
             <Card footerLabel="Deadlines">
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {rounds
                   .filter((r) => r.submissionDeadline)
                   .map((r) => (
                     <li key={r.name}>
-                      <strong>{r.name}</strong>: {formatDateTime(r.submissionDeadline!, e.timeZone)}
+                      <p className="font-bold text-ink">{r.name}</p>
+                      <DeadlineLines
+                        compact
+                        deadline={r.submissionDeadline}
+                        graceMinutes={r.graceMinutes ?? 0}
+                        timeZone={e.timeZone}
+                      />
                     </li>
                   ))}
               </ul>
@@ -164,11 +178,20 @@ function PrimaryAction({
     retry: false,
   });
   if (!user) {
+    // Signed-out visitors always get a way in: register while open, otherwise sign in to their event.
     return registration === 'OPEN' ? (
       <Link to="/login" state={{ from: `/e/${slug}/register` }} className={actionCls}>
-        Sign in to register
+        Sign up or sign in to register
       </Link>
-    ) : null;
+    ) : (
+      <Link
+        to="/login"
+        state={{ from: `/e/${slug}` }}
+        className="inline-flex min-h-11 items-center rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
+      >
+        Already registered? Sign in
+      </Link>
+    );
   }
   if (me.isPending) return null;
   if (me.data?.role === 'PARTICIPANT' && me.data.registered)

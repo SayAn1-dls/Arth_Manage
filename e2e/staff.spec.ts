@@ -70,14 +70,15 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   const admin = await adminCtx.newPage();
   await signInUi(admin, s.org.email, s.org.password);
   await admin.goto(`/events/${s.eventId}`);
-  await expect(admin.getByText('1 urgent issue')).toBeVisible();
+  // the urgent issue is listed under Needs attention with what happened, and links to the queue
+  await admin.getByRole('link', { name: /Urgent issue: Projector is dead in hall B/ }).click();
   await expect(admin.getByText('Projector is dead in hall B').first()).toBeVisible();
-  await expect(admin.getByText('2/2', { exact: false }).first()).toBeVisible(); // 2 of 2 people checked in
-  await admin.getByRole('link', { name: 'Open the issue queue' }).click();
   await admin.getByRole('button', { name: 'Resolve' }).click();
   await admin.getByLabel('Resolution note').fill('Swapped the projector');
   await admin.getByRole('button', { name: 'Mark resolved' }).click();
   await expect(admin.getByText('Swapped the projector')).toBeVisible();
+  await admin.goto(`/events/${s.eventId}/checkin`);
+  await expect(admin.getByText(/2 of 2 people checked in/)).toBeVisible();
 
   await admin.goto(`/events/${s.eventId}/audit?action=checkin`);
   await expect(admin.getByText('checkin.marked').first()).toBeVisible();

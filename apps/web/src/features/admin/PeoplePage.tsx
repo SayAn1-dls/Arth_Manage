@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
-import { formatDateTime, ROLE_LABEL } from '../../lib/format.js';
+import { formatDateTime } from '../../lib/format.js';
 import {
   Alert,
   Badge,
@@ -29,15 +29,37 @@ interface Members {
     name: string;
     email: string;
     role: 'ADMIN' | 'JUDGE' | 'STAFF';
+    accessLevel: string;
     owner: boolean;
   }[];
   invitations: {
     id: string;
     email: string;
     role: 'ADMIN' | 'JUDGE' | 'STAFF';
+    accessLevel: string;
     expiresAt: string;
   }[];
+  viewerIsOwner: boolean;
 }
+
+/** What each invitation option grants. Access labels (co-admin, sponsor, staff lead) need the owner. */
+const INVITE_AS = {
+  JUDGE: { role: 'JUDGE', accessLevel: 'STANDARD', label: 'Judge' },
+  STAFF: { role: 'STAFF', accessLevel: 'STANDARD', label: 'Helping staff' },
+  STAFF_LEAD: { role: 'STAFF', accessLevel: 'STAFF_LEAD', label: 'Staff lead', owner: true },
+  ADMIN: { role: 'ADMIN', accessLevel: 'STANDARD', label: 'Core admin' },
+  CO_ADMIN: { role: 'ADMIN', accessLevel: 'CO_ADMIN', label: 'Co-admin', owner: true },
+  SPONSOR_VIEWER: {
+    role: 'ADMIN',
+    accessLevel: 'SPONSOR_VIEWER',
+    label: 'Sponsor viewer (impact report only)',
+    owner: true,
+  },
+} as const;
+type InviteAs = keyof typeof INVITE_AS;
+export const accessName = (role: string, accessLevel: string) =>
+  Object.values(INVITE_AS).find((o) => o.role === role && o.accessLevel === accessLevel)?.label ??
+  role;
 
 /** Core admins, judges and helping staff: invite by email, see pending invitations, remove access (PRD FR-006). */
 export function PeoplePage() {
@@ -45,7 +67,7 @@ export function PeoplePage() {
   const qc = useQueryClient();
   const errors = useFormErrors();
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'ADMIN' | 'JUDGE' | 'STAFF'>('JUDGE');
+  const [as, setAs] = useState<InviteAs>('JUDGE');
   const [sent, setSent] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['members', mine.eventId],
@@ -53,7 +75,12 @@ export function PeoplePage() {
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ['members', mine.eventId] });
   const invite = useMutation({
-    mutationFn: () => request('POST', `/events/${mine.eventId}/invitations`, { email, role }),
+    mutationFn: () =>
+      request('POST', `/events/${mine.eventId}/invitations`, {
+        email,
+        role: INVITE_AS[as].role,
+        accessLevel: INVITE_AS[as].accessLevel,
+      }),
     onSuccess: async () => {
       errors.clear();
       setSent(email);
@@ -77,12 +104,16 @@ export function PeoplePage() {
     <div className="flex flex-col gap-4">
       <h2>People</h2>
       <p>
-        Participants are managed on the Participants page. Here you manage the organising team,
-        judges and helping staff. Each person holds one role per event.
+        Participants are managed on Teams &amp; participants. Here you invite the organising team,
+        judges, helping staff and sponsor viewers. Each person holds one role per event. A sponsor
+        viewer only ever sees the aggregate impact report, never participants' details.
+        {q.data &&
+          !q.data.viewerIsOwner &&
+          ' Only the event owner can invite co-admins, staff leads and sponsor viewers.'}
       </p>
       <Card footerLabel="Invite someone">
         <form
-          className="grid gap-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end"
+          className="grid gap-3 sm:grid-cols-[1fr_16rem_auto] sm:items-end"
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
@@ -100,14 +131,14 @@ export function PeoplePage() {
             onChange={(e) => setEmail(e.target.value)}
             error={errors.fields.email}
           />
-          <Select
-            label="Role"
-            value={role}
-            onChange={(e) => setRole(e.target.value as typeof role)}
-          >
-            <option value="JUDGE">Judge</option>
-            <option value="STAFF">Helping staff</option>
-            <option value="ADMIN">Core admin</option>
+          <Select label="Invite as" value={as} onChange={(e) => setAs(e.target.value as InviteAs)}>
+            {(Object.keys(INVITE_AS) as InviteAs[])
+              .filter((k) => !('owner' in INVITE_AS[k]) || q.data?.viewerIsOwner)
+              .map((k) => (
+                <option key={k} value={k}>
+                  {INVITE_AS[k].label}
+                </option>
+              ))}
           </Select>
           <Button type="submit" loading={invite.isPending}>
             Send invitation
@@ -143,7 +174,9 @@ export function PeoplePage() {
                   <Td>{m.name}</Td>
                   <Td>{m.email}</Td>
                   <Td>
-                    <Badge tone={m.role === 'ADMIN' ? 'brand' : 'info'}>{ROLE_LABEL[m.role]}</Badge>{' '}
+                    <Badge tone={m.role === 'ADMIN' ? 'brand' : 'info'}>
+                      {accessName(m.role, m.accessLevel)}
+                    </Badge>{' '}
                     {m.owner && <Badge tone="info">Owner</Badge>}
                   </Td>
                   <Td>
@@ -171,7 +204,7 @@ export function PeoplePage() {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-white p-3 shadow-card"
                 >
                   <span>
-                    {i.email} · {ROLE_LABEL[i.role]} · expires{' '}
+                    {i.email} · {accessName(i.role, i.accessLevel)} · expires{' '}
                     {formatDateTime(i.expiresAt, mine.timeZone)}
                   </span>
                   <Button variant="ghost" onClick={() => revoke.mutate(i.id)}>

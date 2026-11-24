@@ -15,6 +15,7 @@ import {
 import { ApiError } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import { judgingApi, type Workspace } from '../../lib/judging.js';
+import { useUnsavedGuard } from '../../lib/useUnsavedGuard.js';
 import {
   Alert,
   Badge,
@@ -155,6 +156,13 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
     const t = setTimeout(() => void save(), 6000);
     return () => clearTimeout(t);
   }, [state, fieldErrors, save]);
+  // Never lose a score on in-app navigation (audit P0-07): save now instead of waiting for the timer.
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    return save();
+  }, [save]);
+  const guard = useUnsavedGuard({ dirty: editable && state !== 'saved', flush });
 
   async function leave(path: string) {
     try {
@@ -165,6 +173,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
         setNotice({ tone: 'error', text: 'Save your evaluation before leaving.' });
         return;
       }
+      guard.release(); // saved just now; the re-render that clears the dirty flag may not have run yet
       navigate(path);
     } catch {
       setNotice({
@@ -203,6 +212,15 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
   const check = validateScores(criteria, numeric);
   const live = check.ok ? judgeScoreExact(criteria, numeric).toDecimalPlaces(2).toFixed(2) : null;
   const scored = criteria.filter((c) => numeric[c.id] !== undefined).length;
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const saveText =
+    state === 'saved'
+      ? 'All changes saved'
+      : state === 'failed'
+        ? hasFieldErrors
+          ? 'Not saved – fix the highlighted fields'
+          : 'Not saved – retrying'
+        : 'Saving…';
 
   async function submit() {
     setSubmitting(true);
@@ -490,17 +508,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
 
           <div className="flex flex-col gap-4 xl:sticky xl:top-4">
             <JudgeNotebook ref={notebook} eventId={eventId} assignmentId={data.assignmentId} />
-            <Card
-              footerLabel={
-                editable
-                  ? state === 'saved'
-                    ? 'All changes saved'
-                    : state === 'failed'
-                      ? 'Not saved. Retrying'
-                      : 'Saving…'
-                  : 'Scoring'
-              }
-            >
+            <Card footerLabel={editable ? saveText : 'Scoring'}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3>Your evaluation</h3>
                 {ev && (
@@ -599,12 +607,13 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
                   hint="Never shared with teams."
                 />
               </div>
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 {editable && (
                   <Button onClick={() => setConfirm(true)} disabled={!live} loading={submitting}>
                     Submit evaluation
                   </Button>
                 )}
+                {editable && <span className="text-sm font-semibold text-ink">{saveText}</span>}
                 {editable &&
                   data.assignmentStatus === 'ACTIVE' &&
                   !ev?.status.includes('SUBMITTED') && (
@@ -712,6 +721,7 @@ function Workspace({ data, mine, roundId }: { data: Workspace; mine: MyEvent; ro
           hint="An organiser decides. You cannot change a submitted evaluation yourself."
         />
       </Dialog>
+      {guard.dialog}
     </div>
   );
 }

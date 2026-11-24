@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { Link, useOutletContext } from 'react-router';
+import { Link, useLocation, useOutletContext } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { useListState } from '../../lib/useListState.js';
@@ -10,7 +8,6 @@ import {
   Badge,
   Card,
   EmptyState,
-  Input,
   Pagination,
   Select,
   SortHeader,
@@ -42,11 +39,11 @@ const tone = {
   Removed: 'error',
 } as const;
 
-/** Searchable, sortable participant list with filters kept in the URL (PRD FR-016, FR-020). */
-export function ParticipantsPage() {
+/** Participants view of Teams & participants (PRD FR-016, FR-020). Search lives on the page. */
+export function ParticipantsView() {
   const mine = useOutletContext<MyEvent>();
+  const location = useLocation();
   const list = useListState({ sort: 'name' });
-  const [q, setQ] = useState(list.get('q'));
   const qs = new URLSearchParams({
     q: list.get('q'),
     status: list.get('status'),
@@ -56,6 +53,7 @@ export function ParticipantsPage() {
     page: String(list.page),
     pageSize: '25',
   });
+  const hasFilter = ['q', 'status', 'team'].some((k) => list.get(k));
   const res = useQuery({
     queryKey: ['participants', mine.eventId, qs.toString()],
     queryFn: () =>
@@ -67,31 +65,12 @@ export function ParticipantsPage() {
   });
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Participants</h2>
-        <a
-          href={`/api/v1/events/${mine.eventId}/exports/participants.csv`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Export CSV
-        </a>
-      </div>
       <Card>
         <form
-          className="grid gap-3 sm:grid-cols-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            list.set({ q });
-          }}
-          role="search"
+          className="grid gap-3 sm:grid-cols-2"
+          aria-label="Participant filters"
+          onSubmit={(e) => e.preventDefault()}
         >
-          <Input
-            label="Search"
-            hint="Name, email, phone, institution, team name or ID"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onBlur={() => q !== list.get('q') && list.set({ q })}
-          />
           <Select
             label="Status"
             value={list.get('status')}
@@ -117,9 +96,9 @@ export function ParticipantsPage() {
       {res.isPending && <Spinner label="Loading participants" />}
       {res.isError && <Alert tone="error" title="We couldn't load participants" />}
       {res.data && res.data.rows.length === 0 && (
-        <EmptyState title={list.queryString() ? 'No matches' : 'No participants yet'}>
-          {list.queryString()
-            ? 'Try clearing the filters.'
+        <EmptyState title={hasFilter ? 'No participants match' : 'No participants yet'}>
+          {hasFilter
+            ? 'Try another search or clear the filters.'
             : 'People appear here as they register.'}
         </EmptyState>
       )}
@@ -170,7 +149,12 @@ export function ParticipantsPage() {
               {res.data.rows.map((r) => (
                 <Tr key={r.membershipId}>
                   <Td>
-                    <Link to={`${r.membershipId}`}>{r.name}</Link>
+                    <Link
+                      to={`/events/${mine.eventId}/participants/${r.membershipId}`}
+                      state={{ from: `${location.pathname}${location.search}` }}
+                    >
+                      {r.name}
+                    </Link>
                   </Td>
                   <Td>{r.email}</Td>
                   <Td>{r.institution}</Td>
@@ -179,7 +163,10 @@ export function ParticipantsPage() {
                   </Td>
                   <Td>
                     {r.teamId ? (
-                      <Link to={`../teams/${r.teamId}`}>
+                      <Link
+                        to={`/events/${mine.eventId}/teams/${r.teamId}`}
+                        state={{ from: `${location.pathname}${location.search}` }}
+                      >
                         {r.teamCode} {r.teamName}
                       </Link>
                     ) : (
