@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Lock, Plus, Trash2 } from 'lucide-react';
 import { MAX_CRITERIA, weightsTotal, type MyEvent } from '@arthakram/shared';
-import { eventApi } from '../../lib/events.js';
+import { eventApi, useEvent } from '../../lib/events.js';
 import { judgingApi, type RubricDto } from '../../lib/judging.js';
 import {
   Alert,
@@ -62,6 +62,7 @@ export function RubricPage() {
 }
 
 function RubricEditor({ eventId, roundId }: { eventId: string; roundId: string }) {
+  const eventType = useEvent(eventId).data?.type;
   const qc = useQueryClient();
   const errors = useFormErrors();
   const q = useQuery({
@@ -168,25 +169,33 @@ function RubricEditor({ eventId, roundId }: { eventId: string; roundId: string }
         </EmptyState>
         {errors.formError && <Alert tone="error" title={errors.formError} />}
         <div className="grid gap-4 sm:grid-cols-2">
-          {templates.data?.map((t) => (
-            <Card key={t.key} footerLabel="Template">
-              <h3>{t.name}</h3>
-              <ul className="mt-2 text-sm">
-                {t.criteria.map((c) => (
-                  <li key={c.name}>
-                    {c.name} · {c.weight}%
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="mt-3"
-                onClick={() => apply.mutate(t.key)}
-                loading={apply.isPending}
-              >
-                Use this template
-              </Button>
-            </Card>
-          ))}
+          {[...(templates.data ?? [])]
+            .sort((a, b) => Number(b.key === eventType) - Number(a.key === eventType))
+            .map((t) => (
+              <Card key={t.key} footerLabel="Template">
+                {t.key === eventType && (
+                  <p className="mb-1 text-sm font-bold text-ink">
+                    Suggested for this{' '}
+                    {eventType === 'HACKATHON' ? 'hackathon' : 'case competition'}
+                  </p>
+                )}
+                <h3>{t.name}</h3>
+                <ul className="mt-2 text-sm">
+                  {t.criteria.map((c) => (
+                    <li key={c.name}>
+                      {c.name} · {c.weight}%
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-3"
+                  onClick={() => apply.mutate(t.key)}
+                  loading={apply.isPending}
+                >
+                  Use this template
+                </Button>
+              </Card>
+            ))}
         </div>
         <Button
           variant="secondary"
