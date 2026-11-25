@@ -150,7 +150,7 @@ function Body({
 
   return (
     <>
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <Metric
           icon={<Users aria-hidden className="size-9 stroke-ember" />}
           value={teams?.total}
@@ -183,7 +183,7 @@ function Body({
         <li>
           <Link
             to={`${base}/area/configuration`}
-            className="flex h-full items-center gap-4 rounded-[14px] border border-line/60 bg-white p-5 text-ink no-underline shadow-card transition-colors hover:border-ember/50"
+            className="flex h-full flex-wrap items-center gap-x-4 gap-y-2 rounded-[14px] border border-line/60 bg-white p-4 text-ink no-underline shadow-card transition-colors hover:border-ember/50 sm:flex-nowrap sm:p-5"
           >
             <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ember">
               <CheckCircle2 aria-hidden className="size-7 text-ink" />
@@ -218,12 +218,12 @@ function Body({
         </li>
       </ul>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,29rem)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,29rem)] [&>*]:min-w-0">
         <RegistrationOverview trend={trend} base={base} mine={mine} />
         <QuickAccess base={base} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,29rem)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,29rem)] [&>*]:min-w-0">
         <AttentionRequired life={life} base={base} />
         <Deadlines deadlines={deadlines} mine={mine} base={base} />
       </div>
@@ -263,7 +263,7 @@ function Metric({
     <li>
       <Link
         to={to}
-        className="flex h-full items-center gap-4 rounded-[14px] border border-line/60 bg-white p-5 text-ink no-underline shadow-card transition-colors hover:border-ember/50"
+        className="flex h-full flex-wrap items-center gap-x-4 gap-y-2 rounded-[14px] border border-line/60 bg-white p-4 text-ink no-underline shadow-card transition-colors hover:border-ember/50 sm:flex-nowrap sm:p-5"
       >
         <span className="shrink-0">{icon}</span>
         <span className="min-w-0 flex-1">
@@ -273,7 +273,7 @@ function Metric({
           <span className="block">{label}</span>
         </span>
         <span className="flex flex-col items-end gap-1 self-stretch justify-between">
-          {spark ? <Sparkline values={spark} /> : <span />}
+          {spark ? <Sparkline values={spark} className="hidden sm:block" /> : <span />}
           {note}
         </span>
       </Link>
@@ -418,7 +418,7 @@ function AttentionRequired({ life, base }: { life: DashboardLifecycle | null; ba
         <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ember">
           <CircleAlert aria-hidden className="size-7 text-ink" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-48">
           <h3 id="attention-h" className="text-xl">
             Attention required
             <span className="ml-2 align-middle text-sm font-semibold text-graphite">
@@ -433,7 +433,7 @@ function AttentionRequired({ life, base }: { life: DashboardLifecycle | null; ba
         <Link
           to={`${base}/${top!.to}`}
           aria-label={`Review: ${top!.label}`}
-          className="inline-flex min-h-12 items-center gap-2 rounded-pill border-2 border-ember bg-white/70 px-6 font-bold text-ink no-underline hover:bg-white sm:border-l"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-pill border-2 border-ember bg-white/70 px-6 font-bold text-ink no-underline hover:bg-white sm:w-auto"
         >
           Review <ArrowRight aria-hidden className="size-4" />
         </Link>

@@ -208,7 +208,7 @@ export function TopBar({
         <Popover
           label={`${mine.name}, ${roleLabel}. Switch event`}
           align="left"
-          className="min-w-0 flex-1 lg:flex-none"
+          className="min-w-0 flex-1"
           button={
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate font-display text-lg font-extrabold tracking-section text-ink sm:text-xl">
@@ -270,7 +270,7 @@ export function TopBar({
               onClick={onOpenSearch}
               aria-label="Search"
               aria-keyshortcuts="Control+K Meta+K"
-              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-pill text-graphite hover:bg-blush max-md:w-11 max-md:justify-center md:w-64 md:border md:border-line md:bg-white md:px-4 xl:w-80"
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-pill text-graphite hover:bg-blush max-md:w-11 max-md:justify-center md:w-56 md:border md:border-line md:bg-white md:px-4 xl:w-80"
             >
               <Search aria-hidden className="size-5 shrink-0 text-ink" />
               <span className="hidden flex-1 text-left text-sm md:inline">Search anything…</span>

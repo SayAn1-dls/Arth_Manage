@@ -263,3 +263,20 @@ Legend: `[ ]` not started · `[~]` partial · `[x]` done and verified (tests run
 Features implemented · features tested · test results (actual output) · visual QA performed (which
 screens, which widths) · commits created · push status (verified with `git ls-remote`) · incomplete work ·
 external configuration required · commands to run the app.
+
+## 8. Command Centre UX restructuring (Nov 2026, branch `feature/arthakram-command-centre`)
+
+Approved brief: persistent domain sidebar, domain landing pages, contextual panel, screenshot-led Core Admin
+dashboard, bottom bar plus drawer on mobile. Details: `docs/UX_IMPLEMENTATION_AUDIT.md`,
+`docs/UX_IMPLEMENTATION_DECISIONS.md`, `docs/UX_IMPLEMENTATION_PROGRESS.md`. Sections 1–7 above remain the
+record of earlier work.
+
+- [x] Global shell: sidebar (7 domains), header with event switcher, search, notifications, account
+- [x] Contextual right panel with domain shortcuts; fold-out on small screens
+- [x] Mobile bottom bar + full navigation drawer
+- [x] Command Centre dashboard from real data (API: people, trend, setup, config, records)
+- [x] Seven domain landing pages with derived statuses, checklist and advanced tools folded away
+- [x] Shared page header on every workspace; problem statements restructured around coverage
+- [x] Participant, judge and staff homes in the same design language
+- [ ] Deeper re-sectioning of the largest workspaces (Results, Certificates, Support, Judging) by priority
+- [ ] Organiser-specific (co-admin) home variant, if the product wants one beyond event-scoped `ADMIN`

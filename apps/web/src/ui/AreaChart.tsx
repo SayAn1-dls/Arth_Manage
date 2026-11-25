@@ -55,7 +55,7 @@ export function AreaChart({
   label: string;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const [width, setWidth] = useState(320);
   const [active, setActive] = useState<number | null>(null);
   const gradientId = useId();
   useEffect(() => {
@@ -88,7 +88,7 @@ export function AreaChart({
   const a = active !== null ? points[active] : null;
 
   return (
-    <div ref={wrap} className="relative w-full">
+    <div ref={wrap} className="relative w-full min-w-0 overflow-x-clip">
       <svg
         role="img"
         aria-label={label}
