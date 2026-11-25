@@ -46,7 +46,7 @@ test.describe('event setup and guidebook', () => {
     await expect(page.getByText(/Latest published: version 1/)).toBeVisible();
 
     // One Communication page: compose, review the audience and recipient count, then post
-    await goToNav(page, 'Communication');
+    await goToNav(page, 'Messages & announcements');
     await expect(page.getByText('Nothing sent yet')).toBeVisible();
     await page.getByLabel('Title').fill('Doors open at 9');
     await page.getByLabel('Message').fill('Bring your ID card.');
@@ -76,7 +76,7 @@ test.describe('event setup and guidebook', () => {
     await goToNav(page, 'Guidebook');
     await expect(page.getByRole('heading', { name: 'Welcome to HackSonipat' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download PDF' })).toBeVisible();
-    await goToNav(page, 'Updates');
+    await goToNav(page, 'Announcements', true);
     await expect(page.getByRole('heading', { name: 'Welcome to HackSonipat 2026' })).toBeVisible();
     await expect(page.getByText('Judge briefing')).toHaveCount(0); // judge-only announcement is hidden
   });

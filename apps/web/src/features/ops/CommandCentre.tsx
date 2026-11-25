@@ -560,6 +560,7 @@ function AttentionRequired({ life, base }: { life: DashboardLifecycle | null; ba
         </div>
         <Link
           to={`${base}/${top!.to}`}
+          aria-label={`Review: ${top!.label}`}
           className="inline-flex min-h-12 items-center gap-2 rounded-pill border-2 border-ember bg-white/70 px-6 font-bold text-ink no-underline hover:bg-white sm:border-l"
         >
           Review <ArrowRight aria-hidden className="size-4" />

@@ -1,5 +1,4 @@
 import type { Role } from '@arthakram/shared';
-import type { CollapsibleNavGroup, CollapsibleNavItem } from '../ui/CollapsibleNav.js';
 
 /**
  * Information priority (UX spec v1.0 §4). Critical: the event or the current workflow cannot run correctly
@@ -7,18 +6,30 @@ import type { CollapsibleNavGroup, CollapsibleNavItem } from '../ui/CollapsibleN
  */
 export type Priority = 'critical' | 'important' | 'advanced';
 
-export type NavEntry = CollapsibleNavItem & {
+export interface NavEntry {
+  /** Path under /events/:eventId; '' is the role's dashboard. */
+  to: string;
+  label: string;
+  /** Match the path exactly (the dashboard). */
+  end?: boolean;
+  /** Optional sub-heading used to group entries. */
+  section?: string;
   /** One line saying what the task is for, shown on domain cards and in search. */
   description?: string;
   priority?: Priority;
   /** Shown as its own sidebar destination (non-admin roles); the rest live under More. */
   primary?: boolean;
-};
-export type NavGroup = Omit<CollapsibleNavGroup, 'items'> & {
+}
+export interface NavGroup {
+  id: string;
+  label: string;
   items: NavEntry[];
+  /** A single-destination group (the dashboard) with no landing page of its own. */
+  flat?: boolean;
+  description?: string;
   /** Extra cards on the domain landing page that open a workspace owned by another domain or a page section. */
   shortcuts?: NavEntry[];
-};
+}
 
 const item = (
   to: string,

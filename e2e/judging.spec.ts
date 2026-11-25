@@ -24,7 +24,7 @@ test('judging: assignment, scoring with live weighted score, submit, and admin p
   await signInUi(page, judge.email, judge.password);
   await page.getByRole('link', { name: /Scenario Cup/ }).click();
   await expect(page.getByText('2 teams left to evaluate')).toBeVisible();
-  await goToNav(page, 'My teams', true);
+  await goToNav(page, 'Assigned teams', true);
   await expect(page.getByRole('heading', { name: 'Round 1' })).toBeVisible();
   await page.getByRole('link', { name: 'Alpha Squad' }).click();
   await expect(page.getByRole('heading', { name: 'Alpha Squad project' })).toBeVisible();

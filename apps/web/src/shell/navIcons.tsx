@@ -1,5 +1,18 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Activity,
+  FileBarChart,
+  FlaskConical,
+  History,
+  KeyRound,
+  LifeBuoy,
+  Lightbulb,
+  Plug,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Trophy,
+  UserCog,
   Award,
   BarChart3,
   BookOpen,
@@ -61,4 +74,47 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function navIcon(id: string): LucideIcon {
   return ICONS[id] ?? LayoutDashboard;
+}
+
+/** Icons for task cards on domain landing pages, keyed by the destination's first path segment. */
+const TASK_ICONS: Record<string, LucideIcon> = {
+  setup: Settings2,
+  rounds: CalendarClock,
+  structure: Lightbulb,
+  guidebook: BookOpen,
+  integrations: Plug,
+  sandbox: FlaskConical,
+  teams: Users,
+  applications: ClipboardCheck,
+  people: UserCog,
+  access: KeyRound,
+  rubric: ListChecks,
+  submissions: FileText,
+  judging: Gavel,
+  briefing: BookOpen,
+  advancement: Trophy,
+  calibration: SlidersHorizontal,
+  integrity: ShieldCheck,
+  checkin: ScanLine,
+  support: LifeBuoy,
+  issues: TriangleAlert,
+  tasks: ClipboardCheck,
+  engagement: Activity,
+  communication: Megaphone,
+  results: Trophy,
+  feedback: MessageSquareText,
+  certificates: Award,
+  report: FileBarChart,
+  audit: History,
+  team: Users,
+  submission: FileText,
+  updates: Megaphone,
+  judge: ClipboardList,
+  practice: ListChecks,
+  profile: UserRound,
+  discovery: Users,
+};
+
+export function taskIcon(to: string): LucideIcon {
+  return TASK_ICONS[to.split(/[/?#]/)[0] ?? ''] ?? LayoutGrid;
 }

@@ -215,6 +215,7 @@ export interface Dashboard {
     emptyTracks: number;
     guidebookPublished: boolean;
     registrationQuestions: number;
+    applicationReview: boolean;
     eventStatus: string;
     registration: string;
   }>;

@@ -70,37 +70,39 @@ export function useContextSections(mine: MyEvent, section: string, groupId: stri
   const admin = mine.role === 'ADMIN' && !sponsor;
   // On every role's home the main page already carries this information.
   const home = section === '';
+  // Nothing loads for the stand-in used while the event list is still loading (empty event id).
+  const off = !mine.eventId || sponsor || home;
 
   const dashboard = useQuery({
     queryKey: ['dashboard', mine.eventId],
     queryFn: () => opsApi.dashboard(mine.eventId),
-    enabled: admin && !home,
+    enabled: admin && !off,
   });
   const judgeRounds = useQuery({
     queryKey: ['judge-rounds', mine.eventId],
     queryFn: () => judgingApi.judgeRounds(mine.eventId),
-    enabled: mine.role === 'JUDGE' && !home,
+    enabled: mine.role === 'JUDGE' && !off,
   });
   const rounds = useQuery({
     queryKey: ['rounds', mine.eventId],
     queryFn: () => eventApi.rounds(mine.eventId),
-    enabled: mine.role === 'PARTICIPANT' && !home,
+    enabled: mine.role === 'PARTICIPANT' && !off,
   });
   const announcements = useQuery({
     queryKey: ['announcements', mine.eventId],
     queryFn: () => eventApi.announcements(mine.eventId),
     enabled:
-      (mine.role === 'PARTICIPANT' || mine.role === 'JUDGE') && !home && section !== 'updates',
+      (mine.role === 'PARTICIPANT' || mine.role === 'JUDGE') && !off && section !== 'updates',
   });
   const summary = useQuery({
     queryKey: ['checkin-summary', mine.eventId],
     queryFn: () => opsApi.checkinSummary(mine.eventId),
-    enabled: mine.role === 'STAFF' && !home && section !== 'checkin',
+    enabled: mine.role === 'STAFF' && !off && section !== 'checkin',
   });
   const tasks = useQuery({
     queryKey: ['staff-tasks', mine.eventId, ''],
     queryFn: () => opsApi.tasks(mine.eventId),
-    enabled: mine.role === 'STAFF' && !home && section !== 'tasks',
+    enabled: mine.role === 'STAFF' && !off && section !== 'tasks',
   });
   const inbox = useQuery({
     queryKey: ['inbox', mine.eventId],
@@ -109,7 +111,7 @@ export function useContextSections(mine: MyEvent, section: string, groupId: stri
         'GET',
         `${base}/workspace/inbox`,
       ),
-    enabled: mine.role === 'PARTICIPANT' && !home && section !== 'updates',
+    enabled: mine.role === 'PARTICIPANT' && !off && section !== 'updates',
   });
 
   if (sponsor || home) return [];

@@ -266,6 +266,7 @@ export function opsRouter(deps: Deps) {
           emptyTracks,
           guidebookPublished: guidebookVersions > 0,
           registrationQuestions: questions,
+          applicationReview: e.applicationReview,
           eventStatus: e.status,
           registration: effectiveRegistration(e),
         };

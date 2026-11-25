@@ -58,7 +58,7 @@ test('event day: tasks, check-in on a phone, issue reporting and the organiser d
   await expect(page.getByText(/ID verified by Sahil Staff: College ID matched/)).toBeVisible();
 
   // An urgent issue
-  await goToNav(page, 'Report an issue');
+  await goToNav(page, 'Issues', true);
   await page.getByLabel('What happened?').fill('Projector is dead in hall B');
   await page.getByLabel('This is urgent').check();
   await page.getByRole('button', { name: 'Send report' }).click();
