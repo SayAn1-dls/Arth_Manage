@@ -20,3 +20,4 @@ export * from './Spinner.js';
 export * from './Table.js';
 export { cn } from './cn.js';
 export * from './Popover.js';
+export * from './PageHeader.js';

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useOutletContext } from 'react-router';
+import { useLocation, useOutletContext } from 'react-router';
+import { CheckCircle2, CircleAlert, Plus } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
@@ -12,16 +13,28 @@ import {
   FormErrorSummary,
   Input,
   Markdown,
+  PageHeader,
+  SectionLabel,
   Select,
   Spinner,
   Textarea,
 } from '../../ui/index.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
+import { cn } from '../../ui/cn.js';
 
-/** Tracks and problem statements (PRD FR-010/011). Everyone in the event can read them; Core Admins edit. */
+/**
+ * Tracks and problem statements (PRD FR-010/011). Problem statements come first: they are what teams work
+ * on, and a track without one leaves its teams with nothing to choose. Core Admins see coverage per track
+ * and add a problem straight into the track that lacks one; everyone else reads them grouped by track.
+ */
 export function StructurePage() {
   const mine = useOutletContext<MyEvent>();
+  const { hash } = useLocation();
   const isAdmin = mine.role === 'ADMIN';
+  const [adding, setAdding] = useState<{ trackId: string } | null>(() =>
+    isAdmin && hash === '#problems' ? { trackId: '' } : null,
+  );
+  const [addingTrack, setAddingTrack] = useState(false);
   const tracks = useQuery({
     queryKey: ['tracks', mine.eventId],
     queryFn: () => eventApi.tracks(mine.eventId),
@@ -31,46 +44,157 @@ export function StructurePage() {
     queryFn: () => eventApi.problems(mine.eventId),
   });
   if (tracks.isPending || problems.isPending) return <Spinner label="Loading tracks" />;
+  const trackList = tracks.data ?? [];
+  const problemList = problems.data ?? [];
+  const countFor = (trackId: string) => problemList.filter((p) => p.trackId === trackId).length;
+  const empty = trackList.filter((t) => countFor(t.id) === 0);
+  const groups = [
+    ...trackList.map((t) => ({
+      key: t.id,
+      title: t.name,
+      items: problemList.filter((p) => p.trackId === t.id),
+    })),
+    {
+      key: 'event',
+      title: trackList.length ? 'Open to every track' : 'Problem statements',
+      items: problemList.filter((p) => !p.trackId || !trackList.some((t) => t.id === p.trackId)),
+    },
+  ].filter((g) => g.items.length > 0);
+  const openForm = (trackId = '') => {
+    setAdding({ trackId });
+    window.setTimeout(() => document.getElementById('pr-title')?.focus(), 50);
+  };
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4" aria-labelledby="tracks-h">
-        <h2 id="tracks-h">Tracks</h2>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Tracks & problem statements"
+        description={
+          isAdmin
+            ? 'What teams work on. Every track needs at least one problem statement before teams choose.'
+            : 'The tracks and the problem statements teams choose from.'
+        }
+        actions={
+          isAdmin && (
+            <>
+              <Button onClick={() => openForm()} icon={<Plus aria-hidden className="size-4" />}>
+                Add problem statement
+              </Button>
+              <Button variant="secondary" onClick={() => setAddingTrack((v) => !v)}>
+                {addingTrack ? 'Close' : 'Add track'}
+              </Button>
+            </>
+          )
+        }
+      />
+
+      {isAdmin && trackList.length > 0 && (
+        <section aria-labelledby="coverage-h" className="flex flex-col gap-3">
+          <SectionLabel id="coverage-h">Coverage by track</SectionLabel>
+          <ul className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+            {trackList.map((t) => {
+              const n = countFor(t.id);
+              return (
+                <li
+                  key={t.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 rounded-card border bg-white px-4 py-3',
+                    n === 0 ? 'border-ember' : 'border-line',
+                  )}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold text-ink">{t.name}</span>
+                    <span className="flex items-center gap-1.5 text-sm">
+                      {n === 0 ? (
+                        <>
+                          <CircleAlert aria-hidden className="size-4 stroke-ember" />
+                          <span className="font-semibold text-ink">No problem statement yet</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 aria-hidden className="size-4 stroke-success-fg" />
+                          {n} problem statement{n === 1 ? '' : 's'}
+                        </>
+                      )}
+                    </span>
+                  </span>
+                  <Button
+                    variant={n === 0 ? 'primary' : 'ghost'}
+                    className="min-h-10 shrink-0 px-3 text-sm"
+                    onClick={() => openForm(t.id)}
+                  >
+                    Add
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+          {empty.length > 0 && (
+            <p className="text-sm">
+              {empty.length} of {trackList.length} tracks have no problem statement. Teams in those
+              tracks will have nothing to choose.
+            </p>
+          )}
+        </section>
+      )}
+
+      {isAdmin && adding && (
+        <ProblemForm
+          key={adding.trackId}
+          eventId={mine.eventId}
+          tracks={trackList}
+          initialTrackId={adding.trackId}
+          onClose={() => setAdding(null)}
+        />
+      )}
+      {isAdmin && addingTrack && (
+        <TrackForm eventId={mine.eventId} onClose={() => setAddingTrack(false)} />
+      )}
+
+      <section
+        id="problems"
+        className="flex scroll-mt-20 flex-col gap-5"
+        aria-labelledby="problems-h"
+      >
+        <h3 id="problems-h" className="sr-only">
+          Problem statements
+        </h3>
+        {problemList.length === 0 && (
+          <EmptyState title="No problem statements yet">
+            {isAdmin
+              ? 'Add the briefs or cases teams will work on. They can be event-wide or belong to a track.'
+              : 'Problem statements appear here once the organisers publish them.'}
+          </EmptyState>
+        )}
+        {groups.map((g) => (
+          <div key={g.key} className="flex flex-col gap-3">
+            {(trackList.length > 0 || groups.length > 1) && <SectionLabel>{g.title}</SectionLabel>}
+            <ul className="flex flex-col gap-3">
+              {g.items.map((p) => (
+                <ProblemRow key={p.id} problem={p} eventId={mine.eventId} isAdmin={isAdmin} />
+              ))}
+            </ul>
+          </div>
+        ))}
+      </section>
+
+      <section className="flex flex-col gap-3" aria-labelledby="tracks-h">
+        <SectionLabel id="tracks-h">Tracks</SectionLabel>
         <p>
           Tracks are optional parallel categories. With none, participants never see a track
           selector.
         </p>
-        {isAdmin && <TrackForm eventId={mine.eventId} />}
-        {tracks.data?.length === 0 && (
+        {trackList.length === 0 ? (
           <EmptyState title="No tracks">
             Add a track if your event runs parallel categories.
           </EmptyState>
+        ) : (
+          <ul className="grid gap-3 md:grid-cols-2">
+            {trackList.map((t) => (
+              <TrackRow key={t.id} track={t} eventId={mine.eventId} isAdmin={isAdmin} />
+            ))}
+          </ul>
         )}
-        <ul className="flex flex-col gap-3">
-          {tracks.data?.map((t) => (
-            <TrackRow key={t.id} track={t} eventId={mine.eventId} isAdmin={isAdmin} />
-          ))}
-        </ul>
-      </section>
-      <section className="flex flex-col gap-4" aria-labelledby="problems-h">
-        <h2 id="problems-h">Problem statements</h2>
-        {isAdmin && <ProblemForm eventId={mine.eventId} tracks={tracks.data ?? []} />}
-        {problems.data?.length === 0 && (
-          <EmptyState title="No problem statements">
-            Briefs and cases appear here once added.
-          </EmptyState>
-        )}
-        <ul className="flex flex-col gap-3">
-          {problems.data?.map((p) => (
-            <ProblemRow
-              key={p.id}
-              problem={p}
-              tracks={tracks.data ?? []}
-              eventId={mine.eventId}
-              isAdmin={isAdmin}
-            />
-          ))}
-        </ul>
       </section>
     </div>
   );
@@ -81,7 +205,7 @@ function useInvalidate(eventId: string, key: 'tracks' | 'problems') {
   return () => qc.invalidateQueries({ queryKey: [key, eventId] });
 }
 
-function TrackForm({ eventId }: { eventId: string }) {
+function TrackForm({ eventId, onClose }: { eventId: string; onClose: () => void }) {
   const errors = useFormErrors();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -94,6 +218,7 @@ function TrackForm({ eventId }: { eventId: string }) {
       setName('');
       setDescription('');
       await invalidate();
+      onClose();
     },
     onError: errors.capture,
   });
@@ -126,6 +251,9 @@ function TrackForm({ eventId }: { eventId: string }) {
         <div>
           <Button type="submit" loading={add.isPending}>
             Add track
+          </Button>{' '}
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
           </Button>
         </div>
       </form>
@@ -169,11 +297,21 @@ function TrackRow({
   );
 }
 
-function ProblemForm({ eventId, tracks }: { eventId: string; tracks: Track[] }) {
+function ProblemForm({
+  eventId,
+  tracks,
+  initialTrackId,
+  onClose,
+}: {
+  eventId: string;
+  tracks: Track[];
+  initialTrackId: string;
+  onClose: () => void;
+}) {
   const errors = useFormErrors();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [trackId, setTrackId] = useState('');
+  const [trackId, setTrackId] = useState(initialTrackId);
   const invalidate = useInvalidate(eventId, 'problems');
   const add = useMutation({
     mutationFn: () =>
@@ -187,6 +325,7 @@ function ProblemForm({ eventId, tracks }: { eventId: string; tracks: Track[] }) 
       setTitle('');
       setDescription('');
       await invalidate();
+      onClose();
     },
     onError: errors.capture,
   });
@@ -238,6 +377,9 @@ function ProblemForm({ eventId, tracks }: { eventId: string; tracks: Track[] }) 
         <div>
           <Button type="submit" loading={add.isPending}>
             Add problem statement
+          </Button>{' '}
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
           </Button>
         </div>
       </form>
@@ -247,12 +389,10 @@ function ProblemForm({ eventId, tracks }: { eventId: string; tracks: Track[] }) 
 
 function ProblemRow({
   problem,
-  tracks,
   eventId,
   isAdmin,
 }: {
   problem: Problem;
-  tracks: Track[];
   eventId: string;
   isAdmin: boolean;
 }) {
@@ -263,10 +403,9 @@ function ProblemRow({
     onSuccess: invalidate,
     onError: errors.capture,
   });
-  const track = tracks.find((t) => t.id === problem.trackId);
   return (
     <li>
-      <Card footerLabel={track ? `Track: ${track.name}` : 'Event-level'}>
+      <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h3>{problem.title}</h3>
           {isAdmin && (

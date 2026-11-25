@@ -52,7 +52,7 @@ export function Popover({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((o) => !o)}
-        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-pill px-2 text-ink hover:bg-blush"
+        className="flex min-h-11 max-w-full min-w-0 cursor-pointer items-center gap-2 rounded-pill px-2 text-ink hover:bg-blush"
       >
         {button}
       </button>

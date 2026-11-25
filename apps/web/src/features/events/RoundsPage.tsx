@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useOutletContext } from 'react-router';
+import { useLocation, useOutletContext } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { eventApi, useEvent, type Round } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -51,19 +52,30 @@ export function RoundsPage() {
     queryKey: ['rounds', mine.eventId],
     queryFn: () => eventApi.rounds(mine.eventId),
   });
-  const [editing, setEditing] = useState<Round | 'new' | null>(null);
+  const { hash } = useLocation();
+  // "Add deadline" shortcuts land on #new-round with the form already open.
+  const [editing, setEditing] = useState<Round | 'new' | null>(
+    isAdmin && hash === '#new-round' ? 'new' : null,
+  );
   const [formFor, setFormFor] = useState<string | null>(null);
   if (rounds.isPending || event.isPending) return <Spinner label="Loading rounds" />;
   const tz = event.data?.timeZone ?? mine.timeZone;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Rounds and deadlines</h2>
-        {isAdmin && editing === null && (
-          <Button onClick={() => setEditing('new')}>Add round</Button>
-        )}
-      </div>
+      <PageHeader
+        title={isAdmin ? 'Rounds & deadlines' : 'Schedule'}
+        description={
+          isAdmin
+            ? `Every round, its submission window and judging deadline. Times are in ${tz}.`
+            : `Every round and its official deadline, in ${tz} time.`
+        }
+        actions={
+          isAdmin &&
+          editing === null && <Button onClick={() => setEditing('new')}>Add round</Button>
+        }
+      />
+      <span id="new-round" className="-mt-6 block scroll-mt-20" />
       {editing !== null && event.data && (
         <RoundForm
           key={editing === 'new' ? 'new' : editing.id}

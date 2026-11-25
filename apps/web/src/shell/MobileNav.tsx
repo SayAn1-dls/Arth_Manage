@@ -109,9 +109,9 @@ export function NavDrawer({
       onClick={(e) => e.target === ref.current && onClose()}
       className="m-0 h-dvh max-h-dvh w-[min(22rem,88vw)] bg-paper p-0 text-graphite backdrop:bg-graphite/40"
     >
-      <div className="flex h-16 items-center justify-between border-b border-line px-4">
+      <div className="flex h-20 items-center justify-between border-b border-line px-4">
         <Link to="/events" onClick={onClose} aria-label="Arthakram, my events">
-          <Logo width={124} />
+          <Logo width={112} />
         </Link>
         <button
           type="button"
