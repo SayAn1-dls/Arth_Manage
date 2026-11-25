@@ -7,6 +7,7 @@ import { formatDateTime } from '../../lib/format.js';
 import { useListState } from '../../lib/useListState.js';
 import { opsApi } from '../../lib/ops.js';
 import {
+  PageHeader,
   Alert,
   Button,
   Card,
@@ -49,19 +50,18 @@ export function AuditPage() {
   });
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Audit history</h2>
-        <a
-          href={`/api/v1/events/${mine.eventId}/audit.csv?${csv}`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Export CSV
-        </a>
-      </div>
-      <p>
-        Every important action is recorded here with who did it and when. Entries cannot be edited
-        or deleted by anyone.
-      </p>
+      <PageHeader
+        title="Audit history"
+        description="Every important action, with who did it and when. Entries cannot be edited or deleted by anyone."
+        actions={
+          <a
+            href={`/api/v1/events/${mine.eventId}/audit.csv?${csv}`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 font-bold text-ink no-underline hover:bg-blush"
+          >
+            <Download aria-hidden className="size-4" /> Export CSV
+          </a>
+        }
+      />
       <Card>
         <form
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"

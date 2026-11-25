@@ -1,5 +1,4 @@
 import type { Role } from '@arthakram/shared';
-import type { CollapsibleNavGroup, CollapsibleNavItem } from '../ui/CollapsibleNav.js';
 
 /**
  * Information priority (UX spec v1.0 §4). Critical: the event or the current workflow cannot run correctly
@@ -7,12 +6,30 @@ import type { CollapsibleNavGroup, CollapsibleNavItem } from '../ui/CollapsibleN
  */
 export type Priority = 'critical' | 'important' | 'advanced';
 
-export type NavEntry = CollapsibleNavItem & {
-  /** One line saying what the task is for, shown on area and division cards. */
+export interface NavEntry {
+  /** Path under /events/:eventId; '' is the role's dashboard. */
+  to: string;
+  label: string;
+  /** Match the path exactly (the dashboard). */
+  end?: boolean;
+  /** Optional sub-heading used to group entries. */
+  section?: string;
+  /** One line saying what the task is for, shown on domain cards and in search. */
   description?: string;
   priority?: Priority;
-};
-export type NavGroup = Omit<CollapsibleNavGroup, 'items'> & { items: NavEntry[] };
+  /** Shown as its own sidebar destination (non-admin roles); the rest live under More. */
+  primary?: boolean;
+}
+export interface NavGroup {
+  id: string;
+  label: string;
+  items: NavEntry[];
+  /** A single-destination group (the dashboard) with no landing page of its own. */
+  flat?: boolean;
+  description?: string;
+  /** Extra cards on the domain landing page that open a workspace owned by another domain or a page section. */
+  shortcuts?: NavEntry[];
+}
 
 const item = (
   to: string,
@@ -28,19 +45,28 @@ const item = (
   ...(to === '' ? { end: true } : {}),
   ...(section ? { section } : {}),
 });
+const primary = (e: NavEntry): NavEntry => ({ ...e, primary: true });
 const group = (
   id: string,
   label: string,
   items: NavEntry[],
   description: string,
   flat = false,
-): NavGroup => ({ id, label, items, description, ...(flat ? { flat: true } : {}) });
+  shortcuts?: NavEntry[],
+): NavGroup => ({
+  id,
+  label,
+  items,
+  description,
+  ...(flat ? { flat: true } : {}),
+  ...(shortcuts ? { shortcuts } : {}),
+});
 
 /** Every destination across all groups, in menu order. */
 export const navItems = (groups: NavGroup[]): NavEntry[] => groups.flatMap((g) => g.items);
 
 /** First path segment of a destination, e.g. 'teams' for 'teams' and '' for the dashboard. */
-export const segmentOf = (to: string) => to.split(/[/?]/)[0] ?? '';
+export const segmentOf = (to: string) => to.split(/[/?#]/)[0] ?? '';
 
 /** The group holding the page at `section` (first path segment under /events/:eventId; '' is the dashboard). */
 export function activeGroupId(groups: NavGroup[], section: string): string | null {
@@ -68,271 +94,265 @@ const NAV_ALIASES: Record<string, string> = {
   participants: 'teams',
 };
 
-/** Path of a division's landing page (Core Admin) under /events/:eventId. */
-export const areaPath = (groupId: string) => `area/${groupId}`;
-/** Path of the page that lists every area for the caller's role. */
+/** Path of a domain's landing page (Core Admin) under /events/:eventId. The Command Centre is the dashboard. */
+export const areaPath = (groupId: string) => (groupId === 'command' ? '' : `area/${groupId}`);
+/** Path of the page that lists every destination for the caller's role. */
 export const ALL_AREAS = 'areas';
 
 /**
- * Core Admin information architecture: seven divisions (ArthManage navigation audit, UX spec v1.0 §6–7).
- * Each division has a landing page of task cards; the Dashboard is the default landing page. Tasks inside a
- * division follow the event's real order of work. Hiding an entry is presentation only; the API enforces
- * every permission independently.
+ * Core Admin information architecture: seven domains (approved UX decision, Nov 2026). Each domain has a
+ * landing page of task cards; the Command Centre is the dashboard. Every route belongs to exactly one
+ * domain (its breadcrumb and sidebar highlight); a domain may also show `shortcuts` into another domain's
+ * workspace when the task is commonly started from there. Hiding an entry is presentation only; the API
+ * enforces every permission independently.
  */
 function adminNav(): NavGroup[] {
   return [
     group(
-      'dashboard',
-      'Dashboard',
-      [item('', 'Dashboard', 'Event status, what needs you and what to do next.', 'critical')],
-      'What is happening, what needs you and what to do next.',
+      'command',
+      'Command Centre',
+      [item('', 'Command Centre', 'Event status, what needs you and what to do next.', 'critical')],
+      'What is happening across the event and what needs you now.',
       true,
     ),
     group(
-      'setup',
-      'Setup',
+      'configuration',
+      'Event Configuration',
       [
         item(
           'setup',
           'Event details & publishing',
-          'Name, dates, team rules, results visibility, publishing and registration.',
+          'Name, dates, venue, team rules, registration window and publishing.',
           'critical',
-          'Event configuration',
         ),
         item(
           'rounds',
           'Rounds & deadlines',
           'Rounds, submission deadlines, grace periods and submission forms.',
           'critical',
-          'Event configuration',
         ),
         item(
           'structure',
-          'Tracks & problems',
+          'Tracks & problem statements',
           'Tracks and the problem statements teams choose from.',
           'critical',
-          'Event configuration',
         ),
-        item(
-          'guidebook',
-          'Guidebook',
-          'The rules and schedule participants read, with a PDF.',
-          'important',
-          'Event resources',
-        ),
+        item('guidebook', 'Guidebook', 'The rules and schedule participants read, with a PDF.'),
         item(
           'integrations',
-          'Integrations',
+          'Integrations & exports',
           'Optional Google Sheets and Drive sync, and CSV exports.',
           'advanced',
-          'Event resources',
-        ),
-      ],
-      'Event details, rounds, tracks, guidebook and integrations.',
-    ),
-    group(
-      'registrations',
-      'Registrations & people',
-      [
-        item(
-          'teams',
-          'Teams & participants',
-          'Find any team or participant, fix records and manage membership.',
-          'important',
-          'Registration management',
-        ),
-        item(
-          'applications',
-          'Application review',
-          'Accept, waitlist or reject team applications when screening is used.',
-          'important',
-          'Registration management',
-        ),
-        item(
-          'people',
-          'People',
-          'Invite organisers, judges, helping staff and sponsor viewers.',
-          'important',
-          'Organising team',
-        ),
-      ],
-      'Teams, participants, applications and your organising team.',
-    ),
-    group(
-      'administration',
-      'Administration',
-      [
-        item(
-          'access',
-          'Access & matching',
-          'Access labels and the institutions and tracks used to match judges.',
-          'advanced',
-          'Access & permissions',
-        ),
-        item(
-          'audit',
-          'Audit history',
-          'Who changed what and when, with filters and a CSV export.',
-          'advanced',
-          'Records',
-        ),
-      ],
-      'Access levels, judge matching and the audit trail.',
-    ),
-    group(
-      'operations',
-      'Event operations',
-      [
-        item(
-          'support',
-          'Support & requests',
-          'Questions and exception requests from participants, judges and staff.',
-          'important',
-          'Participant support',
-        ),
-        item(
-          'communication',
-          'Communication',
-          'Announcements and targeted messages, with history and delivery status.',
-          'important',
-          'Communication',
-        ),
-        item(
-          'checkin',
-          'Check-in',
-          'Find a team and mark members present on event day.',
-          'important',
-          'Event-day management',
-        ),
-        item(
-          'tasks',
-          'Staff tasks',
-          'Create, assign and follow up helping staff tasks.',
-          'important',
-          'Event-day management',
-        ),
-        item(
-          'issues',
-          'Issues',
-          'Problems reported by staff and judges on event day.',
-          'important',
-          'Event-day management',
-        ),
-        item(
-          'engagement',
-          'Team engagement',
-          'Which teams look active, slipping or inactive.',
-          'advanced',
-          'Engagement',
-        ),
-      ],
-      'Requests, messages, check-in, staff tasks and issues.',
-    ),
-    group(
-      'evaluation',
-      'Submissions & evaluation',
-      [
-        item(
-          'rubric',
-          'Rubric',
-          'The criteria and weights judges score against, per round.',
-          'critical',
-          'Judge configuration',
-        ),
-        item(
-          'briefing',
-          'Judge briefing & glossary',
-          'What judges read before scoring, and terms explained in context.',
-          'important',
-          'Judge configuration',
-        ),
-        item(
-          'submissions',
-          'Submissions',
-          'Who has submitted, late work, extensions and files.',
-          'critical',
-          'Work management',
-        ),
-        item(
-          'judging',
-          'Judging',
-          'Assign judges, open and close judging, follow evaluations.',
-          'critical',
-          'Evaluation & integrity',
-        ),
-        item(
-          'calibration',
-          'Judge calibration',
-          'Compare judges’ scoring and the optional normalisation.',
-          'advanced',
-          'Evaluation & integrity',
-        ),
-        item(
-          'integrity',
-          'Project review',
-          'Repository checks, integrity notes and market context.',
-          'advanced',
-          'Evaluation & integrity',
-        ),
-        item(
-          'advancement',
-          'Round shortlists',
-          'Choose which teams advance to the next round.',
-          'important',
-          'Work management',
         ),
         item(
           'sandbox',
           'Practice workspace',
           'Preview the participant or judge screens with practice data.',
           'advanced',
-          'Testing',
         ),
       ],
-      'Rubrics, submissions, judging, calibration and shortlists.',
+      'Everything the event needs before it can run: details, rounds, problems and rules.',
+      false,
+      [
+        item(
+          'setup#publishing',
+          'Registration settings',
+          'When registration opens and closes, and whether it is open now.',
+        ),
+        item(
+          'setup#registration-questions',
+          'Registration questions',
+          'Extra questions participants answer when they register.',
+        ),
+        item(
+          'setup#teams-eligibility',
+          'Team size & eligibility',
+          'Minimum and maximum team size, declarations and who can take part.',
+        ),
+      ],
     ),
     group(
-      'results',
-      'Results & insights',
+      'people',
+      'People & Teams',
+      [
+        item(
+          'teams',
+          'Teams & participants',
+          'Find any team or participant, fix records and manage membership.',
+          'critical',
+        ),
+        item(
+          'applications',
+          'Application review',
+          'Accept, waitlist or reject team applications when screening is used.',
+        ),
+        item(
+          'people',
+          'Organising team, judges & staff',
+          'Invite co-admins, judges, helping staff and sponsor viewers.',
+        ),
+        item(
+          'access',
+          'Access & matching',
+          'Access labels and the institutions and tracks used to match judges.',
+          'advanced',
+        ),
+      ],
+      'Registrations, teams, applications and the people running the event.',
+      false,
+      [
+        item(
+          'teams?view=participants',
+          'Participant search',
+          'Search every registered participant by name, email or institution.',
+        ),
+        item(
+          'teams?add=1',
+          'Add participants',
+          'Share the registration link; participants register themselves.',
+        ),
+      ],
+    ),
+    group(
+      'judging',
+      'Judging & Evaluation',
+      [
+        item(
+          'rubric',
+          'Rubrics',
+          'The criteria and weights judges score against, per round.',
+          'critical',
+        ),
+        item(
+          'submissions',
+          'Submissions',
+          'Who has submitted, late work, extensions and files.',
+          'critical',
+        ),
+        item(
+          'judging',
+          'Judge assignments & progress',
+          'Assign judges, open and close judging, follow every evaluation.',
+          'critical',
+        ),
+        item(
+          'briefing',
+          'Judge briefing & glossary',
+          'What judges read before scoring, and terms explained in context.',
+        ),
+        item('advancement', 'Round shortlists', 'Choose which teams advance to the next round.'),
+        item(
+          'calibration',
+          'Judge calibration',
+          'Compare judges’ scoring and the optional normalisation.',
+          'advanced',
+        ),
+        item(
+          'integrity',
+          'Project review',
+          'Repository checks, integrity notes and market context.',
+          'advanced',
+        ),
+      ],
+      'Rubrics, submissions, judge assignments, evaluations and shortlists.',
+      false,
+      [item('results', 'Results', 'Review ranks and ties, then approve and publish results.')],
+    ),
+    group(
+      'operations',
+      'Live Operations',
+      [
+        item('checkin', 'Check-in', 'Find a team and mark members present.', 'critical'),
+        item(
+          'support',
+          'Helpdesk & exception requests',
+          'Questions and exception requests from participants, judges and staff.',
+          'critical',
+        ),
+        item('issues', 'Issues', 'Problems reported by staff and judges on event day.'),
+        item('tasks', 'Staff tasks', 'Create, assign and follow up helping staff tasks.'),
+        item(
+          'engagement',
+          'Team engagement',
+          'Which teams look active, slipping or inactive.',
+          'advanced',
+        ),
+      ],
+      'Event day: check-in, requests, issues and staff tasks.',
+      false,
+      [item('rounds', 'Event schedule', 'Every round and deadline, in the event’s time zone.')],
+    ),
+    group(
+      'communication',
+      'Communication',
+      [
+        item(
+          'communication',
+          'Messages & announcements',
+          'Write once, choose the audience, and see delivery for every message.',
+          'critical',
+        ),
+      ],
+      'Announcements and targeted messages to participants, judges and staff.',
+      false,
+      [
+        item(
+          'communication?history=announcements',
+          'Announcements',
+          'Everyone-in-the-event updates and their history.',
+        ),
+        item(
+          'communication?history=targeted',
+          'Targeted messages',
+          'Messages to chosen teams, participants, judges or staff.',
+        ),
+        item(
+          'communication?history=targeted&delivery=FAILED',
+          'Email delivery problems',
+          'Messages that could not be delivered by email.',
+        ),
+        item(
+          'support?tab=general',
+          'Questions & responses',
+          'Questions from participants and judges, and your answers.',
+        ),
+      ],
+    ),
+    group(
+      'records',
+      'Reports & Records',
       [
         item(
           'results',
           'Results',
           'Review ranks and ties, approve and publish results.',
           'critical',
-          'Results',
         ),
         item(
           'feedback',
           'Feedback & reviews',
           'Participant and judge surveys, and judges’ comments for teams.',
-          'important',
-          'Post-event',
         ),
+        item('certificates', 'Certificates', 'Design, generate, review and release certificates.'),
+        item('report', 'Impact report', 'An aggregate PDF for sponsors and the institution.'),
         item(
-          'certificates',
-          'Certificates',
-          'Design, generate, review and release certificates.',
-          'important',
-          'Post-event',
-        ),
-        item(
-          'report',
-          'Impact report',
-          'An aggregate PDF for sponsors and the institution.',
+          'audit',
+          'Audit history',
+          'Who changed what and when, with filters and a CSV export.',
           'advanced',
-          'Post-event',
         ),
       ],
-      'Results, feedback, judges’ comments, certificates and the impact report.',
+      'Results, feedback, certificates, reports and the audit trail.',
+      false,
+      [item('integrations', 'Exports', 'CSV exports of teams, participants and scores.')],
     ),
   ];
 }
 
 /**
- * Role-specific areas (PRD §5.4). Every role lands on its own dashboard ('' route); the other destinations
- * are listed on the All areas page and in the small-screen bottom bar. Hiding an entry is presentation only;
- * the API enforces permissions.
+ * Role-specific navigation (PRD §5.4). Every role lands on its own dashboard ('' route). Entries marked
+ * `primary` are sidebar destinations; the rest are under More (the All areas page and the mobile drawer).
+ * Hiding an entry is presentation only; the API enforces permissions.
  */
 export function navFor(role: Role): NavGroup[] {
   switch (role) {
@@ -344,15 +364,24 @@ export function navFor(role: Role): NavGroup[] {
           'workspace',
           'My event',
           [
-            item('', 'My event', 'Your next step, team, submission and updates.', 'critical'),
-            item('team', 'My team', 'Members, your invite code, track and problem.', 'critical'),
-            item(
-              'submission',
-              'Submission',
-              'Your team’s work for each round, before the deadline.',
-              'critical',
+            primary(
+              item('', 'My event', 'Your next step, team, submission and updates.', 'critical'),
             ),
-            item('updates', 'Updates', 'Announcements and messages from the organisers.'),
+            primary(
+              item('team', 'My team', 'Members, your invite code, track and problem.', 'critical'),
+            ),
+            primary(
+              item(
+                'submission',
+                'Submissions',
+                'Your team’s work for each round, before the deadline.',
+                'critical',
+              ),
+            ),
+            primary(item('rounds', 'Schedule', 'Every round and its official deadline.')),
+            primary(
+              item('updates', 'Announcements', 'Announcements and messages from the organisers.'),
+            ),
           ],
           'Your next step, team, submission and updates.',
         ),
@@ -361,11 +390,15 @@ export function navFor(role: Role): NavGroup[] {
           'Results & certificates',
           [
             item('results', 'Results', 'How your team did, once results are published.'),
-            item('certificates', 'Certificates', 'Download your certificates once released.'),
-            item(
-              'feedback',
-              'Survey & judges’ comments',
-              'Tell the organisers how it went, and read judges’ comments.',
+            primary(
+              item(
+                'feedback',
+                'Feedback',
+                'Tell the organisers how it went, and read judges’ comments.',
+              ),
+            ),
+            primary(
+              item('certificates', 'Certificates', 'Download your certificates once released.'),
             ),
           ],
           'Results, judges’ comments, certificates and the event survey.',
@@ -387,7 +420,6 @@ export function navFor(role: Role): NavGroup[] {
           'more',
           'More',
           [
-            item('rounds', 'Rounds & deadlines', 'Every round and its official deadline.'),
             item('structure', 'Tracks & problems', 'The tracks and problem statements.'),
             item(
               'applications',
@@ -417,18 +449,29 @@ export function navFor(role: Role): NavGroup[] {
           'judging',
           'Judging',
           [
-            item('', 'Judge dashboard', 'Your rounds, progress and deadline.', 'critical'),
-            item('judge', 'My teams', 'The teams assigned to you and their status.', 'critical'),
-            item(
-              'briefing',
-              'Judge briefing',
-              'How the rubric works, examples and contacts.',
-              'critical',
+            primary(item('', 'My dashboard', 'Your rounds, progress and deadline.', 'critical')),
+            primary(
+              item(
+                'judge',
+                'Assigned teams',
+                'The teams assigned to you and their status.',
+                'critical',
+              ),
             ),
-            item(
-              'practice',
-              'Practice team',
-              'Try scoring a made-up submission; nothing is saved.',
+            primary(
+              item(
+                'briefing',
+                'Rubric & briefing',
+                'How the rubric works, examples and contacts.',
+                'critical',
+              ),
+            ),
+            primary(
+              item(
+                'practice',
+                'Practice team',
+                'Try scoring a made-up submission; nothing is saved.',
+              ),
             ),
             item(
               'integrity',
@@ -443,7 +486,7 @@ export function navFor(role: Role): NavGroup[] {
           'help',
           'Help & updates',
           [
-            item('updates', 'Updates', 'Announcements from the organisers.'),
+            primary(item('updates', 'Announcements', 'Announcements from the organisers.')),
             item('support', 'Ask the organisers', 'A private question to the event organisers.'),
             item('guidebook', 'Guidebook', 'The event’s rules and schedule.'),
             item('feedback', 'Judge survey', 'Tell the organisers how judging went.'),
@@ -457,10 +500,21 @@ export function navFor(role: Role): NavGroup[] {
           'operations',
           'Event day',
           [
-            item('', 'Staff dashboard', 'Check-in, your tasks and issue reports.', 'critical'),
-            item('checkin', 'Check-in', 'Find a team and mark members present.', 'critical'),
-            item('tasks', 'My tasks', 'What you have been asked to do, overdue first.', 'critical'),
-            item('issues', 'Report an issue', 'Tell the organisers about a problem.'),
+            primary(
+              item('', 'My dashboard', 'Check-in, your tasks and issue reports.', 'critical'),
+            ),
+            primary(
+              item(
+                'tasks',
+                'My tasks',
+                'What you have been asked to do, overdue first.',
+                'critical',
+              ),
+            ),
+            primary(
+              item('checkin', 'Check-in', 'Find a team and mark members present.', 'critical'),
+            ),
+            primary(item('issues', 'Issues', 'Report a problem and follow what you reported.')),
           ],
           'Check-in, your tasks and issue reports.',
         ),
@@ -468,9 +522,9 @@ export function navFor(role: Role): NavGroup[] {
           'help',
           'Help & updates',
           [
-            item('updates', 'Updates', 'Announcements from the organisers.'),
+            primary(item('updates', 'Announcements', 'Announcements from the organisers.')),
+            primary(item('guidebook', 'Schedule & rules', 'The event’s rules and schedule.')),
             item('support', 'Helpdesk', 'Questions from participants and judges.'),
-            item('guidebook', 'Guidebook', 'The event’s rules and schedule.'),
           ],
           'Announcements, the helpdesk and the guidebook.',
         ),
@@ -478,22 +532,52 @@ export function navFor(role: Role): NavGroup[] {
   }
 }
 
+/** A sidebar destination: an admin domain or a role's primary page. */
+export interface SidebarEntry {
+  id: string;
+  label: string;
+  /** Path under /events/:eventId ('' is the role's dashboard). */
+  to: string;
+  /** Whether this entry is the current location. */
+  match: (section: string, groupId: string | null) => boolean;
+}
+
+/** Sidebar destinations for a role: the seven domains for Core Admins, primary pages for everyone else. */
+export function sidebarFor(role: Role): SidebarEntry[] {
+  const groups = navFor(role);
+  if (role === 'ADMIN')
+    return groups.map((g) => ({
+      id: g.id,
+      label: g.label,
+      to: areaPath(g.id),
+      match: (_section, groupId) => groupId === g.id,
+    }));
+  return navItems(groups)
+    .filter((i) => i.primary)
+    .map((i) => ({
+      id: i.to || 'home',
+      label: i.label,
+      to: i.to,
+      match: (section) => resolveSection(groups, section) === segmentOf(i.to),
+    }));
+}
+
 /**
- * Up to four destinations for the small-screen bottom bar, taken from the same definitions as every other
- * entry point so they can never disagree. The fifth slot is always All areas.
+ * Four destinations for the small-screen bottom bar, taken from the same definitions as every other entry
+ * point so they can never disagree. The fifth slot is always More (the full navigation drawer).
  */
 const BOTTOM_BAR: Record<Role, string[]> = {
-  ADMIN: ['', 'support', 'teams', 'judging'],
-  PARTICIPANT: ['', 'team', 'submission', 'updates'],
-  JUDGE: ['', 'judge', 'briefing', 'updates'],
-  STAFF: ['', 'checkin', 'tasks', 'issues'],
+  ADMIN: ['command', 'people', 'judging', 'operations'],
+  PARTICIPANT: ['home', 'team', 'submission', 'updates'],
+  JUDGE: ['home', 'judge', 'briefing', 'updates'],
+  STAFF: ['home', 'tasks', 'checkin', 'issues'],
 };
 
-export function bottomBarFor(role: Role, groups: NavGroup[]): NavEntry[] {
-  const all = navItems(groups);
+export function bottomBarFor(role: Role): SidebarEntry[] {
+  const all = sidebarFor(role);
   return BOTTOM_BAR[role]
-    .map((to) => all.find((i) => i.to === to))
-    .filter((i): i is NavEntry => Boolean(i));
+    .map((id) => all.find((i) => i.id === id))
+    .filter((i): i is SidebarEntry => Boolean(i));
 }
 
 /**
@@ -517,4 +601,14 @@ export const LEGACY_REDIRECTS: Partial<Record<Role, Record<string, string>>> = {
   },
   JUDGE: { helpdesk: 'support', announcements: 'updates' },
   STAFF: { helpdesk: 'support', announcements: 'updates' },
+};
+
+/** Old domain landing-page ids (UX v1.0) mapped to the current ones, so bookmarked area pages still open. */
+export const LEGACY_AREAS: Record<string, string> = {
+  dashboard: 'command',
+  setup: 'configuration',
+  registrations: 'people',
+  administration: 'records',
+  evaluation: 'judging',
+  results: 'records',
 };

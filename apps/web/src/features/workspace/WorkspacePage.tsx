@@ -5,6 +5,7 @@ import { APPLICATION_TEXT } from '../participant/Deadline.js';
 import type { MyEvent } from '@arthakram/shared';
 import { ApiError, request } from '../../lib/api.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -162,31 +163,42 @@ export function WorkspacePage({ section }: { section: string }) {
     enabled: section === 'applications' && !admin,
   });
   const titles: Record<string, string> = {
-    applications: 'Application review',
+    applications: admin ? 'Application review' : 'Application status',
     advancement: 'Round shortlists',
     calibration: 'Judge calibration',
     engagement: 'Team engagement',
     discovery: 'Find teammates',
-    access: 'Access and judge matching',
-    report: 'Event impact report',
+    access: 'Access & matching',
+    report: 'Impact report',
     sandbox: 'Practice workspace',
     integrity: 'Project review',
+  };
+  const descriptions: Record<string, string> = {
+    applications: admin
+      ? 'Accept, waitlist or reject team applications when screening is used.'
+      : 'Whether your team is accepted, when screening is used.',
+    advancement: 'Choose which teams advance to the next round.',
+    calibration: 'Compare judges’ scoring and the optional normalisation.',
+    engagement: 'Which teams look active, slipping or inactive.',
+    discovery: 'Profiles of people looking for a team.',
+    access: 'Access labels and the institutions and tracks used to match judges.',
+    report: 'An aggregate PDF for sponsors and the institution.',
   };
   if (me.accessLevel === 'SPONSOR_VIEWER' && section === 'report')
     return (
       <div className="flex flex-col gap-4">
-        <h2>Sponsor overview</h2>
-        <p>
-          As a sponsor you can see this event's aggregate impact report: totals, colleges, tracks
-          and judging averages. It never contains participants' names, contact details or individual
-          scores.
-        </p>
-        <a
-          href={`/api/v1${base}/report.pdf`}
-          className="inline-flex min-h-11 items-center self-start rounded-pill bg-ember px-5 font-bold text-ink no-underline"
-        >
-          Download the impact report (PDF)
-        </a>
+        <PageHeader
+          title="Sponsor overview"
+          description="This event's aggregate impact report: totals, colleges, tracks and judging averages. It never contains participants' names, contact details or individual scores."
+          actions={
+            <a
+              href={`/api/v1${base}/report.pdf`}
+              className="inline-flex min-h-11 items-center self-start rounded-pill bg-ember px-5 font-bold text-ink no-underline"
+            >
+              Download the impact report (PDF)
+            </a>
+          }
+        />
         <p className="text-sm">
           The report reflects the event's data at the moment you download it.
         </p>
@@ -197,12 +209,7 @@ export function WorkspacePage({ section }: { section: string }) {
     options.error || engagement.error || calibration.error || discovery.error || application.error;
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm font-bold uppercase tracking-eyebrow text-graphite">
-          Event workspace
-        </p>
-        <h2 className="mt-2 text-3xl">{titles[section]}</h2>
-      </div>
+      <PageHeader title={titles[section]} description={descriptions[section]} />
       {(error || queryError) && (
         <Alert tone="error" title="Could not complete request">
           {error || queryError?.message}

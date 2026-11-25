@@ -3,32 +3,35 @@ import type { APIRequestContext, Page } from '@playwright/test';
 import { navFor } from '../apps/web/src/shell/nav.js';
 
 /**
- * Opens a destination the way a person would without a sidebar (UX spec v1.0): All areas, then (for Core
- * Admins) the division card that holds the task, then the task card. "Advanced tools" are unfolded first.
- * The division is looked up in the app's own navigation definitions, so the helper never drifts from them.
+ * Opens a destination the way a person would: Core Admins click the domain in the sidebar, then the task
+ * card on the domain's landing page ("Advanced tools" unfolded first); other roles use More (All areas).
+ * Domains are looked up in the app's own navigation definitions, so the helper never drifts from them.
  */
 export async function goToNav(page: Page, name: string, exact = false) {
   const match = page.url().match(/\/events\/[^/?#]+/);
   if (!match) throw new Error(`goToNav needs an event page, got ${page.url()}`);
   const main = page.getByRole('main');
   const ready = () => main.getByRole('heading', { level: 2 }).first().waitFor();
-  await page.goto(`${match[0]}/areas`);
+  // Core Admins have domain links in the sidebar (present in the DOM even when the sidebar is hidden).
+  const isAdmin = (await page.locator('a[href$="/area/configuration"]').count()) > 0;
+  const domain = isAdmin
+    ? navFor('ADMIN').find(
+        (g) =>
+          g.id !== 'command' &&
+          [...g.items, ...(g.shortcuts ?? [])].some((i) =>
+            exact ? i.label === name : i.label.includes(name),
+          ),
+      )
+    : undefined;
+  await page.goto(`${match[0]}/${domain ? `area/${domain.id}` : 'areas'}`);
   await ready();
-  const division = navFor('ADMIN').find(
-    (g) =>
-      g.id !== 'dashboard' &&
-      g.items.some((i) => (exact ? i.label === name : i.label.includes(name))),
-  );
-  const divisionCard = division
-    ? main.getByRole('link', { name: division.label, exact: true })
-    : null;
-  if (divisionCard && (await divisionCard.count()) > 0) {
-    await divisionCard.first().click();
-    await ready();
-  }
-  for (const summary of await main.locator('details:not([open]) > summary:visible').all())
-    await summary.click();
-  await main.getByRole('link', { name, exact }).first().click();
+  for (const toggle of await main.locator('button[aria-expanded="false"]:visible').all())
+    await toggle.click();
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await main
+    .getByRole('link', { name: new RegExp(exact ? `^${escaped}(,|$)` : escaped) })
+    .first()
+    .click();
 }
 
 export const DEV_PASSWORD = 'Password!2345';

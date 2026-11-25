@@ -14,6 +14,7 @@ import { ApiError } from '../../lib/api.js';
 import { engageApi, type CertTemplateDto, type CertificateDto } from '../../lib/engage.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -54,19 +55,18 @@ export function CertificatesAdminPage() {
   const [type, setType] = useState<CertType>('PARTICIPATION');
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Certificates</h2>
-        <a
-          href={`/api/v1/events/${mine.eventId}/certificates/export.csv`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Export CSV
-        </a>
-      </div>
-      <p>
-        Design the certificate, generate them, check the list, then release. Nobody can download a
-        certificate until you release it.
-      </p>
+      <PageHeader
+        title="Certificates"
+        description="Design the certificate, generate them, check the list, then release. Nobody can download a certificate until you release it."
+        actions={
+          <a
+            href={`/api/v1/events/${mine.eventId}/certificates/export.csv`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 font-bold text-ink no-underline hover:bg-blush"
+          >
+            <Download aria-hidden className="size-4" /> Export CSV
+          </a>
+        }
+      />
       <div className="w-60">
         <Select
           label="Certificate type"

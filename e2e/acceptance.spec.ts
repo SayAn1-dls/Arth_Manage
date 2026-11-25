@@ -31,7 +31,9 @@ test('role boundaries hold through the lifecycle (AT-01, AT-11, AT-12, AT-19)', 
     await p.goto(`/events/${s.eventId}/${path}`);
     // Out-of-scope screens never render their content; the shell shows a plain not-found or access message.
     await expect(
-      p.getByRole('heading', { name: /Participants|Audit history|Judging|Setup/ }),
+      p.getByRole('heading', {
+        name: /Participants|Audit history|Judging|Judge assignments|Setup/,
+      }),
     ).toHaveCount(0);
   };
 

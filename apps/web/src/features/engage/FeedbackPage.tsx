@@ -5,6 +5,7 @@ import type { MyEvent } from '@arthakram/shared';
 import { engageApi, type MyFeedback } from '../../lib/engage.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
 import {
+  PageHeader,
   Alert,
   Button,
   Card,
@@ -24,7 +25,14 @@ export function FeedbackPage() {
   });
   return (
     <div className="flex flex-col gap-6">
-      <h2>Feedback</h2>
+      <PageHeader
+        title={mine.role === 'PARTICIPANT' ? 'Feedback' : 'Judge survey'}
+        description={
+          mine.role === 'PARTICIPANT'
+            ? 'Tell the organisers how it went, and read judges’ comments about your team.'
+            : 'Tell the organisers how judging went.'
+        }
+      />
       {q.isPending && <Spinner label="Loading feedback form" />}
       {q.isError && <Alert tone="error" title="We couldn't load the feedback form" />}
       {q.data && (

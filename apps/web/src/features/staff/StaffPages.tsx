@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, MapPin, Undo2 } from 'lucide-react';
+import { AlertTriangle, Check, ClipboardCheck, MapPin, ScanLine, Undo2 } from 'lucide-react';
+import { HomeGreeting } from '../ops/EventHeader.js';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
@@ -65,63 +66,143 @@ export function StaffPanel({ mine }: { mine: MyEvent }) {
         Number(y.status === 'BLOCKED') - Number(x.status === 'BLOCKED') ||
         (x.dueAt ?? '9').localeCompare(y.dueAt ?? '9'),
     );
-  const action =
-    'flex min-h-16 items-center justify-center rounded-card border-2 border-ink px-4 text-center text-lg font-bold text-ink no-underline';
+  const event = useEvent(mine.eventId);
+  const overdue = open.filter((t) => t.overdue).length;
+  const pct = summary.data?.participants
+    ? Math.round((summary.data.checkedIn / summary.data.participants) * 100)
+    : 0;
+  const actions = [
+    { label: 'Check in a team', to: `${base}/checkin`, icon: ScanLine, primary: true },
+    { label: 'My tasks', to: `${base}/tasks`, icon: ClipboardCheck },
+    { label: 'Report an issue', to: `${base}/issues`, icon: AlertTriangle },
+  ];
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2>Staff dashboard</h2>
-        <p className="mt-1">
-          Check people in, work through your tasks, and report anything that goes wrong.
-        </p>
-      </div>
+      <HomeGreeting
+        mine={mine}
+        event={event.data}
+        subtitle={
+          q.isPending
+            ? 'Check people in, work through your tasks, and report anything that goes wrong.'
+            : tasks.length === 0
+              ? 'No tasks are assigned to you yet. Check people in and report anything that goes wrong.'
+              : open.length === 0
+                ? 'Your tasks are done. Help at the check-in desk or report anything that goes wrong.'
+                : `You have ${open.length} task${open.length === 1 ? '' : 's'} to do${overdue ? `, ${overdue} overdue` : ''}.`
+        }
+      />
       <nav aria-label="Staff actions" className="grid gap-3 sm:grid-cols-3">
-        <Link to={`${base}/checkin`} className={cn(action, 'bg-ember')}>
-          Check in a team
-        </Link>
-        <Link to={`${base}/tasks`} className={cn(action, 'bg-white hover:bg-blush')}>
-          My tasks
-        </Link>
-        <Link to={`${base}/issues`} className={cn(action, 'bg-white hover:bg-blush')}>
-          Report an issue
-        </Link>
+        {actions.map((x) => (
+          <Link
+            key={x.label}
+            to={x.to}
+            className={cn(
+              'flex min-h-20 items-center justify-center gap-3 rounded-[14px] px-4 text-center text-lg font-bold text-ink no-underline',
+              x.primary
+                ? 'bg-ember hover:brightness-95'
+                : 'border border-line/60 bg-white shadow-card hover:border-ember/60',
+            )}
+          >
+            <x.icon
+              aria-hidden
+              className={cn('size-6', x.primary ? 'stroke-ink' : 'stroke-ember')}
+            />
+            {x.label}
+          </Link>
+        ))}
       </nav>
-      {summary.data && (
-        <p className="text-lg text-ink">
-          <strong>
-            {summary.data.checkedIn} of {summary.data.participants}
-          </strong>{' '}
-          people checked in · {summary.data.teams.checkedIn}{' '}
-          {summary.data.teams.checkedIn === 1 ? 'team' : 'teams'} fully in ·{' '}
-          {summary.data.teams.partial} partly in
-        </p>
-      )}
-      <Card>
-        {q.isPending ? (
-          <Skeleton className="h-16" />
-        ) : q.isError ? (
-          <Alert tone="error" title="We couldn't load your tasks" />
-        ) : tasks.length === 0 ? (
-          <p>No tasks are assigned to you yet. Help at the check-in desk in the meantime.</p>
-        ) : (
-          <>
-            <h3>
-              {open.length === 0
-                ? 'All your tasks are done'
-                : `${open.length} task${open.length === 1 ? '' : 's'} to do`}
-            </h3>
-            <ul className="mt-2 flex flex-col gap-2">
-              {open.slice(0, 5).map((t) => (
-                <li key={t.id} className="flex flex-wrap items-center gap-2">
-                  <Link to={`${base}/tasks`}>{t.title}</Link>
-                  <Badge tone={statusTone[t.status]}>{statusLabel[t.status]}</Badge>
-                  {t.overdue && <Badge tone="error">Overdue</Badge>}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section
+          aria-labelledby="checkin-progress-h"
+          className="rounded-[14px] border border-line/60 bg-white p-5 shadow-card sm:p-6"
+        >
+          <h3 id="checkin-progress-h" className="text-xl">
+            Check-in progress
+          </h3>
+          {summary.data ? (
+            <>
+              <p className="mt-2 font-display text-3xl font-extrabold text-ink">
+                {summary.data.checkedIn}
+                <span className="text-lg font-semibold text-graphite">
+                  {' '}
+                  of {summary.data.participants} people
+                </span>
+              </p>
+              <span
+                role="progressbar"
+                aria-label="People checked in"
+                aria-valuenow={pct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="mt-3 block h-2 w-full overflow-hidden rounded-full bg-blush"
+              >
+                <span className="block h-full rounded-full bg-ember" style={{ width: `${pct}%` }} />
+              </span>
+              <p className="mt-2 text-sm">
+                {summary.data.teams.checkedIn}{' '}
+                {summary.data.teams.checkedIn === 1 ? 'team' : 'teams'} fully in ·{' '}
+                {summary.data.teams.partial} partly in · {summary.data.teams.notCheckedIn} not yet
+              </p>
+            </>
+          ) : summary.isError ? (
+            <p className="mt-2">Check-in progress could not load.</p>
+          ) : (
+            <Skeleton className="mt-3 h-16" />
+          )}
+        </section>
+        <section
+          aria-labelledby="staff-tasks-h"
+          className="rounded-[14px] border border-line/60 bg-white p-5 shadow-card sm:p-6"
+        >
+          {q.isPending ? (
+            <Skeleton className="h-16" />
+          ) : q.isError ? (
+            <Alert tone="error" title="We couldn't load your tasks" />
+          ) : tasks.length === 0 ? (
+            <>
+              <h3 id="staff-tasks-h" className="text-xl">
+                My tasks
+              </h3>
+              <p className="mt-2">
+                No tasks are assigned to you yet. Help at the check-in desk in the meantime.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <h3 id="staff-tasks-h" className="text-xl">
+                  {open.length === 0
+                    ? 'All your tasks are done'
+                    : `${open.length} task${open.length === 1 ? '' : 's'} to do`}
+                </h3>
+                <Link to={`${base}/tasks`} className="text-sm font-semibold">
+                  All tasks
+                </Link>
+              </div>
+              <ul className="mt-3 flex flex-col divide-y divide-line">
+                {open.slice(0, 5).map((t) => (
+                  <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span className="min-w-0">
+                      <Link to={`${base}/tasks`} className="font-semibold text-ink">
+                        {t.title}
+                      </Link>
+                      {t.dueAt && (
+                        <span className="block text-sm">
+                          Due {formatDateTime(t.dueAt, mine.timeZone)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="flex gap-1.5">
+                      {t.overdue && <Badge tone="error">Overdue</Badge>}
+                      <Badge tone={statusTone[t.status]}>{statusLabel[t.status]}</Badge>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

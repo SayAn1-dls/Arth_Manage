@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useParams } from 'react-router';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
-import { Alert, Button, Spinner } from '../../ui/index.js';
+import { PageHeader, Alert, Button, Spinner } from '../../ui/index.js';
 const control = 'block w-full rounded-lg border border-line-strong bg-white px-3 py-2';
 type Review = {
   id: string;
@@ -79,11 +79,10 @@ export function ProjectReviewPage() {
         .map((v) => ({ id: v.teamId, name: 'Market context', teamCode: '' }));
   return (
     <div className="space-y-5">
-      <h2 className="text-3xl">Project integrity and market context</h2>
-      <p>
-        Concept overlap is context for differentiation, execution, and user experience. Integrity
-        flags require human investigation before any action.
-      </p>
+      <PageHeader
+        title={admin ? 'Project review' : 'Market context'}
+        description="Concept overlap is context for differentiation, execution and user experience. Integrity flags require human investigation before any action."
+      />
       {admin && (
         <Alert tone="info" title="Public repository checks available">
           This checks GitHub creation and pre-event commit history. Full code similarity and AI

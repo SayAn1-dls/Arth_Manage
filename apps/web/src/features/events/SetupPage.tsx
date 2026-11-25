@@ -6,6 +6,7 @@ import { ApiError } from '../../lib/api.js';
 import { eventApi, MODE_LABEL, TIME_ZONES, TYPE_LABEL, useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -90,13 +91,16 @@ export function SetupPage() {
     return <Alert tone="error" title="We couldn't load the event setup" />;
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2>Event details &amp; publishing</h2>
-        <p className="mt-1">
-          Details, team rules, what teams see in results and certificate rules save together with{' '}
-          <strong>Save changes</strong>. Publishing, registration questions and closing the event
-          take effect as soon as you use them.
-        </p>
+      <PageHeader
+        title="Event details & publishing"
+        description={
+          <>
+            Details, team rules, results visibility and certificate rules save together with{' '}
+            <strong>Save changes</strong>. Publishing, registration questions and closing the event
+            take effect immediately.
+          </>
+        }
+      >
         <nav aria-label="Sections on this page" className="mt-3">
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {[
@@ -114,7 +118,7 @@ export function SetupPage() {
             ))}
           </ul>
         </nav>
-      </div>
+      </PageHeader>
       <PublicationCard event={event.data} />
       <DetailsForm key={event.data.version} event={event.data} />
       <RegistrationFieldsCard eventId={event.data.id} />

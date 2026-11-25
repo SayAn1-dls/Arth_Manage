@@ -3,7 +3,7 @@ import { Link, Navigate, useOutletContext } from 'react-router';
 import type { MyEvent } from '@arthakram/shared';
 import { eventApi } from '../../lib/events.js';
 import { participantApi } from '../../lib/participant.js';
-import { Alert, Badge, Button, Card, EmptyState, Spinner } from '../../ui/index.js';
+import { PageHeader, Alert, Badge, Button, Card, EmptyState, Spinner } from '../../ui/index.js';
 import { DeadlineLines } from './Deadline.js';
 import { extensionOf } from './SubmissionPage.js';
 
@@ -33,11 +33,17 @@ export function SubmissionIndexPage() {
     })),
   });
 
+  const header = (
+    <PageHeader
+      title="Submissions"
+      description="Your team’s work for each round, submitted before the deadline."
+    />
+  );
   if (rounds.isPending) return <Spinner label="Loading rounds" />;
   if (rounds.isError)
     return (
       <div className="flex flex-col gap-4">
-        <h2>Submissions</h2>
+        {header}
         <Alert tone="error" title="We could not load the rounds">
           Check your connection and try again.
           <div className="mt-2">
@@ -52,7 +58,7 @@ export function SubmissionIndexPage() {
   if (list.length === 0)
     return (
       <div className="flex flex-col gap-4">
-        <h2>Submissions</h2>
+        {header}
         <EmptyState title="No rounds have been announced yet">
           When the organisers announce a round, its deadline and your submission form will appear
           here.
@@ -61,7 +67,7 @@ export function SubmissionIndexPage() {
     );
   return (
     <div className="flex flex-col gap-4">
-      <h2>Submissions</h2>
+      {header}
       <ul className="flex flex-col gap-3">
         {list.map((r, i) => {
           const view = views[i]?.data;

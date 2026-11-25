@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { request } from '../../lib/api.js';
-import { Button, Alert, Spinner } from '../../ui/index.js';
+import { PageHeader, Button, Alert, Spinner } from '../../ui/index.js';
 const control = 'block w-full rounded-lg border border-line-strong bg-white px-3 py-2';
 type Round = {
   id: string;
@@ -45,7 +45,10 @@ export function SandboxPage() {
   const round = q.data.rounds.find((r) => r.id === roundId) ?? q.data.rounds[0];
   return (
     <div className="space-y-5">
-      <h2 className="text-3xl">View as · practice workspace</h2>
+      <PageHeader
+        title="Practice workspace"
+        description="Preview the participant or judge screens with practice data, without logging in as anyone."
+      />
       <Alert tone="info" title="Isolated practice session">
         This copies event configuration and the selected user’s assignments into a practice screen.
         Dummy submissions and scores stay in this page’s memory. It does not log in as that person.

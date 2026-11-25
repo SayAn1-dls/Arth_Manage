@@ -1,5 +1,17 @@
 import { JudgeLinks } from './JudgeTools.js';
-import { useState } from 'react';
+import {
+  BookOpen,
+  CircleCheck,
+  ClipboardList,
+  Hourglass,
+  ListChecks,
+  Megaphone,
+  Send,
+  Timer,
+} from 'lucide-react';
+import { useEvent } from '../../lib/events.js';
+import { HomeGreeting } from '../ops/EventHeader.js';
+import { useState, type ReactNode } from 'react';
 import { Link, Navigate, useOutletContext, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
@@ -42,6 +54,176 @@ export const evalLabel: Record<EvalStatus, string> = {
   CONFLICT: 'Conflict',
 };
 
+/**
+ * Judge dashboard: the judge's own assigned work in numbers (assigned, pending, completed, next deadline),
+ * then each round, then the tools judges use before and while scoring. Only this judge's assignments are
+ * read (GET /judge/rounds is scoped to the caller), so nothing about other judges is exposed.
+ */
+export function JudgeHome({ mine }: { mine: MyEvent }) {
+  const event = useEvent(mine.eventId);
+  const q = useQuery({
+    queryKey: ['judge-rounds', mine.eventId],
+    queryFn: () => judgingApi.judgeRounds(mine.eventId),
+  });
+  const base = `/events/${mine.eventId}`;
+  const rounds = q.data ?? [];
+  const assigned = rounds.reduce((n, r) => n + r.toEvaluate, 0);
+  const done = rounds.reduce((n, r) => n + Math.min(r.submitted, r.toEvaluate), 0);
+  const pending = Math.max(assigned - done, 0);
+  const now = Date.now();
+  const nextDeadline = rounds
+    .filter(
+      (r) =>
+        r.judgingStatus !== 'CLOSED' && r.judgingDeadline && +new Date(r.judgingDeadline) > now,
+    )
+    .sort((a, b) => a.judgingDeadline!.localeCompare(b.judgingDeadline!))[0];
+  const openRound = rounds.find((r) => r.judgingStatus === 'OPEN' && r.submitted < r.toEvaluate);
+  const one = rounds.length === 1 ? rounds[0] : undefined;
+  const teamsLink = one ? `${base}/judge/${one.roundId}` : `${base}/judge`;
+  const metric = (icon: ReactNode, value: ReactNode, label: string, to?: string) => {
+    const body = (
+      <>
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0">
+          <span className="block font-display text-3xl font-extrabold text-ink">{value}</span>
+          <span className="block">{label}</span>
+        </span>
+      </>
+    );
+    const cls =
+      'flex h-full items-center gap-4 rounded-[14px] border border-line/60 bg-white p-5 text-graphite no-underline shadow-card';
+    return to ? (
+      <Link to={to} className={`${cls} hover:border-ember/60`}>
+        {body}
+      </Link>
+    ) : (
+      <div className={cls}>{body}</div>
+    );
+  };
+  const tools = [
+    { label: 'Rubric & briefing', to: `${base}/briefing`, icon: BookOpen },
+    { label: 'Practice team', to: `${base}/practice`, icon: ListChecks },
+    { label: 'Announcements', to: `${base}/updates`, icon: Megaphone },
+    { label: 'Ask the organisers', to: `${base}/support`, icon: Send },
+  ];
+  return (
+    <div className="flex flex-col gap-6">
+      <HomeGreeting
+        mine={mine}
+        event={event.data}
+        subtitle={
+          q.isPending
+            ? 'Loading your assignments…'
+            : pending > 0
+              ? `You have ${pending} evaluation${pending === 1 ? '' : 's'} to submit.`
+              : assigned > 0
+                ? 'All your evaluations are submitted. Thank you!'
+                : 'Your assigned teams will appear here.'
+        }
+      />
+      {openRound && (
+        <section
+          aria-labelledby="judge-next-h"
+          className="flex flex-wrap items-center gap-4 rounded-[14px] bg-blush p-5 sm:p-6"
+        >
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ember">
+            <ClipboardList aria-hidden className="size-6 stroke-ink" />
+          </span>
+          <div className="min-w-0 flex-1 basis-64">
+            <p className="text-xs font-bold tracking-eyebrow text-graphite uppercase">
+              Your next step
+            </p>
+            <h3 id="judge-next-h" className="mt-0.5 text-xl">
+              Continue judging {openRound.name}
+            </h3>
+            <p className="mt-0.5">
+              {openRound.toEvaluate - openRound.submitted} of {openRound.toEvaluate} left. Only
+              submitted evaluations count.
+            </p>
+          </div>
+          <Link
+            to={`${base}/judge/${openRound.roundId}`}
+            className="inline-flex min-h-12 items-center rounded-pill bg-ember px-6 font-bold text-ink no-underline hover:brightness-95"
+          >
+            Continue judging
+          </Link>
+        </section>
+      )}
+      {!q.isPending && !q.isError && rounds.length > 0 && (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <li>
+            {metric(
+              <ClipboardList aria-hidden className="size-9 stroke-ember" />,
+              assigned,
+              'Assigned teams',
+              teamsLink,
+            )}
+          </li>
+          <li>
+            {metric(
+              <Hourglass aria-hidden className="size-9 stroke-ember" />,
+              pending,
+              'Pending evaluations',
+              teamsLink,
+            )}
+          </li>
+          <li>
+            {metric(
+              <CircleCheck aria-hidden className="size-9 stroke-ember" />,
+              done,
+              'Completed evaluations',
+              one ? `${base}/judge/${one.roundId}?status=SUBMITTED` : `${base}/judge`,
+            )}
+          </li>
+          <li>
+            {metric(
+              <Timer aria-hidden className="size-9 stroke-ember" />,
+              nextDeadline ? (
+                <Countdown until={nextDeadline.judgingDeadline!} className="text-2xl" />
+              ) : (
+                '—'
+              ),
+              nextDeadline
+                ? `Until ${nextDeadline.name} judging closes (${formatDateTime(nextDeadline.judgingDeadline!, mine.timeZone)})`
+                : 'No judging deadline set',
+            )}
+          </li>
+        </ul>
+      )}
+      <section aria-labelledby="judge-rounds-h" className="flex flex-col gap-3">
+        <h3
+          id="judge-rounds-h"
+          className="font-sans text-sm font-bold tracking-eyebrow text-graphite uppercase"
+        >
+          Your rounds
+        </h3>
+        <JudgeRoundsPanel mine={mine} />
+      </section>
+      <section aria-labelledby="judge-tools-h" className="flex flex-col gap-3">
+        <h3
+          id="judge-tools-h"
+          className="font-sans text-sm font-bold tracking-eyebrow text-graphite uppercase"
+        >
+          Before and while you judge
+        </h3>
+        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {tools.map((t) => (
+            <li key={t.label}>
+              <Link
+                to={t.to}
+                className="flex h-full min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-line/70 bg-white p-3 text-center font-semibold text-ink no-underline hover:border-ember/50 hover:bg-blush/50"
+              >
+                <t.icon aria-hidden className="size-7 stroke-ember" />
+                {t.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
 /** Judge home: assigned rounds with live progress from persisted evaluations (PRD FR-091, audit P1-18..20). */
 export function JudgeRoundsPanel({ mine }: { mine: MyEvent }) {
   const q = useQuery({
@@ -63,7 +245,7 @@ export function JudgeRoundsPanel({ mine }: { mine: MyEvent }) {
         const left = Math.max(r.toEvaluate - r.submitted, 0);
         const passed = r.judgingDeadline !== null && +new Date(r.judgingDeadline) <= now;
         return (
-          <Card key={r.roundId}>
+          <Card key={r.roundId} className="rounded-[14px] border border-line/60">
             <div className="flex flex-wrap items-center gap-2">
               <h3>{r.name}</h3>
               <Badge tone={roundTone[r.judgingStatus]}>{roundLabel[r.judgingStatus]}</Badge>

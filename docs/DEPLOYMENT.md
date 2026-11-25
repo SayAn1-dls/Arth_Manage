@@ -127,5 +127,9 @@ second after each backup rehearsal. Backups contain personal data: restrict acce
   no `.env` file on the host.
 * **Free-plan limits.** The disk is ephemeral (uploads and certificate PDFs vanish on restart or redeploy; see section 9),
   the service sleeps when idle, and a free Render PostgreSQL database expires 30 days after creation.
-* **Vercel.** Vercel cannot run this app as it is (one long-running Express process with background workers and a
-  local disk), so its deployments of this repository fail. Disconnect those Vercel projects or ignore them.
+* **Vercel is not a deployment target.** Render (this blueprint) is the only deployment. Vercel cannot run this app
+  as it is (one long-running Express process with background workers and a local disk). The repository contains
+  no Vercel configuration; the failing "Vercel – arth-manage" and "Vercel – arth-manage-9kv2" commit checks come
+  from two Vercel projects connected to the GitHub repository from the Vercel side. Remove them in the Vercel
+  dashboard (each project → Settings → Advanced → Delete Project) or disconnect the Vercel GitHub app from the
+  repository; nothing in this repository needs to change.

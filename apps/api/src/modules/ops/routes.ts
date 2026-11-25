@@ -9,7 +9,7 @@ import { checkinSummary } from '../staff/routes.js';
 import { submissionStatus } from '../submissions/logic.js';
 import { hasDraftContent, roundTiming } from '../submissions/service.js';
 import { effectiveRegistration } from '../events/registrationState.js';
-import { eventLifecycle } from './lifecycle.js';
+import { eventLifecycle, setupChecklist } from './lifecycle.js';
 
 /** Operational dashboard and audit history for Core Admins (PRD FR-043, FR-046). */
 export function opsRouter(deps: Deps) {
@@ -21,6 +21,7 @@ export function opsRouter(deps: Deps) {
     adminOnly(ctx);
     const e = ctx.event;
     const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     // Each card loads independently: one failing never blanks the others (PRD FR-043).
     const card = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
       try {
@@ -160,9 +161,14 @@ export function opsRouter(deps: Deps) {
         card(async () => {
           const rounds = await db.round.findMany({ where: { eventId: e.id } });
           const items = [
+            ...(e.registrationOpensAt
+              ? [{ label: 'Registration opens', at: e.registrationOpensAt }]
+              : []),
             ...(e.registrationClosesAt
               ? [{ label: 'Registration closes', at: e.registrationClosesAt }]
               : []),
+            { label: 'Event day', at: e.startsAt },
+            { label: 'Event ends', at: e.endsAt },
             ...rounds.flatMap((r) => [
               ...(r.submissionDeadline
                 ? [{ label: `${r.name} submissions close`, at: r.submissionDeadline }]
@@ -175,11 +181,141 @@ export function opsRouter(deps: Deps) {
           return items
             .filter((i) => i.at > now)
             .sort((a, b) => a.at.getTime() - b.at.getTime())
-            .slice(0, 3);
+            .slice(0, 6);
         }),
       ]);
+    const [people, trend, setup, config, records] = await Promise.all([
+      // Judges and staff on the event, with pending invitations so a just-invited judge is not "zero".
+      card(async () => {
+        const [judges, judgeInvites, staff, admins, judgesThisWeek] = await Promise.all([
+          db.eventMembership.count({ where: { eventId: e.id, role: 'JUDGE', status: 'ACTIVE' } }),
+          db.invitation.count({ where: { eventId: e.id, role: 'JUDGE', status: 'PENDING' } }),
+          db.eventMembership.count({ where: { eventId: e.id, role: 'STAFF', status: 'ACTIVE' } }),
+          db.eventMembership.count({ where: { eventId: e.id, role: 'ADMIN', status: 'ACTIVE' } }),
+          db.eventMembership.count({
+            where: { eventId: e.id, role: 'JUDGE', status: 'ACTIVE', createdAt: { gte: weekAgo } },
+          }),
+        ]);
+        return { judges, judgeInvites, staff, admins, judgesThisWeek };
+      }),
+      // Registrations and teams created per day in the event's time zone (real records, no smoothing).
+      card(async () => {
+        const [regs, teamsCreated] = await Promise.all([
+          db.registration.findMany({ where: { eventId: e.id }, select: { createdAt: true } }),
+          db.team.findMany({
+            where: { eventId: e.id, status: { not: 'DISSOLVED' } },
+            select: { createdAt: true },
+          }),
+        ]);
+        const day = new Intl.DateTimeFormat('en-CA', {
+          timeZone: e.timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        });
+        const bucket = (rows: { createdAt: Date }[]) => {
+          const m = new Map<string, number>();
+          for (const r of rows) {
+            const k = day.format(r.createdAt);
+            m.set(k, (m.get(k) ?? 0) + 1);
+          }
+          return [...m.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, count]) => ({ date, count }));
+        };
+        return {
+          today: day.format(now),
+          registrations: bucket(regs),
+          teams: bucket(teamsCreated),
+          registrationsThisWeek: regs.filter((r) => r.createdAt >= weekAgo).length,
+          teamsThisWeek: teamsCreated.filter((t) => t.createdAt >= weekAgo).length,
+        };
+      }),
+      card(() => setupChecklist(db, e)),
+      // Configuration at a glance for the Event Configuration landing page.
+      card(async () => {
+        const [rounds, tracks, problems, emptyTracks, guidebookVersions, questions] =
+          await Promise.all([
+            db.round.findMany({
+              where: { eventId: e.id },
+              orderBy: { order: 'asc' },
+              select: {
+                id: true,
+                name: true,
+                submissionDeadline: true,
+                judgingStatus: true,
+                rubric: { select: { state: true } },
+              },
+            }),
+            db.track.count({ where: { eventId: e.id } }),
+            db.problemStatement.count({ where: { eventId: e.id } }),
+            db.track.count({ where: { eventId: e.id, problems: { none: {} } } }),
+            db.guidebookVersion.count({ where: { eventId: e.id } }),
+            db.registrationFieldDef.count({ where: { eventId: e.id } }),
+          ]);
+        return {
+          rounds: rounds.map((r) => ({
+            id: r.id,
+            name: r.name,
+            submissionDeadline: r.submissionDeadline,
+            judgingStatus: r.judgingStatus,
+            rubric: r.rubric?.state ?? null,
+          })),
+          tracks,
+          problems,
+          emptyTracks,
+          guidebookPublished: guidebookVersions > 0,
+          registrationQuestions: questions,
+          applicationReview: e.applicationReview,
+          eventStatus: e.status,
+          registration: effectiveRegistration(e),
+        };
+      }),
+      // Outcomes for Reports & Records: results state per round, certificates and survey responses.
+      card(async () => {
+        const [rounds, certs, responses, auditEntries] = await Promise.all([
+          db.round.findMany({
+            where: { eventId: e.id },
+            orderBy: { order: 'asc' },
+            select: {
+              id: true,
+              name: true,
+              judgingStatus: true,
+              snapshots: {
+                where: { status: 'APPROVED' },
+                select: { publishedAt: true, unpublishedAt: true },
+              },
+            },
+          }),
+          db.certificate.groupBy({ by: ['status'], where: { eventId: e.id }, _count: true }),
+          db.feedbackResponse.count({ where: { form: { eventId: e.id } } }),
+          db.auditLog.count({ where: { eventId: e.id } }),
+        ]);
+        return {
+          results: rounds.map((r) => ({
+            roundId: r.id,
+            name: r.name,
+            state: r.snapshots.some((s) => s.publishedAt && !s.unpublishedAt)
+              ? 'PUBLISHED'
+              : r.snapshots.length
+                ? 'APPROVED'
+                : r.judgingStatus === 'CLOSED'
+                  ? 'AWAITING_APPROVAL'
+                  : 'NOT_READY',
+          })),
+          certificates: Object.fromEntries(certs.map((c) => [c.status, c._count])),
+          feedbackResponses: responses,
+          auditEntries,
+        };
+      }),
+    ]);
     res.json({
       generatedAt: now,
+      people,
+      trend,
+      setup,
+      config,
+      records,
       participants,
       teams,
       submissions,

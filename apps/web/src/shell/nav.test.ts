@@ -6,6 +6,8 @@ import {
   LEGACY_REDIRECTS,
   navFor,
   navItems,
+  segmentOf,
+  sidebarFor,
 } from './nav.js';
 
 /** Every destination each role must be able to reach from the menu (merged pages are in MERGED). */
@@ -104,22 +106,33 @@ describe('role navigation', () => {
     });
   }
 
-  it('admin uses the seven divisions of the navigation audit, dashboard first', () => {
+  it('admin uses the seven approved domains, Command Centre first', () => {
     expect(navFor('ADMIN').map((g) => g.label)).toEqual([
-      'Dashboard',
-      'Setup',
-      'Registrations & people',
-      'Administration',
-      'Event operations',
-      'Submissions & evaluation',
-      'Results & insights',
+      'Command Centre',
+      'Event Configuration',
+      'People & Teams',
+      'Judging & Evaluation',
+      'Live Operations',
+      'Communication',
+      'Reports & Records',
     ]);
-    const dashboard = navFor('ADMIN')[0]!;
-    expect(dashboard.items).toEqual([expect.objectContaining({ to: '', end: true })]);
+    const command = navFor('ADMIN')[0]!;
+    expect(command.items).toEqual([expect.objectContaining({ to: '', end: true })]);
   });
 
-  it('every admin division has a one-line description for the dashboard cards', () => {
+  it('every admin domain has a one-line description for its landing page', () => {
     for (const g of navFor('ADMIN')) expect(g.description?.length).toBeGreaterThan(10);
+  });
+
+  it('domain shortcuts only point at destinations the admin can already reach', () => {
+    const reachable = navItems(navFor('ADMIN')).map((i) => i.to);
+    for (const g of navFor('ADMIN'))
+      for (const sc of g.shortcuts ?? []) expect(reachable, sc.label).toContain(segmentOf(sc.to));
+  });
+
+  it('keeps problem statements with the critical configuration tasks', () => {
+    const config = navFor('ADMIN').find((g) => g.id === 'configuration')!;
+    expect(config.items.find((i) => i.to === 'structure')?.priority).toBe('critical');
   });
 
   it('orders judging work the way the event runs it', () => {
@@ -131,6 +144,15 @@ describe('role navigation', () => {
     expect(at('judging')).toBeLessThan(at('results'));
   });
 
+  it('the sidebar is never a tree: admins get seven domains, other roles at most eight pages', () => {
+    expect(sidebarFor('ADMIN')).toHaveLength(7);
+    for (const role of ['PARTICIPANT', 'JUDGE', 'STAFF'] as const) {
+      const entries = sidebarFor(role);
+      expect(entries.length).toBeGreaterThanOrEqual(4);
+      expect(entries.length).toBeLessThanOrEqual(8);
+    }
+  });
+
   it('every role lands on its own dashboard', () => {
     for (const role of ['ADMIN', 'PARTICIPANT', 'JUDGE', 'STAFF'] as const)
       expect(navItems(navFor(role))[0]).toMatchObject({ to: '', end: true });
@@ -138,11 +160,10 @@ describe('role navigation', () => {
 
   it('bottom bar entries come from the sidebar definitions', () => {
     for (const role of ['ADMIN', 'PARTICIPANT', 'JUDGE', 'STAFF'] as const) {
-      const groups = navFor(role);
-      const bar = bottomBarFor(role, groups);
-      expect(bar.length).toBeGreaterThanOrEqual(3);
-      expect(bar.length).toBeLessThanOrEqual(4);
-      for (const b of bar) expect(navItems(groups)).toContainEqual(b);
+      const bar = bottomBarFor(role);
+      expect(bar).toHaveLength(4);
+      const ids = sidebarFor(role).map((e) => e.id);
+      for (const b of bar) expect(ids).toContain(b.id);
     }
   });
 
@@ -166,13 +187,14 @@ describe('role navigation', () => {
 
   it('finds the group of the active section, including nested routes', () => {
     const admin = navFor('ADMIN');
-    expect(activeGroupId(admin, '')).toBe('dashboard');
-    expect(activeGroupId(admin, 'advancement')).toBe('evaluation');
+    expect(activeGroupId(admin, '')).toBe('command');
+    expect(activeGroupId(admin, 'advancement')).toBe('judging');
     expect(activeGroupId(admin, 'checkin')).toBe('operations');
-    expect(activeGroupId(admin, 'guidebook')).toBe('setup');
-    expect(activeGroupId(admin, 'certificates')).toBe('results');
-    expect(activeGroupId(admin, 'audit')).toBe('administration');
-    expect(activeGroupId(admin, 'participants')).toBe('registrations');
+    expect(activeGroupId(admin, 'guidebook')).toBe('configuration');
+    expect(activeGroupId(admin, 'certificates')).toBe('records');
+    expect(activeGroupId(admin, 'audit')).toBe('records');
+    expect(activeGroupId(admin, 'participants')).toBe('people');
+    expect(activeGroupId(admin, 'communication')).toBe('communication');
     expect(activeGroupId(admin, 'unknown')).toBeNull();
     expect(activeItem(admin, 'teams')?.to).toBe('teams');
     expect(activeGroupId(navFor('JUDGE'), 'judge')).toBe('judging');

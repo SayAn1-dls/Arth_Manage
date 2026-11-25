@@ -1,23 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router';
-import { ChevronRight, LayoutGrid, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router';
+import { ChevronRight, ListChecks, X } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { api, request } from '../lib/api.js';
-import { ROLE_LABEL } from '../lib/format.js';
-import { Alert, Badge, Spinner } from '../ui/index.js';
+import { Alert, Spinner } from '../ui/index.js';
 import { cn } from '../ui/cn.js';
+import { CommandPalette } from './CommandPalette.js';
 import { PanelSections, useContextSections } from './ContextPanel.js';
+import { BottomBar, NavDrawer } from './MobileNav.js';
 import {
   ALL_AREAS,
   activeGroupId,
   activeItem,
   areaPath,
-  bottomBarFor,
+  LEGACY_AREAS,
   LEGACY_REDIRECTS,
   navFor,
   type NavGroup,
 } from './nav.js';
+import { readSidebarCollapsed, saveSidebarCollapsed, Sidebar } from './Sidebar.js';
+import { TopBar } from './TopBar.js';
 
 const PANEL_KEY = 'ak.panel.v1';
 const readPanel = () => {
@@ -38,16 +41,19 @@ const LOADING: MyEvent = {
 } as unknown as MyEvent;
 
 /**
- * Event workspace (UX spec v1.0 §3): no permanent sidebar. A compact event bar carries the breadcrumbs,
- * the event switcher, a Dashboard shortcut and All areas; the page uses the full width, with a contextual
- * right panel when it has something useful to say. Small screens get a bottom bar and the panel as a
- * fold-out section.
+ * Event workspace (approved layout, Nov 2026): a persistent, collapsible sidebar with one entry per domain,
+ * a compact global header, the main workspace and a contextual right panel that the user can hide. Small
+ * screens get a bottom bar with More, a full navigation drawer and the panel as a fold-out section.
  */
 export function EventLayout() {
   const { eventId = '' } = useParams();
   const { pathname, search, hash } = useLocation();
-  const navigate = useNavigate();
   const [panelOpen, setPanelOpen] = useState(readPanel);
+  const [collapsed, setCollapsed] = useState(readSidebarCollapsed);
+  const [drawer, setDrawer] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState(false);
+
   useEffect(() => {
     const pulse = () =>
       void request('POST', `/events/${eventId}/workspace/activity`, {
@@ -59,7 +65,10 @@ export function EventLayout() {
   }, [eventId, pathname]);
   // Deep links such as setup#conclude: scroll to the section once the page has rendered it.
   useEffect(() => {
-    if (!hash) return;
+    if (!hash) {
+      window.scrollTo({ top: 0 });
+      return;
+    }
     let tries = 0;
     const timer = window.setInterval(() => {
       const el = document.getElementById(decodeURIComponent(hash.slice(1)));
@@ -70,6 +79,23 @@ export function EventLayout() {
     }, 100);
     return () => window.clearInterval(timer);
   }, [pathname, hash]);
+  // ⌘K / Ctrl+K opens search from anywhere in the event.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPalette(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  // Moving to another page closes the phone drawer and fold-out.
+  useEffect(() => {
+    setDrawer(false);
+    setMobilePanel(false);
+  }, [pathname]);
+
   const events = useQuery({ queryKey: ['my-events'], queryFn: api.myEvents });
   const mine = events.data?.find((e) => e.eventId === eventId);
   const sponsor = mine?.accessLevel === 'SPONSOR_VIEWER';
@@ -110,6 +136,7 @@ export function EventLayout() {
   if (sponsor && !pathname.endsWith('/report'))
     return <Navigate to={`/events/${eventId}/report`} replace />;
 
+  const base = `/events/${eventId}`;
   // Pages merged into a consolidated destination keep working: the old list path redirects with its query.
   const legacy = segments.length === 4 && LEGACY_REDIRECTS[mine.role]?.[section];
   if (legacy) {
@@ -117,23 +144,25 @@ export function EventLayout() {
     const params = new URLSearchParams(query);
     new URLSearchParams(search).forEach((v, k) => params.set(k, v));
     const qs = params.toString();
-    return <Navigate to={`/events/${eventId}/${path}${qs ? `?${qs}` : ''}`} replace />;
+    return <Navigate to={`${base}/${path}${qs ? `?${qs}` : ''}`} replace />;
   }
+  // Domain landing pages renamed with the seven-domain structure.
+  if (areaId && LEGACY_AREAS[areaId] && mine.role === 'ADMIN') {
+    const target = areaPath(LEGACY_AREAS[areaId]);
+    return <Navigate to={target ? `${base}/${target}` : base} replace />;
+  }
+  if (areaId === 'command') return <Navigate to={base} replace />;
 
-  const base = `/events/${eventId}`;
   const current = activeItem(groups, section);
   const group = groups.find((g) => g.id === groupId);
-  const isAreas = section === ALL_AREAS || section === 'area';
   // A screen outside the caller's role is not rendered at all; the API enforces this independently (PRD §8.1).
   const allowed =
     !section ||
     Boolean(current) ||
     (section === ALL_AREAS && !sponsor) ||
     (section === 'area' && mine.role === 'ADMIN' && !sponsor && Boolean(group));
-  const bottom = sponsor ? [] : bottomBarFor(mine.role, groups);
-  const others = (events.data ?? []).filter((e) => e.eventId !== eventId);
   const showPanel = allowed && sections.length > 0;
-  const panelCount = sections.reduce((n, s) => n + s.items.length, 0);
+  const panelCount = sections.reduce((n, s) => n + s.items.filter((i) => !i.action).length, 0);
   const togglePanel = () => {
     const next = !panelOpen;
     setPanelOpen(next);
@@ -143,12 +172,16 @@ export function EventLayout() {
       /* storage unavailable: the choice still applies for this visit */
     }
   };
+  const toggleSidebar = () => {
+    setCollapsed((c) => {
+      saveSidebarCollapsed(!c);
+      return !c;
+    });
+  };
 
-  // Breadcrumbs: Event › Division (or area) › Page › Details.
-  const crumbs: { label: string; to?: string }[] = [{ label: mine.name, to: base }];
-  if (section === ALL_AREAS) crumbs.push({ label: 'All areas' });
-  else if (section === 'area' && group) crumbs.push({ label: group.label });
-  else if (section && current) {
+  // Breadcrumbs on task pages only: Domain › Page › Details. Landing pages and dashboards have their own title.
+  const crumbs: { label: string; to?: string }[] = [];
+  if (section && section !== 'area' && section !== ALL_AREAS && current && !sponsor) {
     if (group && !group.flat)
       crumbs.push({
         label: group.label,
@@ -157,153 +190,137 @@ export function EventLayout() {
     const detail = segments.length > 4 && segments[4] !== '';
     crumbs.push({ label: current.label, to: detail ? `${base}/${current.to}` : undefined });
     if (detail) crumbs.push({ label: 'Details' });
-  } else if (!section) crumbs.push({ label: groups[0]?.items[0]?.label ?? 'Dashboard' });
-
-  const pill =
-    'inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong px-4 font-bold text-ink no-underline hover:bg-blush';
+  }
 
   return (
-    <div className={cn(bottom.length ? 'pb-24 lg:pb-12' : 'pb-12')}>
-      <div className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-workspace flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-8">
-          <nav aria-label="Breadcrumb" className="w-full min-w-0 xl:w-auto xl:flex-1">
-            <ol className="flex flex-wrap items-center gap-1">
-              {crumbs.map((c, i) => (
-                <li key={`${c.label}-${i}`} className="flex items-center gap-1">
-                  {i > 0 && <ChevronRight aria-hidden className="size-4 shrink-0 text-graphite" />}
-                  {c.to ? (
-                    <Link to={c.to} className={cn(i === 0 && 'font-bold text-ink')}>
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span aria-current="page" className="font-semibold text-ink">
-                      {c.label}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </nav>
-          <Badge>{sponsor ? 'Sponsor viewer' : ROLE_LABEL[mine.role]}</Badge>
-          {!sponsor && (
-            <div className="hidden items-center gap-2 lg:flex">
-              {section !== '' && (
-                <Link to={base} className={pill}>
-                  Dashboard
-                </Link>
+    <div className="flex min-h-dvh bg-paper">
+      <Sidebar
+        role={mine.role}
+        base={base}
+        section={section}
+        groupId={groupId}
+        collapsed={collapsed}
+        onToggle={toggleSidebar}
+        sponsor={sponsor}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          mine={mine}
+          events={events.data ?? []}
+          sponsor={sponsor}
+          onOpenSearch={() => setPalette(true)}
+          onOpenDrawer={() => setDrawer(true)}
+          panel={{ available: showPanel, open: panelOpen, toggle: togglePanel }}
+        />
+        <div className="flex min-w-0 flex-1">
+          <main
+            className={cn(
+              'min-w-0 flex-1 px-4 pt-5 sm:px-6 lg:px-8 lg:pt-7',
+              sponsor ? 'pb-12' : 'pb-28 lg:pb-12',
+            )}
+          >
+            <h1 className="sr-only">{mine.name}</h1>
+            <div className="mx-auto max-w-workspace">
+              {crumbs.length > 0 && (
+                <nav aria-label="Breadcrumb" className="mb-4">
+                  <ol className="flex flex-wrap items-center gap-1 text-sm">
+                    {crumbs.map((c, i) => (
+                      <li key={`${c.label}-${i}`} className="flex items-center gap-1">
+                        {i > 0 && (
+                          <ChevronRight aria-hidden className="size-4 shrink-0 text-graphite" />
+                        )}
+                        {c.to ? (
+                          <Link to={c.to} className="text-graphite">
+                            {c.label}
+                          </Link>
+                        ) : (
+                          <span aria-current="page" className="font-semibold text-ink">
+                            {c.label}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </nav>
               )}
-              <Link to={`${base}/${ALL_AREAS}`} className={pill}>
-                <LayoutGrid aria-hidden className="size-4" /> All areas
-              </Link>
               {showPanel && (
-                <button
-                  type="button"
-                  aria-pressed={panelOpen}
-                  onClick={togglePanel}
-                  className={pill}
-                >
-                  {panelOpen ? (
-                    <PanelRightClose aria-hidden className="size-4" />
-                  ) : (
-                    <PanelRightOpen aria-hidden className="size-4" />
+                <div className="mb-5 xl:hidden">
+                  <button
+                    type="button"
+                    aria-expanded={mobilePanel}
+                    aria-controls="context-foldout"
+                    onClick={() => setMobilePanel((o) => !o)}
+                    className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-card border border-line bg-white px-4 text-left font-semibold text-ink"
+                  >
+                    <span className="flex items-center gap-2">
+                      <ListChecks aria-hidden className="size-5 stroke-ember" />
+                      What matters here{panelCount > 0 ? ` (${panelCount})` : ''}
+                    </span>
+                    {mobilePanel ? (
+                      <X aria-hidden className="size-4" />
+                    ) : (
+                      <ChevronRight aria-hidden className="size-4 rotate-90" />
+                    )}
+                  </button>
+                  {mobilePanel && (
+                    <div
+                      id="context-foldout"
+                      className="mt-2 rounded-card border border-line bg-white p-4"
+                    >
+                      <PanelSections sections={sections} />
+                    </div>
                   )}
-                  {panelOpen ? 'Hide panel' : 'Show panel'}
-                </button>
+                </div>
+              )}
+              {allowed ? (
+                <Outlet context={mine} />
+              ) : (
+                <Alert tone="info" title="This page isn't available">
+                  It may have moved, or it isn't part of your role in this event.{' '}
+                  <Link to={base}>Go to the event home</Link>
+                </Alert>
               )}
             </div>
-          )}
-          {others.length > 0 && (
-            <select
-              aria-label="Switch event"
-              className="min-h-11 max-w-56 rounded-card border border-line-strong bg-white px-3 text-ink"
-              value=""
-              onChange={(e) => e.target.value && navigate(`/events/${e.target.value}`)}
+          </main>
+          {showPanel && panelOpen && (
+            <aside
+              aria-label="What matters here"
+              className="sticky top-16 hidden h-[calc(100dvh-4rem)] w-80 shrink-0 overflow-y-auto border-l border-line bg-white/60 px-5 py-6 xl:block"
             >
-              <option value="">Switch event…</option>
-              {others.map((e) => (
-                <option key={e.eventId} value={e.eventId}>
-                  {e.name} ({ROLE_LABEL[e.role]})
-                </option>
-              ))}
-            </select>
+              <div className="mb-4 flex items-center justify-between">
+                <p className="font-display text-lg font-bold text-ink">What matters here</p>
+                <button
+                  type="button"
+                  onClick={togglePanel}
+                  aria-label="Hide side panel"
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-pill text-graphite hover:bg-blush"
+                >
+                  <X aria-hidden className="size-4" />
+                </button>
+              </div>
+              <PanelSections sections={sections} />
+            </aside>
           )}
         </div>
       </div>
-
-      <div
-        className={cn(
-          'mx-auto grid max-w-workspace gap-6 px-4 py-6 sm:px-8',
-          showPanel && panelOpen && 'lg:grid-cols-[minmax(0,1fr)_minmax(17rem,26%)]',
-        )}
-      >
-        <main className="min-w-0">
-          <h1 className="sr-only">{mine.name}</h1>
-          {showPanel && (
-            <details className="mb-6 rounded-card border border-line bg-white p-4 lg:hidden">
-              <summary className="min-h-11 cursor-pointer content-center font-bold text-ink">
-                What matters here ({panelCount})
-              </summary>
-              <div className="mt-3">
-                <PanelSections sections={sections} />
-              </div>
-            </details>
-          )}
-          {allowed ? (
-            <Outlet context={mine} />
-          ) : (
-            <Alert tone="info" title="This page isn't available">
-              It may have moved, or it isn't part of your role in this event.{' '}
-              <Link to={base}>Go to the event home</Link>
-            </Alert>
-          )}
-        </main>
-        {showPanel && panelOpen && (
-          <aside
-            aria-label="What matters here"
-            className="hidden self-start rounded-card border border-line bg-white p-5 lg:sticky lg:top-4 lg:block"
-          >
-            <PanelSections sections={sections} />
-          </aside>
-        )}
-      </div>
-
-      {bottom.length > 0 && (
-        <nav
-          aria-label="Quick links"
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-paper lg:hidden"
-        >
-          <ul className="mx-auto flex max-w-workspace">
-            {bottom.map((i) => (
-              <li key={i.to} className="min-w-0 flex-1">
-                <NavLink
-                  to={i.to === '' ? base : `${base}/${i.to}`}
-                  end={i.end}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex min-h-14 items-center justify-center border-t-4 px-1 text-center text-sm leading-tight text-ink no-underline',
-                      isActive ? 'border-ember font-bold' : 'border-transparent font-medium',
-                    )
-                  }
-                >
-                  {i.to === '' ? 'Home' : i.label}
-                </NavLink>
-              </li>
-            ))}
-            <li className="min-w-0 flex-1">
-              <Link
-                to={`${base}/${ALL_AREAS}`}
-                aria-current={isAreas ? 'page' : undefined}
-                className={cn(
-                  'flex min-h-14 flex-col items-center justify-center gap-0.5 border-t-4 text-sm text-ink no-underline',
-                  isAreas ? 'border-ember font-bold' : 'border-transparent font-medium',
-                )}
-              >
-                <LayoutGrid aria-hidden className="size-4" />
-                All areas
-              </Link>
-            </li>
-          </ul>
-        </nav>
+      {!sponsor && (
+        <>
+          <BottomBar
+            role={mine.role}
+            base={base}
+            section={section}
+            groupId={groupId}
+            onMore={() => setDrawer(true)}
+            drawerOpen={drawer}
+          />
+          <NavDrawer role={mine.role} base={base} open={drawer} onClose={() => setDrawer(false)} />
+          <CommandPalette
+            mine={mine}
+            events={events.data ?? []}
+            open={palette}
+            onClose={() => setPalette(false)}
+          />
+        </>
       )}
     </div>
   );

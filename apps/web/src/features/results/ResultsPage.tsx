@@ -13,6 +13,7 @@ import {
   type ReviewResult,
 } from '../../lib/ops.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -51,7 +52,10 @@ function PublishedResults({ mine }: { mine: MyEvent }) {
     );
   return (
     <div className="flex flex-col gap-4">
-      <h2>Results</h2>
+      <PageHeader
+        title="Results"
+        description="Published results for each round, shown the way the organisers chose."
+      />
       {q.data?.rounds.map((r) => (
         <PublishedCard key={r.roundId} r={r} tz={mine.timeZone} visibility={q.data!.visibility} />
       ))}
@@ -127,20 +131,23 @@ function AdminResults({ mine }: { mine: MyEvent }) {
   const rid = roundId ?? rounds.data?.[0]?.id ?? '';
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Results</h2>
-        {(rounds.data?.length ?? 0) > 1 && (
-          <div className="w-60">
-            <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
-              {rounds.data?.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Results"
+        description="Review ranks and ties, then approve and publish results."
+        actions={
+          (rounds.data?.length ?? 0) > 1 && (
+            <div className="w-60">
+              <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
+                {rounds.data?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )
+        }
+      />
       <ReviewRound key={rid} mine={mine} roundId={rid} />
     </div>
   );

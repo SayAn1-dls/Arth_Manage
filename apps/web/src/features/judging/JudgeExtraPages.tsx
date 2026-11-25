@@ -4,7 +4,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { judgeScoreExact, validateScores, type MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { judgingApi, type Workspace, type RubricCriterionDto } from '../../lib/judging.js';
-import { Alert, Button, Input, Markdown, Spinner, Textarea, Badge } from '../../ui/index.js';
+import {
+  PageHeader,
+  Alert,
+  Button,
+  Input,
+  Markdown,
+  Spinner,
+  Textarea,
+  Badge,
+} from '../../ui/index.js';
 import { JudgeLinks, SimplePanel, GlossaryText, type Briefing } from './JudgeTools.js';
 const control = 'block w-full rounded-lg border border-line-strong bg-white px-3 py-2';
 export function JudgeBriefingPage() {
@@ -22,7 +31,14 @@ export function JudgeBriefingPage() {
   const { briefing, glossary, tracks } = q.data;
   return (
     <div className="space-y-5">
-      <h2>Judge briefing · pinned</h2>
+      <PageHeader
+        title={mine.role === 'ADMIN' ? 'Judge briefing & glossary' : 'Rubric & briefing'}
+        description={
+          mine.role === 'ADMIN'
+            ? 'What judges read before scoring, and terms explained in context.'
+            : 'How the rubric works, examples and who to contact.'
+        }
+      />
       {mine.role === 'JUDGE' && <JudgeLinks eventId={mine.eventId} />}
       {error && <Alert tone="error" title={error} />}{' '}
       {saved && <Alert tone="success" title="Briefing saved" />}
@@ -233,12 +249,11 @@ export function JudgeComparePage() {
     b = right || teams[1]?.teamId || '';
   return (
     <div className="space-y-5">
-      <h2>Compare assigned teams</h2>
+      <PageHeader
+        title="Compare assigned teams"
+        description="Read-only comparison of source submissions and your own evaluations. Other judges’ scores are never shown."
+      />
       <JudgeLinks eventId={mine.eventId} />
-      <p>
-        Read-only comparison of source submissions and your own evaluations. Other judges’ scores
-        are never shown.
-      </p>
       <div className="grid gap-5 xl:grid-cols-2">
         {[
           { side: 'Left', value: a, set: setLeft },

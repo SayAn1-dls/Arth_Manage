@@ -7,6 +7,7 @@ import { eventApi, type Announcement } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { useListState } from '../../lib/useListState.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -64,13 +65,10 @@ export function CommunicationPage() {
   const mine = useOutletContext<MyEvent>();
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2>Communication</h2>
-        <p className="mt-1">
-          Post announcements and send targeted messages from one place. Participants read both on
-          their Updates page.
-        </p>
-      </div>
+      <PageHeader
+        title="Messages & announcements"
+        description="Post announcements and send targeted messages from one place. Participants read both on their Updates page."
+      />
       <Composer mine={mine} />
       <History mine={mine} />
     </div>
@@ -166,7 +164,7 @@ function Composer({ mine }: { mine: MyEvent }) {
     : ROLE_AUDIENCE[audience];
 
   return (
-    <Card>
+    <Card id="compose" className="scroll-mt-20">
       <h3>New message</h3>
       {result && (
         <Alert tone="success" title="Done" className="mt-3">
@@ -598,14 +596,16 @@ export function UpdatesPage() {
   ].sort((x, y) => y.at.localeCompare(x.at));
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2>Updates</h2>
-        <p className="mt-1">
-          Announcements from the organisers and messages sent to you, newest first.{' '}
-          <Link to={`/events/${mine.eventId}/support`}>Ask the organisers</Link> if something is
-          unclear.
-        </p>
-      </div>
+      <PageHeader
+        title="Announcements"
+        description={
+          <>
+            Announcements from the organisers and messages sent to you, newest first.{' '}
+            <Link to={`/events/${mine.eventId}/support`}>Ask the organisers</Link> if something is
+            unclear.
+          </>
+        }
+      />
       {(announcements.isPending || inbox.isPending) && <Spinner label="Loading updates" />}
       {(announcements.isError || inbox.isError) && (
         <Alert tone="error" title="We couldn't load every update">

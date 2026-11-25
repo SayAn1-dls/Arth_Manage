@@ -216,6 +216,17 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
     to: 'applications',
     tone: 'warning',
   });
+  // Tracks exist but some have no problem statement: teams in that track have nothing to choose from.
+  const emptyTracks = tracks
+    ? await db.track.count({ where: { eventId: e.id, problems: { none: {} } } })
+    : 0;
+  add({
+    key: 'empty-tracks',
+    label: `${plural(emptyTracks, 'track')} without a problem statement`,
+    count: emptyTracks,
+    to: 'structure',
+    tone: e.status === 'DRAFT' ? 'info' : 'warning',
+  });
   for (const j of judging) {
     add({
       key: `short-${j.round.id}`,
@@ -461,4 +472,116 @@ export async function eventLifecycle(db: Db, e: Event, now = new Date()): Promis
   };
 
   return { stage, stages: STAGES, nextSteps: steps[stage], attention };
+}
+
+export interface SetupItem {
+  key: string;
+  label: string;
+  done: boolean;
+  to: string;
+  optional?: boolean;
+  /** Why it matters, shown under the label. */
+  hint?: string;
+}
+
+/**
+ * The event's setup checklist, independent of the current stage, so "Setup complete" on the dashboard is
+ * a real percentage: required items done over required items. Optional items never lower the figure.
+ */
+export async function setupChecklist(
+  db: Db,
+  e: Event,
+): Promise<{
+  items: SetupItem[];
+  done: number;
+  total: number;
+  percent: number;
+}> {
+  const [rounds, tracks, problems, emptyTracks, guidebook, judges, judgeInvites, staff, questions] =
+    await Promise.all([
+      db.round.findMany({
+        where: { eventId: e.id },
+        orderBy: { order: 'asc' },
+        select: { name: true, submissionDeadline: true, rubric: { select: { state: true } } },
+      }),
+      db.track.count({ where: { eventId: e.id } }),
+      db.problemStatement.count({ where: { eventId: e.id } }),
+      db.track.count({ where: { eventId: e.id, problems: { none: {} } } }),
+      db.guidebookVersion.count({ where: { eventId: e.id } }),
+      db.eventMembership.count({ where: { eventId: e.id, role: 'JUDGE', status: 'ACTIVE' } }),
+      db.invitation.count({ where: { eventId: e.id, role: 'JUDGE', status: 'PENDING' } }),
+      db.eventMembership.count({ where: { eventId: e.id, role: 'STAFF', status: 'ACTIVE' } }),
+      db.registrationFieldDef.count({ where: { eventId: e.id } }),
+    ]);
+  const first = rounds[0];
+  const items: SetupItem[] = [
+    {
+      key: 'rounds',
+      label: 'Add a round with a submission deadline',
+      done: rounds.some((r) => r.submissionDeadline),
+      to: 'rounds',
+      hint: 'Teams cannot submit until a round has a deadline.',
+    },
+    {
+      key: 'problems',
+      label:
+        emptyTracks > 0
+          ? `Add problem statements to ${plural(emptyTracks, 'track')}`
+          : 'Add problem statements',
+      done: problems > 0 && emptyTracks === 0,
+      to: 'structure',
+      hint: tracks
+        ? 'Every track needs at least one problem statement for teams to choose.'
+        : 'What teams will work on.',
+    },
+    {
+      key: 'registration',
+      label: 'Set the registration window',
+      done: Boolean(e.registrationClosesAt) || e.registrationStatus !== 'NOT_OPEN',
+      to: 'setup#publishing',
+      hint: 'When registration opens and closes.',
+    },
+    {
+      key: 'guidebook',
+      label: 'Publish the guidebook',
+      done: guidebook > 0,
+      to: 'guidebook',
+      hint: 'Rules and schedule participants read before the event.',
+    },
+    {
+      key: 'judges',
+      label: 'Invite judges',
+      done: judges + judgeInvites > 0,
+      to: 'people',
+    },
+    {
+      key: 'rubric',
+      label: first ? `Activate the ${first.name} rubric` : 'Activate a rubric',
+      done: Boolean(first?.rubric && first.rubric.state !== 'DRAFT'),
+      to: 'rubric',
+      hint: 'Judges score against it; it can be finished before judging opens.',
+    },
+    {
+      key: 'publish',
+      label: 'Publish the event',
+      done: e.status !== 'DRAFT',
+      to: 'setup',
+    },
+    {
+      key: 'questions',
+      label: 'Add custom registration questions',
+      done: questions > 0,
+      to: 'setup#registration-questions',
+      optional: true,
+    },
+    { key: 'staff', label: 'Invite helping staff', done: staff > 0, to: 'people', optional: true },
+  ];
+  const required = items.filter((i) => !i.optional);
+  const done = required.filter((i) => i.done).length;
+  return {
+    items,
+    done,
+    total: required.length,
+    percent: Math.round((done / required.length) * 100),
+  };
 }

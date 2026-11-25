@@ -176,8 +176,55 @@ export interface DashboardLifecycle {
     tone: 'error' | 'warning' | 'info';
   }[];
 }
+export interface SetupItem {
+  key: string;
+  label: string;
+  done: boolean;
+  to: string;
+  optional?: boolean;
+  hint?: string;
+}
+export type ResultState = 'PUBLISHED' | 'APPROVED' | 'AWAITING_APPROVAL' | 'NOT_READY';
 export interface Dashboard {
   generatedAt: string;
+  people: Card<{
+    judges: number;
+    judgeInvites: number;
+    staff: number;
+    admins: number;
+    judgesThisWeek: number;
+  }>;
+  trend: Card<{
+    today: string;
+    registrations: { date: string; count: number }[];
+    teams: { date: string; count: number }[];
+    registrationsThisWeek: number;
+    teamsThisWeek: number;
+  }>;
+  setup: Card<{ items: SetupItem[]; done: number; total: number; percent: number }>;
+  config: Card<{
+    rounds: {
+      id: string;
+      name: string;
+      submissionDeadline: string | null;
+      judgingStatus: string;
+      rubric: string | null;
+    }[];
+    tracks: number;
+    problems: number;
+    emptyTracks: number;
+    guidebookPublished: boolean;
+    registrationQuestions: number;
+    applicationReview: boolean;
+    eventStatus: string;
+    registration: string;
+  }>;
+  records: Card<{
+    results: { roundId: string; name: string; state: ResultState }[];
+    certificates: Record<string, number>;
+    feedbackResponses: number;
+    auditEntries: number;
+  }>;
   participants: Card<{
     registered: number;
     inTeam: number;

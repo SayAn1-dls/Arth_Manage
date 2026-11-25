@@ -283,6 +283,17 @@ describe('operational dashboard (FR-043)', () => {
     expect(d.issues.urgent).toHaveLength(1);
     expect(d.deadlines.length).toBeGreaterThan(0);
     expect(d.integrations).toMatchObject({ status: 'NOT_CONNECTED', driveEnabled: false });
+    // Command Centre: registration trend from stored rows, setup completion over required steps only
+    const regDays = d.trend.registrations as { date: string; count: number }[];
+    expect(regDays.reduce((n, x) => n + x.count, 0)).toBe(5);
+    expect(d.trend.registrationsThisWeek).toBe(5);
+    expect(d.trend.teams.reduce((n: number, x: { count: number }) => n + x.count, 0)).toBe(2);
+    expect(d.people).toMatchObject({ judges: 0, staff: 1 });
+    expect(d.setup.total).toBe(
+      d.setup.items.filter((i: { optional?: boolean }) => !i.optional).length,
+    );
+    expect(d.setup.percent).toBe(Math.round((d.setup.done / d.setup.total) * 100));
+    expect(d.records.results.length).toBe(d.config.rounds.length);
     // the same numbers on the linked lists
     expect((await w.admin.get(`${w.base}/participants?team=none`)).body.total).toBe(1);
     expect((await w.admin.get(`${w.base}/teams`)).body.total).toBe(2);

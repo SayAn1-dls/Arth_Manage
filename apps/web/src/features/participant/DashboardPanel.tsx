@@ -1,5 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import { ArrowRight, CalendarClock } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { engageApi } from '../../lib/engage.js';
@@ -9,6 +10,7 @@ import { opsApi } from '../../lib/ops.js';
 import { participantApi, type SubmissionView } from '../../lib/participant.js';
 import { Alert, Badge, Card, Countdown, Spinner } from '../../ui/index.js';
 import { APPLICATION_TEXT, DeadlineLines } from './Deadline.js';
+import { HomeGreeting } from '../ops/EventHeader.js';
 
 const tone = {
   NOT_STARTED: 'info',
@@ -169,39 +171,76 @@ export function ParticipantPanel({ mine }: { mine: MyEvent }) {
     .sort((x, y) => y.at.localeCompare(x.at))
     .slice(0, 3);
 
+  const upcoming = (rounds.data ?? [])
+    .filter((r) => r.submissionDeadline && +new Date(r.submissionDeadline) > now)
+    .slice(0, 2);
+
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h2>My event</h2>
-        {e && (
-          <p className="mt-1">
-            {formatDateTime(e.startsAt, e.timeZone)} to {formatDateTime(e.endsAt, e.timeZone)}
-            {e.venue ? ` · ${e.venue}` : ''}
-          </p>
-        )}
-      </div>
+      <HomeGreeting
+        mine={mine}
+        event={e}
+        subtitle={
+          t
+            ? `You’re registered with team ${t.name}. Here’s what to do next.`
+            : 'You’re registered. Here’s what to do next.'
+        }
+      />
 
       <section
         aria-labelledby="next-h"
-        className="rounded-card border-2 border-ink bg-white p-5 sm:p-6"
+        className="flex flex-wrap items-center gap-4 rounded-[14px] bg-blush p-5 sm:p-6"
       >
-        <p className="text-sm font-semibold">Your next step</p>
-        <h3 id="next-h" className="mt-1 text-xl">
-          {next.title}
-        </h3>
-        <p className="mt-1">{next.text}</p>
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ember">
+          <ArrowRight aria-hidden className="size-6 stroke-ink" />
+        </span>
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-xs font-bold tracking-eyebrow text-graphite uppercase">
+            Your next step
+          </p>
+          <h3 id="next-h" className="mt-0.5 text-xl">
+            {next.title}
+          </h3>
+          <p className="mt-0.5">{next.text}</p>
+        </div>
         {next.to && (
           <Link
             to={next.to}
-            className="mt-3 inline-flex min-h-11 items-center rounded-pill bg-ember px-5 font-bold text-ink no-underline"
+            className="inline-flex min-h-12 items-center gap-2 rounded-pill bg-ember px-6 font-bold text-ink no-underline hover:brightness-95"
           >
-            {next.action}
+            {next.action} <ArrowRight aria-hidden className="size-4" />
           </Link>
         )}
       </section>
 
+      {upcoming.length > 0 && (
+        <ul aria-label="Upcoming deadlines" className="grid gap-4 sm:grid-cols-2">
+          {upcoming.map((r) => (
+            <li key={r.id}>
+              <Link
+                to={`${base}/submission/${r.id}`}
+                className="flex h-full items-center gap-4 rounded-[14px] border border-line/60 bg-white p-5 text-ink no-underline shadow-card hover:border-ember/60"
+              >
+                <CalendarClock aria-hidden className="size-9 shrink-0 stroke-ember" />
+                <span className="min-w-0">
+                  <span className="block text-sm">{r.name} deadline</span>
+                  <span className="block font-display text-xl font-extrabold">
+                    {formatDateTime(r.submissionDeadline!, mine.timeZone)}
+                  </span>
+                  <span className="block text-sm">
+                    <Countdown until={r.submissionDeadline!} className="font-semibold text-ink" />{' '}
+                    left
+                    {r.graceMinutes ? ` · ${r.graceMinutes} min grace` : ''}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="rounded-[14px] border border-line/60">
           <h3>Team</h3>
           {t ? (
             <>
@@ -233,7 +272,7 @@ export function ParticipantPanel({ mine }: { mine: MyEvent }) {
           )}
         </Card>
 
-        <Card>
+        <Card className="rounded-[14px] border border-line/60">
           <h3>Submissions</h3>
           {(rounds.data?.length ?? 0) === 0 && (
             <p className="mt-2">No rounds have been announced yet.</p>
@@ -277,15 +316,15 @@ export function ParticipantPanel({ mine }: { mine: MyEvent }) {
           </ul>
         </Card>
 
-        <Card>
+        <Card className="rounded-[14px] border border-line/60">
           <div className="flex items-center justify-between gap-2">
-            <h3>Updates</h3>
+            <h3>Announcements</h3>
             <Link to={`${base}/updates`} className="text-sm">
-              All updates
+              All announcements
             </Link>
           </div>
           {updates.length === 0 ? (
-            <p className="mt-2">No updates yet.</p>
+            <p className="mt-2">No announcements yet.</p>
           ) : (
             <ul className="mt-2 flex flex-col gap-2">
               {updates.map((u) => (
@@ -299,7 +338,7 @@ export function ParticipantPanel({ mine }: { mine: MyEvent }) {
         </Card>
 
         {(published.length > 0 || certs.length > 0) && (
-          <Card>
+          <Card className="rounded-[14px] border border-line/60">
             <h3>Results &amp; certificates</h3>
             {published.map((p) => (
               <p key={p.roundId} className="mt-2">

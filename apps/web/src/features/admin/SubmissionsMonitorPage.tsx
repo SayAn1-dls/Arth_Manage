@@ -8,6 +8,7 @@ import { eventApi, useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import type { SubmissionView } from '../../lib/participant.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -80,7 +81,10 @@ export function SubmissionsMonitorPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2>Submissions</h2>
+      <PageHeader
+        title="Submissions"
+        description="Who has submitted for each round, late work, extensions and files."
+      />
       <Card>
         <form
           className="grid gap-3 sm:grid-cols-3"

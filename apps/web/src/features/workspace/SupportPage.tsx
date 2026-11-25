@@ -6,6 +6,7 @@ import { ApiError, request } from '../../lib/api.js';
 import { formatDateTime, ROLE_LABEL } from '../../lib/format.js';
 import { useListState } from '../../lib/useListState.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -176,13 +177,15 @@ function SupportInbox({ mine }: { mine: MyEvent }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2>Support &amp; requests</h2>
-        <p className="mt-1">
-          Questions and exception requests from participants, judges and staff, in one inbox.
-          {mine.role === 'STAFF' && ' Only Core Admins can approve or deny exception requests.'}
-        </p>
-      </div>
+      <PageHeader
+        title={mine.role === 'STAFF' ? 'Helpdesk' : 'Helpdesk & exception requests'}
+        description={
+          <>
+            Questions and exception requests from participants, judges and staff, in one inbox.
+            {mine.role === 'STAFF' && ' Only Core Admins can approve or deny exception requests.'}
+          </>
+        }
+      />
       <div role="tablist" aria-label="Request type" className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
@@ -651,14 +654,14 @@ function MyRequests({ mine }: { mine: MyEvent }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h2>{participant ? 'Help & requests' : 'Ask the organisers'}</h2>
-        <p className="mt-1">
-          {participant
+      <PageHeader
+        title={participant ? 'Help & requests' : 'Ask the organisers'}
+        description={
+          participant
             ? 'Ask a question, or request more time, a submission unlock or a teammate change.'
-            : 'Questions go privately to the event organisers.'}
-        </p>
-      </div>
+            : 'Questions go privately to the event organisers.'
+        }
+      />
       <Card>
         <form
           className="flex flex-col gap-3"

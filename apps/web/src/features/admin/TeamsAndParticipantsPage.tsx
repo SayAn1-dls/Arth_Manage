@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useOutletContext } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
+import { Check, Copy, Download, UserPlus } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { useListState } from '../../lib/useListState.js';
-import { Alert, Button, Card, Input } from '../../ui/index.js';
+import { Alert, Button, Card, Input, PageHeader } from '../../ui/index.js';
+import { useEvent } from '../../lib/events.js';
 import { cn } from '../../ui/cn.js';
 import { ParticipantsView } from './ParticipantsPage.js';
 import { TeamsView } from './TeamsPage.js';
@@ -25,6 +26,7 @@ export function TeamsAndParticipantsPage() {
   const q = list.get('q');
   const [draft, setDraft] = useState(q);
   const other: View = view === 'teams' ? 'participants' : 'teams';
+  const adding = list.get('add') === '1';
 
   const count = (path: string, extra: Record<string, string>) =>
     request<{ total: number }>(
@@ -56,15 +58,29 @@ export function TeamsAndParticipantsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Teams &amp; participants</h2>
-        <a
-          href={`/api/v1/events/${mine.eventId}/exports/${view}.csv`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Export {view} CSV
-        </a>
-      </div>
+      <PageHeader
+        title="Teams & participants"
+        description="Find any team or participant, fix records and manage membership."
+        actions={
+          <>
+            <Button
+              variant={adding ? 'secondary' : 'primary'}
+              icon={<UserPlus aria-hidden className="size-4" />}
+              onClick={() => list.set({ add: adding ? null : '1' })}
+              aria-expanded={adding}
+            >
+              Add participants
+            </Button>
+            <a
+              href={`/api/v1/events/${mine.eventId}/exports/${view}.csv`}
+              className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
+            >
+              <Download aria-hidden className="size-4" /> Export {view} CSV
+            </a>
+          </>
+        }
+      />
+      {adding && <AddParticipants eventId={mine.eventId} onClose={() => list.set({ add: null })} />}
 
       <Card>
         <form
@@ -140,5 +156,77 @@ export function TeamsAndParticipantsPage() {
         {view === 'teams' ? <TeamsView /> : <ParticipantsView />}
       </div>
     </div>
+  );
+}
+
+const REG_STATE: Record<string, string> = {
+  OPEN: 'Registration is open',
+  CLOSED: 'Registration is closed',
+  NOT_OPEN: 'Registration is not open yet',
+};
+
+/**
+ * Adding participants: accounts are personal (each person verifies their own email and accepts the
+ * declarations), so organisers share the registration link rather than creating accounts for others.
+ * Teams then form with invite codes, and organisers can fix membership from a team's page.
+ */
+function AddParticipants({ eventId, onClose }: { eventId: string; onClose: () => void }) {
+  const event = useEvent(eventId);
+  const [copied, setCopied] = useState(false);
+  const e = event.data;
+  if (!e) return null;
+  const link = `${window.location.origin}/e/${e.slug}/register`;
+  const published = e.status === 'PUBLISHED';
+  return (
+    <Card>
+      <div className="flex flex-col gap-3">
+        <h3 className="text-xl">Add participants</h3>
+        <p className="max-w-measure">
+          Participants register themselves with the link below: each person verifies their own email
+          and accepts the event’s declarations. They then create a team or join one with its invite
+          code.
+        </p>
+        <p className="font-semibold text-ink">
+          {published
+            ? (REG_STATE[e.registrationStatus] ?? '')
+            : 'The event is not published yet, so the link will not work until you publish it.'}
+          {' · '}
+          <Link to={`/events/${eventId}/setup#publishing`}>Registration settings</Link>
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <code className="min-w-0 flex-1 truncate rounded-card border border-line bg-paper px-3 py-2.5 text-sm text-ink">
+            {link}
+          </code>
+          <div className="flex gap-2">
+            <Button
+              icon={
+                copied ? (
+                  <Check aria-hidden className="size-4" />
+                ) : (
+                  <Copy aria-hidden className="size-4" />
+                )
+              }
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 2500);
+                } catch {
+                  /* clipboard blocked: the link stays visible to copy by hand */
+                }
+              }}
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </Button>
+            <Button variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+        <p role="status" className="sr-only">
+          {copied ? 'Registration link copied' : ''}
+        </p>
+      </div>
+    </Card>
   );
 }
