@@ -5,6 +5,7 @@ import type { MyEvent } from '@arthakram/shared';
 import { request } from '../../lib/api.js';
 import { formatDateTime } from '../../lib/format.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -102,15 +103,18 @@ export function PeoplePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2>People</h2>
-      <p>
-        Participants are managed on Teams &amp; participants. Here you invite the organising team,
-        judges, helping staff and sponsor viewers. Each person holds one role per event. A sponsor
-        viewer only ever sees the aggregate impact report, never participants' details.
-        {q.data &&
-          !q.data.viewerIsOwner &&
-          ' Only the event owner can invite co-admins, staff leads and sponsor viewers.'}
-      </p>
+      <PageHeader
+        title="Organising team, judges & staff"
+        description="Invite co-admins, judges, helping staff and sponsor viewers. Participants are managed on Teams & participants."
+      >
+        <p className="mt-2 max-w-measure">
+          Each person holds one role per event. A sponsor viewer only ever sees the aggregate impact
+          report, never participants' details.
+          {q.data &&
+            !q.data.viewerIsOwner &&
+            ' Only the event owner can invite co-admins, staff leads and sponsor viewers.'}
+        </p>
+      </PageHeader>
       <Card footerLabel="Invite someone">
         <form
           className="grid gap-3 sm:grid-cols-[1fr_16rem_auto] sm:items-end"

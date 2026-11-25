@@ -5,7 +5,16 @@ import { Download } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { engageApi } from '../../lib/engage.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
-import { Alert, Badge, Button, Card, EmptyState, Input, Spinner } from '../../ui/index.js';
+import {
+  PageHeader,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Spinner,
+} from '../../ui/index.js';
 
 /** The signed-in person's own released certificates for this event (PRD FR-235). */
 export function MyCertificatesPage() {
@@ -32,7 +41,10 @@ export function MyCertificatesPage() {
   });
   return (
     <div className="flex flex-col gap-6">
-      <h2>Certificates</h2>
+      <PageHeader
+        title="Certificates"
+        description="Download your certificates once the organisers release them."
+      />
       {q.isPending && <Spinner label="Loading certificates" />}
       {q.isError && <Alert tone="error" title="We couldn't load your certificates" />}
       {notice && <Alert tone="success" title={notice} />}

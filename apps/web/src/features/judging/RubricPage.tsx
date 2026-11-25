@@ -6,6 +6,7 @@ import { MAX_CRITERIA, weightsTotal, type MyEvent } from '@arthakram/shared';
 import { eventApi, useEvent } from '../../lib/events.js';
 import { judgingApi, type RubricDto } from '../../lib/judging.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -42,20 +43,23 @@ export function RubricPage() {
   const rid = roundId ?? rounds.data?.[0]?.id ?? '';
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Rubric</h2>
-        {(rounds.data?.length ?? 0) > 1 && (
-          <div className="w-60">
-            <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
-              {rounds.data?.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Rubrics"
+        description="The criteria and weights judges score against, for each round."
+        actions={
+          (rounds.data?.length ?? 0) > 1 && (
+            <div className="w-60">
+              <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
+                {rounds.data?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )
+        }
+      />
       <RubricEditor key={rid} eventId={mine.eventId} roundId={rid} />
     </div>
   );

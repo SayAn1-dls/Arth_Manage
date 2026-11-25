@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyEvent } from '@arthakram/shared';
 import { participantApi, type MyRegistration } from '../../lib/participant.js';
 import {
+  PageHeader,
   Alert,
   Button,
   Card,
@@ -69,7 +70,10 @@ function ProfileForm({ data, eventId }: { data: MyRegistration; eventId: string 
 
   return (
     <div className="flex flex-col gap-4">
-      <h2>My details</h2>
+      <PageHeader
+        title="My details"
+        description="Your registration details and the name printed on your certificate."
+      />
       {mode === 'phone_and_certificate_name' && (
         <Alert tone="info" title="Registration is closed">
           You can still update your phone number and the name on your certificate. Contact the

@@ -6,7 +6,16 @@ import type { MyEvent } from '@arthakram/shared';
 import { formatDateTime } from '../../lib/format.js';
 import { integrationsApi, type IntegrationsDto } from '../../lib/engage.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
-import { Alert, Badge, Button, Card, Checkbox, Dialog, Spinner } from '../../ui/index.js';
+import {
+  PageHeader,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Dialog,
+  Spinner,
+} from '../../ui/index.js';
 
 const RESULT: Record<string, { tone: 'success' | 'warning' | 'error'; text: string }> = {
   connected: { tone: 'success', text: 'Google is connected. The first sync is queued.' },
@@ -38,12 +47,10 @@ export function IntegrationsPage() {
   const result = RESULT[params.get('result') ?? ''];
   return (
     <div className="flex flex-col gap-6">
-      <h2>Integrations</h2>
-      <p>
-        The platform is always the source of truth. Google Sheets receives a read-only copy and
-        Drive receives an archive copy of submitted files. CSV export always works, whatever Google
-        is doing.
-      </p>
+      <PageHeader
+        title="Integrations & exports"
+        description="Optional Google Sheets and Drive copies, and CSV exports that always work. The platform stays the source of truth."
+      />
       {result && <Alert tone={result.tone} title={result.text} />}
       {q.isPending && <Spinner label="Loading integrations" />}
       {q.isError && <Alert tone="error" title="We couldn't load the integrations" />}

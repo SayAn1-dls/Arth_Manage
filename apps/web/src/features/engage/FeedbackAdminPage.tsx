@@ -10,6 +10,7 @@ import { useListState } from '../../lib/useListState.js';
 import { cn } from '../../ui/cn.js';
 import { useFormErrors } from '../auth/useFormErrors.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -75,7 +76,10 @@ export function FeedbackAdminPage() {
   const audience = tab.key === 'judges' ? 'JUDGE' : 'PARTICIPANT';
   return (
     <div className="flex flex-col gap-6">
-      <h2>Feedback &amp; reviews</h2>
+      <PageHeader
+        title="Feedback & reviews"
+        description="Participant and judge surveys, and judges’ comments for teams."
+      />
       <div role="tablist" aria-label="Feedback source" className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button

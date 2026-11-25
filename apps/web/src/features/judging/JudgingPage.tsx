@@ -6,6 +6,7 @@ import { eventApi } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { judgingApi, type JudgingOverview, type OverviewAssignment } from '../../lib/judging.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -68,20 +69,23 @@ export function JudgingPage() {
   const rid = roundId ?? rounds.data?.[0]?.id ?? '';
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2>Judging</h2>
-        {(rounds.data?.length ?? 0) > 1 && (
-          <div className="w-60">
-            <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
-              {rounds.data?.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Judge assignments & progress"
+        description="Assign judges, open and close judging, and follow every evaluation."
+        actions={
+          (rounds.data?.length ?? 0) > 1 && (
+            <div className="w-60">
+              <Select label="Round" value={rid} onChange={(e) => setRoundId(e.target.value)}>
+                {rounds.data?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )
+        }
+      />
       <JudgingRound key={rid} mine={mine} roundId={rid} />
     </div>
   );

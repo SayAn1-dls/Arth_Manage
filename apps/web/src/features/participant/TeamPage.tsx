@@ -6,6 +6,7 @@ import type { MyEvent, TeamDto } from '@arthakram/shared';
 import { eventApi, useEvent } from '../../lib/events.js';
 import { participantApi } from '../../lib/participant.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -30,7 +31,10 @@ export function TeamPage() {
   const open = event.data?.registrationStatus === 'OPEN';
   return (
     <div className="flex flex-col gap-6">
-      <h2>My team</h2>
+      <PageHeader
+        title="My team"
+        description="Your teammates, invite code, track and problem statement."
+      />
       {q.data ? (
         <TeamDetails team={q.data} eventId={mine.eventId} open={open} />
       ) : (

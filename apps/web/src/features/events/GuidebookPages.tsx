@@ -8,6 +8,7 @@ import { eventApi } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { useUnsavedGuard } from '../../lib/useUnsavedGuard.js';
 import {
+  PageHeader,
   Alert,
   Badge,
   Button,
@@ -52,18 +53,20 @@ function GuidebookReader({ mine }: { mine: MyEvent }) {
   const g = gb.data;
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2>Guidebook</h2>
-          <p className="text-sm">Updated {formatDateTime(g.publishedAt!, mine.timeZone)}</p>
-        </div>
-        <a
-          href={`/api/v1/events/${mine.eventId}/guidebook/pdf`}
-          className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
-        >
-          <Download aria-hidden className="size-4" /> Download PDF
-        </a>
-      </div>
+      <PageHeader
+        title="Guidebook"
+        description="The event’s rules, schedule and submission details."
+        actions={
+          <a
+            href={`/api/v1/events/${mine.eventId}/guidebook/pdf`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
+          >
+            <Download aria-hidden className="size-4" /> Download PDF
+          </a>
+        }
+      >
+        <p className="mt-1 text-sm">Updated {formatDateTime(g.publishedAt!, mine.timeZone)}</p>
+      </PageHeader>
       {g.sections.map((s) => (
         <Card key={s.id}>
           <h3 id={s.id}>{s.title}</h3>
@@ -221,26 +224,28 @@ function GuidebookEditor({ mine }: { mine: MyEvent }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2>Guidebook</h2>
-          <p className="text-sm" role="status" aria-live="polite">
-            {stateLabel}
-            {published ? `. Latest published: version ${published}` : '. Not published yet'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={`/api/v1/events/${mine.eventId}/guidebook/pdf?draft=1`}
-            className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
-          >
-            <Download aria-hidden className="size-4" /> Draft PDF
-          </a>
-          <Button onClick={() => setPublishOpen(true)} disabled={conflict}>
-            Publish
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Guidebook"
+        description="The rules and schedule participants read, with a PDF."
+        actions={
+          <>
+            <a
+              href={`/api/v1/events/${mine.eventId}/guidebook/pdf?draft=1`}
+              className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-line-strong bg-white px-5 py-2 font-bold text-ink no-underline hover:bg-blush"
+            >
+              <Download aria-hidden className="size-4" /> Draft PDF
+            </a>
+            <Button onClick={() => setPublishOpen(true)} disabled={conflict}>
+              Publish
+            </Button>
+          </>
+        }
+      >
+        <p className="mt-1 text-sm" role="status" aria-live="polite">
+          {stateLabel}
+          {published ? `. Latest published: version ${published}` : '. Not published yet'}
+        </p>
+      </PageHeader>
 
       {conflict && (
         <Alert tone="error" title="This guidebook was changed somewhere else">
