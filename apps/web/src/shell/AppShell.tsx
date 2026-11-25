@@ -1,12 +1,18 @@
 import { LogOut } from 'lucide-react';
-import { Link, Outlet, useNavigate } from 'react-router';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router';
 import { Button, Logo } from '../ui/index.js';
 import { useSession } from './session.js';
 
-/** Top bar shared by every signed-in screen, whatever the role. */
+/**
+ * Top bar for signed-in screens outside an event (My events, Create event). Inside an event the EventLayout
+ * draws its own header, sidebar and panel.
+ */
 export function AppShell() {
   const { user, signOut } = useSession();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const inEvent = /^\/events\/(?!new(?:\/|$))[^/]+/.test(pathname);
+  if (inEvent) return <Outlet />;
 
   return (
     <div className="min-h-dvh">

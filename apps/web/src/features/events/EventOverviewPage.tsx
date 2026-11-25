@@ -4,21 +4,9 @@ import { useEvent } from '../../lib/events.js';
 import { formatDateTime } from '../../lib/format.js';
 import { Alert, Spinner } from '../../ui/index.js';
 import { ParticipantPanel } from '../participant/DashboardPanel.js';
-import { DashboardCards } from '../ops/DashboardCards.js';
+import { CommandCentre } from '../ops/CommandCentre.js';
 import { StaffPanel } from '../staff/StaffPages.js';
 import { JudgeRoundsPanel } from '../judging/JudgePages.js';
-
-const EVENT_STATUS_LABEL: Record<string, string> = {
-  DRAFT: 'Draft, not public yet',
-  PUBLISHED: 'Published',
-  CONCLUDED: 'Concluded',
-  ARCHIVED: 'Archived',
-};
-const REGISTRATION_LABEL: Record<string, string> = {
-  NOT_OPEN: 'not open yet',
-  OPEN: 'open',
-  CLOSED: 'closed',
-};
 
 /**
  * The event index: every role lands on its own dashboard, built from persisted data and centred on that
@@ -36,20 +24,7 @@ export function EventOverviewPage() {
 
   switch (mine.role) {
     case 'ADMIN':
-      return (
-        <DashboardCards
-          mine={mine}
-          identity={
-            <p className="text-ink">
-              <strong>{EVENT_STATUS_LABEL[e.status] ?? e.status}</strong>
-              {e.status === 'PUBLISHED' && (
-                <> · Registration {REGISTRATION_LABEL[e.registrationStatus] ?? ''}</>
-              )}{' '}
-              · {when}
-            </p>
-          }
-        />
-      );
+      return <CommandCentre mine={mine} />;
     case 'PARTICIPANT':
       return <ParticipantPanel mine={mine} />;
     case 'STAFF':

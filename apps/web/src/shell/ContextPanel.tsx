@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
-import { CircleAlert } from 'lucide-react';
+import { ArrowRight, CircleAlert } from 'lucide-react';
 import type { MyEvent } from '@arthakram/shared';
 import { request } from '../lib/api.js';
 import { eventApi } from '../lib/events.js';
@@ -16,12 +16,47 @@ export interface PanelItem {
   /** Absolute path; items without one are plain information. */
   to?: string;
   tone?: 'error' | 'warning' | 'info';
+  /** Shortcut rows render as compact action links. */
+  action?: boolean;
 }
 export interface PanelSection {
   id: string;
   title: string;
   items: PanelItem[];
 }
+
+/** Contextual shortcuts per Core Admin domain (approved §13): each opens a real workspace. */
+const SHORTCUTS: Record<string, { label: string; to: string }[]> = {
+  configuration: [
+    { label: 'Add a problem statement', to: 'structure#problems' },
+    { label: 'Add a round', to: 'rounds#new-round' },
+    { label: 'Edit deadlines', to: 'rounds' },
+  ],
+  people: [
+    { label: 'Search teams', to: 'teams' },
+    { label: 'Review applications', to: 'applications' },
+    { label: 'Invite a judge', to: 'people' },
+  ],
+  judging: [
+    { label: 'Assign judges', to: 'judging' },
+    { label: 'Review pending evaluations', to: 'judging' },
+    { label: 'Configure the rubric', to: 'rubric' },
+  ],
+  operations: [
+    { label: 'Open check-in', to: 'checkin' },
+    { label: 'Report an issue', to: 'issues' },
+    { label: 'Assign a staff task', to: 'tasks' },
+  ],
+  communication: [
+    { label: 'Write a message', to: 'communication' },
+    { label: 'Answer questions', to: 'support?tab=general' },
+  ],
+  records: [
+    { label: 'Approve and publish results', to: 'results' },
+    { label: 'Release certificates', to: 'certificates' },
+    { label: 'Download the impact report', to: 'report' },
+  ],
+};
 
 /**
  * The contextual right panel (UX spec v1.0 §3C, §10): concise, actionable summaries for the current role,
@@ -86,7 +121,9 @@ export function useContextSections(mine: MyEvent, section: string, groupId: stri
       dashboard.data && !('error' in dashboard.data.lifecycle) ? dashboard.data.lifecycle : null;
     const groups: NavGroup[] = navFor('ADMIN');
     const divisionOf = (to: string) => activeGroupId(groups, segmentOf(to));
-    if (life && groupId) {
+    // A domain landing page already lists its attention items and steps; the panel adds only what is elsewhere.
+    const landing = section === 'area';
+    if (life && groupId && !landing) {
       const here = life.attention.filter((a) => divisionOf(a.to) === groupId);
       const elsewhere = life.attention.length - here.length;
       if (here.length)
@@ -128,12 +165,28 @@ export function useContextSections(mine: MyEvent, section: string, groupId: stri
       dashboard.data && !('error' in dashboard.data.deadlines) ? dashboard.data.deadlines : [];
     if (
       deadlines.length &&
-      ['setup', 'evaluation', 'operations', 'registrations'].includes(groupId ?? '')
+      ['configuration', 'judging', 'operations', 'people'].includes(groupId ?? '')
     )
       sections.push({
         id: 'deadlines',
         title: 'Coming up',
-        items: deadlines.map((d) => ({ key: d.label, label: `${d.label}: ${at(d.at)}` })),
+        items: deadlines
+          .slice(0, 4)
+          .map((d) => ({ key: d.label, label: `${d.label}: ${at(d.at)}` })),
+      });
+    const shortcuts = (SHORTCUTS[groupId ?? ''] ?? []).filter(
+      (sc) => sc.to.split(/[?#]/)[0] !== section,
+    );
+    if (shortcuts.length)
+      sections.push({
+        id: 'shortcuts',
+        title: 'Shortcuts',
+        items: shortcuts.map((sc) => ({
+          key: sc.label,
+          label: sc.label,
+          to: `${base}/${sc.to}`,
+          action: true,
+        })),
       });
   }
 
@@ -248,32 +301,55 @@ export function useContextSections(mine: MyEvent, section: string, groupId: stri
 /** Renders panel sections; the layout decides whether it is a side column or a fold-out on small screens. */
 export function PanelSections({ sections }: { sections: PanelSection[] }) {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {sections.map((s) => (
         <section key={s.id} aria-labelledby={`panel-${s.id}`}>
-          <h2 id={`panel-${s.id}`} className="text-base font-bold text-ink">
+          <h2
+            id={`panel-${s.id}`}
+            className="font-sans text-xs font-bold tracking-eyebrow text-graphite uppercase"
+          >
             {s.title}
           </h2>
-          <ul className="mt-2 flex flex-col gap-2">
+          <ul className="mt-2 flex flex-col">
             {s.items.map((i) => (
-              <li key={i.key} className="flex items-start gap-2">
-                {i.tone && (
-                  <CircleAlert
-                    aria-hidden
-                    className={cn(
-                      'mt-0.5 size-4 shrink-0',
-                      i.tone === 'error'
-                        ? 'text-error-fg'
-                        : i.tone === 'warning'
-                          ? 'text-warning-fg'
-                          : '',
+              <li key={i.key}>
+                {i.action && i.to ? (
+                  <Link
+                    to={i.to}
+                    className="flex min-h-10 items-center justify-between gap-2 rounded-card px-2 text-sm font-semibold text-ink no-underline hover:bg-blush"
+                  >
+                    {i.label}
+                    <ArrowRight aria-hidden className="size-4 shrink-0 stroke-ember" />
+                  </Link>
+                ) : (
+                  <span className="flex items-start gap-2 px-2 py-1.5 text-sm">
+                    {i.tone ? (
+                      <CircleAlert
+                        aria-hidden
+                        className={cn(
+                          'mt-0.5 size-4 shrink-0',
+                          i.tone === 'error'
+                            ? 'text-error-fg'
+                            : i.tone === 'warning'
+                              ? 'text-warning-fg'
+                              : 'text-graphite',
+                        )}
+                      />
+                    ) : (
+                      <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-ember" />
                     )}
-                  />
+                    <span>
+                      {i.tone === 'error' && <span className="sr-only">Urgent: </span>}
+                      {i.to ? (
+                        <Link to={i.to} className="text-ink">
+                          {i.label}
+                        </Link>
+                      ) : (
+                        i.label
+                      )}
+                    </span>
+                  </span>
                 )}
-                <span>
-                  {i.tone === 'error' && <span className="sr-only">Urgent: </span>}
-                  {i.to ? <Link to={i.to}>{i.label}</Link> : i.label}
-                </span>
               </li>
             ))}
           </ul>
